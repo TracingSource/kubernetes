@@ -36,6 +36,9 @@ var (
 		":" + defaultPodSandboxImageVersion
 )
 
+// caller: 
+// 	1. cmd/kubelet/app/options/options.go -> NewKubeletFlags()
+//
 // NewContainerRuntimeOptions will create a new ContainerRuntimeOptions with
 // default values.
 func NewContainerRuntimeOptions() *config.ContainerRuntimeOptions {

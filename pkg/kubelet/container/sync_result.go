@@ -78,6 +78,8 @@ type SyncResult struct {
 	Message string
 }
 
+// NewSyncResult 直接返回 SyncResult{} 结构体对象(贫穷函数)
+//
 // NewSyncResult generates new SyncResult with specific Action and Target
 func NewSyncResult(action SyncAction, target interface{}) *SyncResult {
 	return &SyncResult{Action: action, Target: target}

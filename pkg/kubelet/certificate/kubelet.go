@@ -36,9 +36,12 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
-// NewKubeletServerCertificateManager creates a certificate manager for the kubelet when retrieving a server certificate
-// or returns an error.
-func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg *kubeletconfig.KubeletConfiguration, nodeName types.NodeName, getAddresses func() []v1.NodeAddress, certDirectory string) (certificate.Manager, error) {
+// NewKubeletServerCertificateManager creates a certificate manager 
+// for the kubelet when retrieving a server certificate or returns an error.
+func NewKubeletServerCertificateManager(
+	kubeClient clientset.Interface, kubeCfg *kubeletconfig.KubeletConfiguration, 
+	nodeName types.NodeName, getAddresses func() []v1.NodeAddress, certDirectory string,
+) (certificate.Manager, error) {
 	var certSigningRequestClient certificatesclient.CertificateSigningRequestInterface
 	if kubeClient != nil && kubeClient.CertificatesV1beta1() != nil {
 		certSigningRequestClient = kubeClient.CertificatesV1beta1().CertificateSigningRequests()
@@ -167,9 +170,20 @@ func addressesToHostnamesAndIPs(addresses []v1.NodeAddress) (dnsNames []string, 
 	return dnsNames, ips
 }
 
+// NewKubeletClientCertificateManager ...
+//
+// 	@param certDirectory: "/var/lib/kubelet/pki"
+// 	@param nodeName: 当前 kubelet 进程所在的主机名.
+// 	@param clientFn: 在主调函数 buildClientCertificateManager() 中声明, 是一个内部函数.
+// 	@param certFile: 一般为空
+// 	@param keyFile: 一般为空
+//
+// caller:
+// 	1. cmd/kubelet/app/server.go -> buildClientCertificateManager() 在 kubelet 启动过程中被调用.
+//
 // NewKubeletClientCertificateManager sets up a certificate manager without a
-// client that can be used to sign new certificates (or rotate). If a CSR
-// client is set later, it may begin rotating/renewing the client cert.
+// client that can be used to sign new certificates (or rotate).
+// If a CSR client is set later, it may begin rotating/renewing the client cert.
 func NewKubeletClientCertificateManager(
 	certDirectory string,
 	nodeName types.NodeName,
@@ -181,11 +195,8 @@ func NewKubeletClientCertificateManager(
 ) (certificate.Manager, error) {
 
 	certificateStore, err := certificate.NewFileStore(
-		"kubelet-client",
-		certDirectory,
-		certDirectory,
-		certFile,
-		keyFile)
+		"kubelet-client", certDirectory, certDirectory, certFile, keyFile,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize client certificate store: %v", err)
 	}

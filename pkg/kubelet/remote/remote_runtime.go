@@ -33,9 +33,14 @@ import (
 	utilexec "k8s.io/utils/exec"
 )
 
+// RemoteRuntimeService 实现了以下2个接口
+// 	1. staging/src/k8s.io/cri-api/pkg/apis/services.go -> ContainerManager 用于创建 container(不是 Pod)
+// 	2. staging/src/k8s.io/cri-api/pkg/apis/services.go -> RuntimeService 这个接口要求的方法比较全面
+//
 // RemoteRuntimeService is a gRPC implementation of internalapi.RuntimeService.
 type RemoteRuntimeService struct {
 	timeout       time.Duration
+	// runtimeClient 连接 /var/run/dockershim.sock 的 grpc 客户端对象.
 	runtimeClient runtimeapi.RuntimeServiceClient
 	// Cache last per-container error message to reduce log spam
 	logReduction *logreduction.LogReduction
@@ -46,8 +51,21 @@ const (
 	identicalErrorDelay = 1 * time.Minute
 )
 
+// NewRemoteRuntimeService 构建连接 dockershim.sock 的对象,
+// 用于执行 docker 容器与镜像的相关函数.
+//
+// 每个 docker 容器在启动时都会创建一个新的 containerd-shim 进程,
+// 并指定 dockershim.sock 路径
+//
+// 	@param endpoint: /var/run/dockershim.sock, 与 docker.sock 同目录.
+//
+// caller:
+// 	1. pkg/kubelet/kubelet.go -> getRuntimeAndImageServices()
+//
 // NewRemoteRuntimeService creates a new internalapi.RuntimeService.
-func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration) (internalapi.RuntimeService, error) {
+func NewRemoteRuntimeService(
+	endpoint string, connectionTimeout time.Duration,
+) (internalapi.RuntimeService, error) {
 	klog.V(3).Infof("Connecting to runtime service %s", endpoint)
 	addr, dailer, err := util.GetAddressAndDialer(endpoint)
 	if err != nil {
@@ -56,7 +74,10 @@ func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration) (
 	ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
 	defer cancel()
 
-	conn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure(), grpc.WithDialer(dailer), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)))
+	conn, err := grpc.DialContext(
+		ctx, addr, grpc.WithInsecure(), grpc.WithDialer(dailer), 
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)),
+	)
 	if err != nil {
 		klog.Errorf("Connect remote runtime %s failed: %v", addr, err)
 		return nil, err
@@ -82,112 +103,25 @@ func (r *RemoteRuntimeService) Version(apiVersion string) (*runtimeapi.VersionRe
 		return nil, err
 	}
 
-	if typedVersion.Version == "" || typedVersion.RuntimeName == "" || typedVersion.RuntimeApiVersion == "" || typedVersion.RuntimeVersion == "" {
+	if typedVersion.Version == "" || typedVersion.RuntimeName == "" || 
+		typedVersion.RuntimeApiVersion == "" || typedVersion.RuntimeVersion == "" {
 		return nil, fmt.Errorf("not all fields are set in VersionResponse (%q)", *typedVersion)
 	}
 
 	return typedVersion, err
 }
 
-// RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure
-// the sandbox is in ready state.
-func (r *RemoteRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig, runtimeHandler string) (string, error) {
-	// Use 2 times longer timeout for sandbox operation (4 mins by default)
-	// TODO: Make the pod sandbox timeout configurable.
-	ctx, cancel := getContextWithTimeout(r.timeout * 2)
-	defer cancel()
-
-	resp, err := r.runtimeClient.RunPodSandbox(ctx, &runtimeapi.RunPodSandboxRequest{
-		Config:         config,
-		RuntimeHandler: runtimeHandler,
-	})
-	if err != nil {
-		klog.Errorf("RunPodSandbox from runtime service failed: %v", err)
-		return "", err
-	}
-
-	if resp.PodSandboxId == "" {
-		errorMessage := fmt.Sprintf("PodSandboxId is not set for sandbox %q", config.GetMetadata())
-		klog.Errorf("RunPodSandbox failed: %s", errorMessage)
-		return "", errors.New(errorMessage)
-	}
-
-	return resp.PodSandboxId, nil
-}
-
-// StopPodSandbox stops the sandbox. If there are any running containers in the
-// sandbox, they should be forced to termination.
-func (r *RemoteRuntimeService) StopPodSandbox(podSandBoxID string) error {
-	ctx, cancel := getContextWithTimeout(r.timeout)
-	defer cancel()
-
-	_, err := r.runtimeClient.StopPodSandbox(ctx, &runtimeapi.StopPodSandboxRequest{
-		PodSandboxId: podSandBoxID,
-	})
-	if err != nil {
-		klog.Errorf("StopPodSandbox %q from runtime service failed: %v", podSandBoxID, err)
-		return err
-	}
-
-	return nil
-}
-
-// RemovePodSandbox removes the sandbox. If there are any containers in the
-// sandbox, they should be forcibly removed.
-func (r *RemoteRuntimeService) RemovePodSandbox(podSandBoxID string) error {
-	ctx, cancel := getContextWithTimeout(r.timeout)
-	defer cancel()
-
-	_, err := r.runtimeClient.RemovePodSandbox(ctx, &runtimeapi.RemovePodSandboxRequest{
-		PodSandboxId: podSandBoxID,
-	})
-	if err != nil {
-		klog.Errorf("RemovePodSandbox %q from runtime service failed: %v", podSandBoxID, err)
-		return err
-	}
-
-	return nil
-}
-
-// PodSandboxStatus returns the status of the PodSandbox.
-func (r *RemoteRuntimeService) PodSandboxStatus(podSandBoxID string) (*runtimeapi.PodSandboxStatus, error) {
-	ctx, cancel := getContextWithTimeout(r.timeout)
-	defer cancel()
-
-	resp, err := r.runtimeClient.PodSandboxStatus(ctx, &runtimeapi.PodSandboxStatusRequest{
-		PodSandboxId: podSandBoxID,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.Status != nil {
-		if err := verifySandboxStatus(resp.Status); err != nil {
-			return nil, err
-		}
-	}
-
-	return resp.Status, nil
-}
-
-// ListPodSandbox returns a list of PodSandboxes.
-func (r *RemoteRuntimeService) ListPodSandbox(filter *runtimeapi.PodSandboxFilter) ([]*runtimeapi.PodSandbox, error) {
-	ctx, cancel := getContextWithTimeout(r.timeout)
-	defer cancel()
-
-	resp, err := r.runtimeClient.ListPodSandbox(ctx, &runtimeapi.ListPodSandboxRequest{
-		Filter: filter,
-	})
-	if err != nil {
-		klog.Errorf("ListPodSandbox with filter %+v from runtime service failed: %v", filter, err)
-		return nil, err
-	}
-
-	return resp.Items, nil
-}
-
+// CreateContainer 类似于 docker 的 create 子命令, 可以只创建而不启动.
+// 不过这个函数只是调用 cri-api, 本身并没有做什么, 参数也是 cri grpc 服务所需的参数.
+//
+// caller: 
+// 	1. pkg/kubelet/kuberuntime/kuberuntime_container.go -> kubeGenericRuntimeManager.startContainer()
+//
 // CreateContainer creates a new container in the specified PodSandbox.
-func (r *RemoteRuntimeService) CreateContainer(podSandBoxID string, config *runtimeapi.ContainerConfig, sandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (r *RemoteRuntimeService) CreateContainer(
+	podSandBoxID string, config *runtimeapi.ContainerConfig, 
+	sandboxConfig *runtimeapi.PodSandboxConfig,
+) (string, error) {
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
@@ -197,12 +131,17 @@ func (r *RemoteRuntimeService) CreateContainer(podSandBoxID string, config *runt
 		SandboxConfig: sandboxConfig,
 	})
 	if err != nil {
-		klog.Errorf("CreateContainer in sandbox %q from runtime service failed: %v", podSandBoxID, err)
+		klog.Errorf(
+			"CreateContainer in sandbox %q from runtime service failed: %v", 
+			podSandBoxID, err,
+		)
 		return "", err
 	}
 
 	if resp.ContainerId == "" {
-		errorMessage := fmt.Sprintf("ContainerId is not set for container %q", config.GetMetadata())
+		errorMessage := fmt.Sprintf(
+			"ContainerId is not set for container %q", config.GetMetadata(),
+		)
 		klog.Errorf("CreateContainer failed: %s", errorMessage)
 		return "", errors.New(errorMessage)
 	}
@@ -265,6 +204,9 @@ func (r *RemoteRuntimeService) RemoveContainer(containerID string) error {
 	return nil
 }
 
+// caller: 
+// 	1. pkg/kubelet/kuberuntime/instrumented_services.go -> instrumentedRuntimeService.ListContainers()
+//
 // ListContainers lists containers by filters.
 func (r *RemoteRuntimeService) ListContainers(filter *runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error) {
 	ctx, cancel := getContextWithTimeout(r.timeout)

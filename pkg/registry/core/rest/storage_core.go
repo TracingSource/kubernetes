@@ -99,7 +99,12 @@ type LegacyRESTStorage struct {
 	ServiceNodePortAllocator           rangeallocation.RangeRegistry
 }
 
-func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generic.RESTOptionsGetter) (LegacyRESTStorage, genericapiserver.APIGroupInfo, error) {
+// NewLegacyRESTStorage ...
+//
+// caller: pkg/master/master.go -> Master.InstallLegacyAPI()
+func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(
+	restOptionsGetter generic.RESTOptionsGetter,
+) (LegacyRESTStorage, genericapiserver.APIGroupInfo, error) {
 	apiGroupInfo := genericapiserver.APIGroupInfo{
 		PrioritizedVersions:          legacyscheme.Scheme.PrioritizedVersionsForGroup(""),
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{},

@@ -103,6 +103,7 @@ func newSystemCgroups(containerName string) *systemContainer {
 	}
 }
 
+// containerManagerImpl 实现了 pkg/kubelet/cm/container_manager.go -> ContainerManager 接口.
 type containerManagerImpl struct {
 	sync.RWMutex
 	cadvisorInterface cadvisor.Interface
@@ -129,6 +130,8 @@ type containerManagerImpl struct {
 	recorder record.EventRecorder
 	// Interface for QoS cgroup management
 	qosContainerManager QOSContainerManager
+	// 被赋值为一个 pkg/kubelet/cm/devicemanager/manager.go -> ManagerImpl{} 对象
+	//
 	// Interface for exporting and allocating devices reported by device plugins.
 	deviceManager devicemanager.Manager
 	// Interface for CPU affinity management.
@@ -194,10 +197,18 @@ func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 	return f, nil
 }
 
+// NewContainerManager ...
+//
+// caller: cmd/kubelet/app/server.go -> run()
+//
 // TODO(vmarmol): Add limits to the system containers.
 // Takes the absolute name of the specified containers.
 // Empty container name disables use of the specified container.
-func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, devicePluginEnabled bool, recorder record.EventRecorder) (ContainerManager, error) {
+func NewContainerManager(
+	mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, 
+	nodeConfig NodeConfig, failSwapOn bool, devicePluginEnabled bool, 
+	recorder record.EventRecorder,
+) (ContainerManager, error) {
 	subsystems, err := GetCgroupSubsystems()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mounted cgroup subsystems: %v", err)
@@ -212,10 +223,14 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		swapData = bytes.TrimSpace(swapData) // extra trailing \n
 		swapLines := strings.Split(string(swapData), "\n")
 
-		// If there is more than one line (table headers) in /proc/swaps, swap is enabled and we should
-		// error out unless --fail-swap-on is set to false.
+		// If there is more than one line (table headers) in /proc/swaps,
+		// swap is enabled and we should error out unless --fail-swap-on is set to false.
 		if len(swapLines) > 1 {
-			return nil, fmt.Errorf("running with swap on is not supported, please disable swap! or set --fail-swap-on flag to false. /proc/swaps contained: %v", swapLines)
+			return nil, fmt.Errorf(
+				"running with swap on is not supported, please disable swap! "+
+				"or set --fail-swap-on flag to false. /proc/swaps contained: %v", 
+				swapLines,
+			)
 		}
 	}
 
@@ -335,6 +350,9 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	return cm, nil
 }
 
+// NewPodContainerManager 只有 kubelet 开启了 cgroups-per-qos 选项时, 
+// 才返回 podContainerManagerImpl 对象, 否则返回一个空对象.
+//
 // NewPodContainerManager is a factory method returns a PodContainerManager object
 // If qosCgroups are enabled then it returns the general pod container manager
 // otherwise it returns a no-op manager which essentially does nothing
@@ -421,6 +439,11 @@ func setupKernelTunables(option KernelTunableBehavior) error {
 	return utilerrors.NewAggregate(errList)
 }
 
+// setupNode ...
+//
+// caller: 
+// 	1. containerManagerImpl.Start()
+//
 func (cm *containerManagerImpl) setupNode(activePods ActivePodsFunc) error {
 	f, err := validateSystemRequirements(cm.mountUtil)
 	if err != nil {
@@ -522,6 +545,13 @@ func (cm *containerManagerImpl) setupNode(activePods ActivePodsFunc) error {
 	return nil
 }
 
+// getContainerNameForProcess 获取指定pid及名称的进程的cgroup名称, 
+// 参数分别为const字符串: dockerd, /var/run/docker.pid
+//
+// caller: 
+// 	1. setupNode()
+// 	2. helper_linux.go -> GetRuntimeContainer()
+//
 func getContainerNameForProcess(name, pidFile string) (string, error) {
 	pids, err := getPidsForProcess(name, pidFile)
 	if err != nil {
@@ -566,6 +596,13 @@ func (cm *containerManagerImpl) Status() Status {
 	return cm.status
 }
 
+// Start ...
+//
+// caller: 
+// 	1. pkg/kubelet/kubelet__init.go -> Kubelet.initializeRuntimeDependentModules()
+//
+// ...其实就是在 kubelet.Run() 方法的一系列调用过程中的.
+//
 func (cm *containerManagerImpl) Start(node *v1.Node,
 	activePods ActivePodsFunc,
 	sourcesReady config.SourcesReady,
@@ -645,8 +682,13 @@ func (cm *containerManagerImpl) GetPluginRegistrationHandler() cache.PluginHandl
 	return cm.deviceManager.GetWatcherHandler()
 }
 
+// caller: 
+// 	1. pkg/kubelet/kubelet_pods.go -> Kubelet.GenerateRunContainerOptions()
+//
 // TODO: move the GetResources logic to PodContainerManager.
-func (cm *containerManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*kubecontainer.RunContainerOptions, error) {
+func (cm *containerManagerImpl) GetResources(
+	pod *v1.Pod, container *v1.Container,
+) (*kubecontainer.RunContainerOptions, error) {
 	opts := &kubecontainer.RunContainerOptions{}
 	// Allocate should already be called during predicateAdmitHandler.Admit(),
 	// just try to fetch device runtime information from cached state here
@@ -806,10 +848,17 @@ func ensureProcessInContainerWithOOMScore(pid int, oomScoreAdj int, manager *fs.
 	return utilerrors.NewAggregate(errs)
 }
 
+// getContainer 获取目标pid进程的cgroup配置, 首选key排序: name=systemd > cpu
+//
+// caller: pkg/kubelet/cm/helpers_linux.go -> GetKubeletContainer()
+//
+// unified: 统一的, 一致的.
+//
 // getContainer returns the cgroup associated with the specified pid.
 // It enforces a unified hierarchy for memory and cpu cgroups.
 // On systemd environments, it uses the name=systemd cgroup for the specified pid.
 func getContainer(pid int) (string, error) {
+	// 解析指定pid程序的cgroup状态文件.
 	cgs, err := cgroups.ParseCgroupFile(fmt.Sprintf("/proc/%d/cgroup", pid))
 	if err != nil {
 		return "", err
@@ -824,6 +873,7 @@ func getContainer(pid int) (string, error) {
 		return "", cgroups.NewNotFoundError("memory")
 	}
 
+	// 就是说cpu和memory的值应该是相同的.
 	// since we use this container for accounting, we need to ensure its a unified hierarchy.
 	if cpu != memory {
 		return "", fmt.Errorf("cpu and memory cgroup hierarchy not unified.  cpu: %s, memory: %s", cpu, memory)

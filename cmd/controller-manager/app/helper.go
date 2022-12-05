@@ -27,6 +27,14 @@ import (
 	"k8s.io/klog"
 )
 
+// WaitForAPIServer 测试与 apiserver 的连接(通过访问 https://localhost:6443/healthz).
+//
+// 	@param client: kube client
+// 	@param timeout: 超时时间
+//
+// caller: 
+// 	1. cmd/kube-controller-manager/app/controllermanager.go -> CreateControllerContext()
+//
 // WaitForAPIServer waits for the API Server's /healthz endpoint to report "ok" with timeout.
 func WaitForAPIServer(client clientset.Interface, timeout time.Duration) error {
 	var lastErr error
@@ -55,8 +63,22 @@ func WaitForAPIServer(client clientset.Interface, timeout time.Duration) error {
 	return nil
 }
 
+// IsControllerEnabled 判断目标 controller 是否被启用
+// (只有返回 true 的 controller 才会被启用).
+//
+// 	@param name: 目标 controller 名称, 如 namespace, deployment 等
+// 	@param disabledByDefaultControllers: 这是一个固定的列表, 见
+// 	cmd/kube-controller-manager/app/controllermanager.go -> ControllersDisabledByDefault()
+//
+// caller: 
+// 	1. cmd/kube-controller-manager/app/controllermanager.go -> 
+// 	ControllerContext.IsControllerEnabled() 
+// 	kcm 在启动时, 启动各 controller. 每启动一种 controller, 就需要先判断一下其是否被启用.
+//
 // IsControllerEnabled check if a specified controller enabled or not.
-func IsControllerEnabled(name string, disabledByDefaultControllers sets.String, controllers []string) bool {
+func IsControllerEnabled(
+	name string, disabledByDefaultControllers sets.String, controllers []string,
+) bool {
 	hasStar := false
 	for _, ctrl := range controllers {
 		if ctrl == name {

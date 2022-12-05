@@ -50,18 +50,22 @@ var ProberResults = metrics.NewCounterVec(
 		"pod_uid"},
 )
 
+// Manager 由 manager{} 结构体实现(就在当前源文件)
+//
 // Manager manages pod probing. It creates a probe "worker" for every container that specifies a
 // probe (AddPod). The worker periodically probes its assigned container and caches the results. The
 // manager use the cached probe results to set the appropriate Ready state in the PodStatus when
 // requested (UpdatePodStatus). Updating probe parameters is not currently supported.
 // TODO: Move liveness probing out of the runtime, to here.
 type Manager interface {
-	// AddPod creates new probe workers for every container probe. This should be called for every
-	// pod created.
+	// AddPod 遍历目标 Pod 中的所有 container, 并注册健康检查任务.
+	//
+	// AddPod creates new probe workers for every container probe.
+	// This should be called for every pod created.
 	AddPod(pod *v1.Pod)
 
-	// RemovePod handles cleaning up the removed pod state, including terminating probe workers and
-	// deleting cached results.
+	// RemovePod handles cleaning up the removed pod state,
+	// including terminating probe workers and deleting cached results.
 	RemovePod(pod *v1.Pod)
 
 	// CleanupPods handles cleaning up pods which should no longer be running.
@@ -98,6 +102,16 @@ type manager struct {
 	prober *prober
 }
 
+// NewManager ...
+//
+// 	@param livenessManager: 与函数体中的 readinessManager 及 startupManager 其实是
+//        同一类型, 但是 livenessManager 在主调函数中还被传入了 
+//        pkg/kubelet/kuberuntime/kuberuntime_manager.go -> NewKubeGenericRuntimeManager()
+//        双方需要进行通信, 不过后者只调用了该对象的 Get() 方法, 相当于只读不写.
+//
+// caller: 
+// 	1. pkg/kubelet/kubelet__new.go -> NewMainKubelet() 在 kubelet 初始化时被调用.
+//
 // NewManager creates a Manager for pod probing.
 func NewManager(
 	statusManager status.Manager,
@@ -119,6 +133,11 @@ func NewManager(
 	}
 }
 
+// Start 在 kubelet 启动时会创建多个工作协程, prober manager 是其中一个.
+//
+// caller: 
+// 	1. pkg/kubelet/kubelet.go -> Kubelet.Run() 
+//
 // Start syncing probe status. This should only be called once.
 func (m *manager) Start() {
 	// Start syncing readiness.
@@ -161,19 +180,26 @@ func (t probeType) String() string {
 	}
 }
 
+// AddPod 遍历目标 Pod 中的所有 container, 并注册健康检查任务.
+//
+// caller:
+// 	1. pkg/kubelet/kubelet.go -> Kubelet.HandlePodAdditions()
 func (m *manager) AddPod(pod *v1.Pod) {
 	m.workerLock.Lock()
 	defer m.workerLock.Unlock()
 
 	key := probeKey{podUID: pod.UID}
+	// 为该 Pod 中的所有 container 都注册健康检测任务.
 	for _, c := range pod.Spec.Containers {
 		key.containerName = c.Name
-
+		// 除了 liveness, readiness, 的确还有个 startup 的探针来着...
 		if c.StartupProbe != nil && utilfeature.DefaultFeatureGate.Enabled(features.StartupProbe) {
 			key.probeType = startup
 			if _, ok := m.workers[key]; ok {
-				klog.Errorf("Startup probe already exists! %v - %v",
-					format.Pod(pod), c.Name)
+				klog.Errorf(
+					"Startup probe already exists! %v - %v",
+					format.Pod(pod), c.Name,
+				)
 				return
 			}
 			w := newWorker(m, startup, pod, c)
@@ -184,8 +210,10 @@ func (m *manager) AddPod(pod *v1.Pod) {
 		if c.ReadinessProbe != nil {
 			key.probeType = readiness
 			if _, ok := m.workers[key]; ok {
-				klog.Errorf("Readiness probe already exists! %v - %v",
-					format.Pod(pod), c.Name)
+				klog.Errorf(
+					"Readiness probe already exists! %v - %v",
+					format.Pod(pod), c.Name,
+				)
 				return
 			}
 			w := newWorker(m, readiness, pod, c)
@@ -196,8 +224,10 @@ func (m *manager) AddPod(pod *v1.Pod) {
 		if c.LivenessProbe != nil {
 			key.probeType = liveness
 			if _, ok := m.workers[key]; ok {
-				klog.Errorf("Liveness probe already exists! %v - %v",
-					format.Pod(pod), c.Name)
+				klog.Errorf(
+					"Liveness probe already exists! %v - %v",
+					format.Pod(pod), c.Name,
+				)
 				return
 			}
 			w := newWorker(m, liveness, pod, c)
@@ -263,8 +293,8 @@ func (m *manager) UpdatePodStatus(podUID types.UID, podStatus *v1.PodStatus) {
 		}
 		podStatus.ContainerStatuses[i].Started = &started
 	}
-	// init containers are ready if they have exited with success or if a readiness probe has
-	// succeeded.
+	// init containers are ready if they have exited with success
+	// or if a readiness probe has succeeded.
 	for i, c := range podStatus.InitContainerStatuses {
 		var ready bool
 		if c.State.Terminated != nil && c.State.Terminated.ExitCode == 0 {
@@ -274,7 +304,9 @@ func (m *manager) UpdatePodStatus(podUID types.UID, podStatus *v1.PodStatus) {
 	}
 }
 
-func (m *manager) getWorker(podUID types.UID, containerName string, probeType probeType) (*worker, bool) {
+func (m *manager) getWorker(
+	podUID types.UID, containerName string, probeType probeType,
+) (*worker, bool) {
 	m.workerLock.RLock()
 	defer m.workerLock.RUnlock()
 	worker, ok := m.workers[probeKey{podUID, containerName, probeType}]
@@ -282,7 +314,9 @@ func (m *manager) getWorker(podUID types.UID, containerName string, probeType pr
 }
 
 // Called by the worker after exiting.
-func (m *manager) removeWorker(podUID types.UID, containerName string, probeType probeType) {
+func (m *manager) removeWorker(
+	podUID types.UID, containerName string, probeType probeType,
+) {
 	m.workerLock.Lock()
 	defer m.workerLock.Unlock()
 	delete(m.workers, probeKey{podUID, containerName, probeType})

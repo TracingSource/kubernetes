@@ -47,6 +47,9 @@ var supportedEndpointSliceAddressTypes = sets.NewString(
 // defined by the proxier if needed.
 type BaseEndpointInfo struct {
 	Endpoint string // TODO: should be an endpointString type
+	// 这是什么情况? 目前只看到过 default/kubernetes 的ep是这样的, 但不知道是如何发生的.
+	// 毕竟如果hostNetwork: true, 也没有必要再创建svc了吧? 这样创建的svc会是这样的吗??? 待验证.
+	//
 	// IsLocal indicates whether the endpoint is running in same host as kube-proxy.
 	IsLocal  bool
 	Topology map[string]string
@@ -322,6 +325,10 @@ func (em EndpointsMap) Update(changes *EndpointChangeTracker) (result UpdateEndp
 	return result
 }
 
+// EndpointsMap 的值为当前集群中各service对应的endpoint表(一个svc中可能存在多个port, 也就存在多个ep).
+// key为 namespace/serviceName:portName(与ServiceMap的key相同), 
+// val为成员格式 serviceIP:port 的数组.
+//
 // EndpointsMap maps a service name to a list of all its Endpoints.
 type EndpointsMap map[ServicePortName][]Endpoint
 

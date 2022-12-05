@@ -71,6 +71,10 @@ type Reconciler interface {
 	StatesHasBeenSynced() bool
 }
 
+// caller: 
+// 	1. pkg/kubelet/volumemanager/volume_manager.go -> NewVolumeManager()
+// 在 kubelet 初始化时被调用.
+//
 // NewReconciler returns a new instance of Reconciler.
 //
 // controllerAttachDetachEnabled - if true, indicates that the attach/detach
@@ -141,6 +145,9 @@ type reconciler struct {
 	timeOfLastSync                time.Time
 }
 
+// caller: 
+// 	1. pkg/kubelet/volumemanager/volume_manager.go -> volumeManager.Run()
+// 在 kubelet 启动时被调用.
 func (rc *reconciler) Run(stopCh <-chan struct{}) {
 	wait.Until(rc.reconciliationLoopFunc(), rc.loopSleepDuration, stopCh)
 }
@@ -149,8 +156,10 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 	return func() {
 		rc.reconcile()
 
-		// Sync the state with the reality once after all existing pods are added to the desired state from all sources.
-		// Otherwise, the reconstruct process may clean up pods' volumes that are still in use because
+		// Sync the state with the reality once after all existing pods are added
+		// to the desired state from all sources.
+		// Otherwise, the reconstruct process may clean up pods' volumes
+		// that are still in use because
 		// desired state of world does not contain a complete list of pods.
 		if rc.populatorHasAddedPods() && !rc.StatesHasBeenSynced() {
 			klog.Infof("Reconciler: start to sync state")
@@ -185,15 +194,22 @@ func (rc *reconciler) reconcile() {
 		}
 	}
 
+	// 遍历所有应该挂载的 volume 列表, 将实际未能挂载的 volume 重新尝试挂载.
 	// Ensure volumes that should be attached/mounted are attached/mounted.
 	for _, volumeToMount := range rc.desiredStateOfWorld.GetVolumesToMount() {
-		volMounted, devicePath, err := rc.actualStateOfWorld.PodExistsInVolume(volumeToMount.PodName, volumeToMount.VolumeName)
+		volMounted, devicePath, err := rc.actualStateOfWorld.PodExistsInVolume(
+			volumeToMount.PodName, volumeToMount.VolumeName,
+		)
 		volumeToMount.DevicePath = devicePath
 		if cache.IsVolumeNotAttachedError(err) {
+			// 如果上一次挂载出错了
 			if rc.controllerAttachDetachEnabled || !volumeToMount.PluginIsAttachable {
-				// Volume is not attached (or doesn't implement attacher), kubelet attach is disabled, wait
-				// for controller to finish attaching volume.
-				klog.V(5).Infof(volumeToMount.GenerateMsgDetailed("Starting operationExecutor.VerifyControllerAttachedVolume", ""))
+				// Volume is not attached (or doesn't implement attacher),
+				// kubelet attach is disabled, 
+				// wait for controller to finish attaching volume.
+				klog.V(5).Infof(volumeToMount.GenerateMsgDetailed(
+					"Starting operationExecutor.VerifyControllerAttachedVolume", "",
+				))
 				err := rc.operationExecutor.VerifyControllerAttachedVolume(
 					volumeToMount.VolumeToMount,
 					rc.nodeName,
@@ -201,16 +217,24 @@ func (rc *reconciler) reconcile() {
 				if err != nil &&
 					!nestedpendingoperations.IsAlreadyExists(err) &&
 					!exponentialbackoff.IsExponentialBackoff(err) {
-					// Ignore nestedpendingoperations.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
+					// Ignore nestedpendingoperations.IsAlreadyExists and 
+					// exponentialbackoff.IsExponentialBackoff errors, they are expected.
 					// Log all other errors.
-					klog.Errorf(volumeToMount.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.VerifyControllerAttachedVolume failed (controllerAttachDetachEnabled %v)", rc.controllerAttachDetachEnabled), err).Error())
+					klog.Errorf(
+						volumeToMount.GenerateErrorDetailed(fmt.Sprintf(
+							"operationExecutor.VerifyControllerAttachedVolume failed (controllerAttachDetachEnabled %v)", 
+							rc.controllerAttachDetachEnabled), err,
+						).Error(),
+					)
 				}
 				if err == nil {
-					klog.Infof(volumeToMount.GenerateMsgDetailed("operationExecutor.VerifyControllerAttachedVolume started", ""))
+					klog.Infof(volumeToMount.GenerateMsgDetailed(
+						"operationExecutor.VerifyControllerAttachedVolume started", "",
+					))
 				}
 			} else {
-				// Volume is not attached to node, kubelet attach is enabled, volume implements an attacher,
-				// so attach it
+				// Volume is not attached to node, kubelet attach is enabled,
+				// volume implements an attacher, so attach it
 				volumeToAttach := operationexecutor.VolumeToAttach{
 					VolumeName: volumeToMount.VolumeName,
 					VolumeSpec: volumeToMount.VolumeSpec,

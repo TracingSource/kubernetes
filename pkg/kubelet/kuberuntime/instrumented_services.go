@@ -24,12 +24,26 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
+// 本文件中定义了两个结构体 instrumentedRuntimeService{}, instrumentedImageManagerService{}
+// 
+// instrumented: 仪器，仪表, 这两个结构体实际上只对真正与 docker api 交互的服务做了一层封装,
+// 仍是分别对容器与镜像进行管理, 只是多了将请求记录到 metrics 中做统计的步骤.
+
+// instrumentedRuntimeService 实现了 staging/src/k8s.io/cri-api/pkg/apis/services.go -> ContainerManager 接口. 
+// 但不是真正的实现位置, 这个结构体只是对 service 成员做了一层封装,
+//
 // instrumentedRuntimeService wraps the RuntimeService and records the operations
 // and errors metrics.
 type instrumentedRuntimeService struct {
+	// service 实现为 pkg/kubelet/remote/remote_runtime.go -> RemoteRuntimeService{}
 	service internalapi.RuntimeService
 }
 
+// newInstrumentedRuntimeService 返回值被赋值给 kubeGenericRuntimeManager.runtimeService 成员.
+//
+// caller: 
+// 	1. pkg/kubelet/kuberuntime/kuberuntime_manager.go -> NewKubeGenericRuntimeManager()
+//
 // Creates an instrumented RuntimeInterface from an existing RuntimeService.
 func newInstrumentedRuntimeService(service internalapi.RuntimeService) internalapi.RuntimeService {
 	return &instrumentedRuntimeService{service: service}
@@ -42,10 +56,14 @@ type instrumentedImageManagerService struct {
 }
 
 // Creates an instrumented ImageManagerService from an existing ImageManagerService.
-func newInstrumentedImageManagerService(service internalapi.ImageManagerService) internalapi.ImageManagerService {
+func newInstrumentedImageManagerService(
+	service internalapi.ImageManagerService,
+) internalapi.ImageManagerService {
 	return &instrumentedImageManagerService{service: service}
 }
 
+// recordOperation 将本次操作记录到 metrics 指标中
+//
 // recordOperation records the duration of the operation.
 func recordOperation(operation string, start time.Time) {
 	metrics.RuntimeOperations.WithLabelValues(operation).Inc()
@@ -80,7 +98,10 @@ func (in instrumentedRuntimeService) Status() (*runtimeapi.RuntimeStatus, error)
 	return out, err
 }
 
-func (in instrumentedRuntimeService) CreateContainer(podSandboxID string, config *runtimeapi.ContainerConfig, sandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (in instrumentedRuntimeService) CreateContainer(
+	podSandboxID string, config *runtimeapi.ContainerConfig, 
+	sandboxConfig *runtimeapi.PodSandboxConfig,
+) (string, error) {
 	const operation = "create_container"
 	defer recordOperation(operation, time.Now())
 
@@ -116,7 +137,13 @@ func (in instrumentedRuntimeService) RemoveContainer(containerID string) error {
 	return err
 }
 
-func (in instrumentedRuntimeService) ListContainers(filter *runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error) {
+// ListContainers ...
+//
+// caller: 
+// 	1. pkg/kubelet/kuberuntime/kuberuntime_container.go -> kubeGenericRuntimeManager.getKubeletContainers()
+func (in instrumentedRuntimeService) ListContainers(
+	filter *runtimeapi.ContainerFilter,
+) ([]*runtimeapi.Container, error) {
 	const operation = "list_containers"
 	defer recordOperation(operation, time.Now())
 
@@ -134,7 +161,9 @@ func (in instrumentedRuntimeService) ContainerStatus(containerID string) (*runti
 	return out, err
 }
 
-func (in instrumentedRuntimeService) UpdateContainerResources(containerID string, resources *runtimeapi.LinuxContainerResources) error {
+func (in instrumentedRuntimeService) UpdateContainerResources(
+	containerID string, resources *runtimeapi.LinuxContainerResources,
+) error {
 	const operation = "update_container"
 	defer recordOperation(operation, time.Now())
 
@@ -152,7 +181,9 @@ func (in instrumentedRuntimeService) ReopenContainerLog(containerID string) erro
 	return err
 }
 
-func (in instrumentedRuntimeService) ExecSync(containerID string, cmd []string, timeout time.Duration) ([]byte, []byte, error) {
+func (in instrumentedRuntimeService) ExecSync(
+	containerID string, cmd []string, timeout time.Duration,
+) ([]byte, []byte, error) {
 	const operation = "exec_sync"
 	defer recordOperation(operation, time.Now())
 
@@ -179,7 +210,9 @@ func (in instrumentedRuntimeService) Attach(req *runtimeapi.AttachRequest) (*run
 	return resp, err
 }
 
-func (in instrumentedRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig, runtimeHandler string) (string, error) {
+func (in instrumentedRuntimeService) RunPodSandbox(
+	config *runtimeapi.PodSandboxConfig, runtimeHandler string,
+) (string, error) {
 	const operation = "run_podsandbox"
 	startTime := time.Now()
 	defer recordOperation(operation, startTime)
@@ -229,7 +262,9 @@ func (in instrumentedRuntimeService) ListPodSandbox(filter *runtimeapi.PodSandbo
 	return out, err
 }
 
-func (in instrumentedRuntimeService) ContainerStats(containerID string) (*runtimeapi.ContainerStats, error) {
+func (in instrumentedRuntimeService) ContainerStats(
+	containerID string,
+) (*runtimeapi.ContainerStats, error) {
 	const operation = "container_stats"
 	defer recordOperation(operation, time.Now())
 
@@ -238,7 +273,9 @@ func (in instrumentedRuntimeService) ContainerStats(containerID string) (*runtim
 	return out, err
 }
 
-func (in instrumentedRuntimeService) ListContainerStats(filter *runtimeapi.ContainerStatsFilter) ([]*runtimeapi.ContainerStats, error) {
+func (in instrumentedRuntimeService) ListContainerStats(
+	filter *runtimeapi.ContainerStatsFilter,
+) ([]*runtimeapi.ContainerStats, error) {
 	const operation = "list_container_stats"
 	defer recordOperation(operation, time.Now())
 
@@ -247,7 +284,9 @@ func (in instrumentedRuntimeService) ListContainerStats(filter *runtimeapi.Conta
 	return out, err
 }
 
-func (in instrumentedRuntimeService) PortForward(req *runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error) {
+func (in instrumentedRuntimeService) PortForward(
+	req *runtimeapi.PortForwardRequest,
+) (*runtimeapi.PortForwardResponse, error) {
 	const operation = "port_forward"
 	defer recordOperation(operation, time.Now())
 
@@ -256,7 +295,9 @@ func (in instrumentedRuntimeService) PortForward(req *runtimeapi.PortForwardRequ
 	return resp, err
 }
 
-func (in instrumentedRuntimeService) UpdateRuntimeConfig(runtimeConfig *runtimeapi.RuntimeConfig) error {
+func (in instrumentedRuntimeService) UpdateRuntimeConfig(
+	runtimeConfig *runtimeapi.RuntimeConfig,
+) error {
 	const operation = "update_runtime_config"
 	defer recordOperation(operation, time.Now())
 
@@ -265,7 +306,9 @@ func (in instrumentedRuntimeService) UpdateRuntimeConfig(runtimeConfig *runtimea
 	return err
 }
 
-func (in instrumentedImageManagerService) ListImages(filter *runtimeapi.ImageFilter) ([]*runtimeapi.Image, error) {
+func (in instrumentedImageManagerService) ListImages(
+	filter *runtimeapi.ImageFilter,
+) ([]*runtimeapi.Image, error) {
 	const operation = "list_images"
 	defer recordOperation(operation, time.Now())
 
@@ -274,7 +317,9 @@ func (in instrumentedImageManagerService) ListImages(filter *runtimeapi.ImageFil
 	return out, err
 }
 
-func (in instrumentedImageManagerService) ImageStatus(image *runtimeapi.ImageSpec) (*runtimeapi.Image, error) {
+func (in instrumentedImageManagerService) ImageStatus(
+	image *runtimeapi.ImageSpec,
+) (*runtimeapi.Image, error) {
 	const operation = "image_status"
 	defer recordOperation(operation, time.Now())
 
@@ -283,7 +328,10 @@ func (in instrumentedImageManagerService) ImageStatus(image *runtimeapi.ImageSpe
 	return out, err
 }
 
-func (in instrumentedImageManagerService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (in instrumentedImageManagerService) PullImage(
+	image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, 
+	podSandboxConfig *runtimeapi.PodSandboxConfig,
+) (string, error) {
 	const operation = "pull_image"
 	defer recordOperation(operation, time.Now())
 

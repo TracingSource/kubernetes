@@ -42,6 +42,9 @@ import (
 // http://issue.k8s.io/2630
 const perm os.FileMode = 0777
 
+// caller: 
+// 	1. cmd/kubelet/app/plugins.go -> ProbeVolumePlugins()
+//
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
 	return []volume.VolumePlugin{

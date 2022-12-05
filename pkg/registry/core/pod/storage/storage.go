@@ -67,8 +67,17 @@ type REST struct {
 	proxyTransport http.RoundTripper
 }
 
+// NewStorage ...
+//
+// caller:
+// 	1. pkg/registry/core/rest/storage_core.go -> NewLegacyRESTStorage()
+//
 // NewStorage returns a RESTStorage object that will work against pods.
-func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGetter, proxyTransport http.RoundTripper, podDisruptionBudgetClient policyclient.PodDisruptionBudgetsGetter) (PodStorage, error) {
+func NewStorage(
+	optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGetter, 
+	proxyTransport http.RoundTripper, 
+	podDisruptionBudgetClient policyclient.PodDisruptionBudgetsGetter,
+) (PodStorage, error) {
 
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &api.Pod{} },
@@ -81,13 +90,16 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 		DeleteStrategy:      pod.Strategy,
 		ReturnDeletedObject: true,
 
-		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
+		TableConvertor: printerstorage.TableConvertor{
+			TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers),
+		},
 	}
 	options := &generic.StoreOptions{
 		RESTOptions: optsGetter,
 		AttrFunc:    pod.GetAttrs,
 		TriggerFunc: map[string]storage.IndexerFunc{"spec.nodeName": pod.NodeNameTriggerFunc},
 	}
+	// 注意这里, 这个函数会向 Store 对象填充许多通用的字段.
 	if err := store.CompleteWithOptions(options); err != nil {
 		return PodStorage{}, err
 	}

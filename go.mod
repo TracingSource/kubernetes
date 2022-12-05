@@ -135,16 +135,16 @@ require (
 	gotest.tools v2.2.0+incompatible
 	gotest.tools/gotestsum v0.3.5
 	honnef.co/go/tools v0.0.1-2019.2.2
-	k8s.io/api v0.0.0
+	k8s.io/api v0.17.2
 	k8s.io/apiextensions-apiserver v0.0.0
-	k8s.io/apimachinery v0.0.0
-	k8s.io/apiserver v0.0.0
-	k8s.io/cli-runtime v0.0.0
-	k8s.io/client-go v0.0.0
+	k8s.io/apimachinery v0.17.2
+	k8s.io/apiserver v0.17.2
+	k8s.io/cli-runtime v0.17.2
+	k8s.io/client-go v0.17.2
 	k8s.io/cloud-provider v0.0.0
 	k8s.io/cluster-bootstrap v0.0.0
-	k8s.io/code-generator v0.0.0
-	k8s.io/component-base v0.0.0
+	k8s.io/code-generator v0.17.2
+	k8s.io/component-base v0.17.2
 	k8s.io/cri-api v0.0.0
 	k8s.io/csi-translation-lib v0.0.0
 	k8s.io/gengo v0.0.0-20190822140433-26a664648505
@@ -158,7 +158,7 @@ require (
 	k8s.io/kubectl v0.0.0
 	k8s.io/kubelet v0.0.0
 	k8s.io/legacy-cloud-providers v0.0.0
-	k8s.io/metrics v0.0.0
+	k8s.io/metrics v0.17.2
 	k8s.io/repo-infra v0.0.1-alpha.1
 	k8s.io/sample-apiserver v0.0.0
 	k8s.io/system-validators v1.0.4
@@ -523,12 +523,12 @@ replace (
 	gotest.tools/gotestsum => gotest.tools/gotestsum v0.3.5
 	grpc.go4.org => grpc.go4.org v0.0.0-20170609214715-11d0a25b4919
 	honnef.co/go/tools => honnef.co/go/tools v0.0.1-2019.2.2
-	k8s.io/api => ./staging/src/k8s.io/api
-	k8s.io/apiextensions-apiserver => ./staging/src/k8s.io/apiextensions-apiserver
-	k8s.io/apimachinery => ./staging/src/k8s.io/apimachinery
-	k8s.io/apiserver => ./staging/src/k8s.io/apiserver
+	k8s.io/api => ../kube-api
+	k8s.io/apiextensions-apiserver => ../apiextensions-apiserver
+	k8s.io/apimachinery => ../apimachinery
+	k8s.io/apiserver => ../apiserver
 	k8s.io/cli-runtime => ./staging/src/k8s.io/cli-runtime
-	k8s.io/client-go => ./staging/src/k8s.io/client-go
+	k8s.io/client-go => ../client-go
 	k8s.io/cloud-provider => ./staging/src/k8s.io/cloud-provider
 	k8s.io/cluster-bootstrap => ./staging/src/k8s.io/cluster-bootstrap
 	k8s.io/code-generator => ./staging/src/k8s.io/code-generator
@@ -538,12 +538,12 @@ replace (
 	k8s.io/gengo => k8s.io/gengo v0.0.0-20190822140433-26a664648505
 	k8s.io/heapster => k8s.io/heapster v1.2.0-beta.1
 	k8s.io/klog => k8s.io/klog v1.0.0
-	k8s.io/kube-aggregator => ./staging/src/k8s.io/kube-aggregator
+	k8s.io/kube-aggregator => ../kube-aggregator
 	k8s.io/kube-controller-manager => ./staging/src/k8s.io/kube-controller-manager
 	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20191107075043-30be4d16710a
 	k8s.io/kube-proxy => ./staging/src/k8s.io/kube-proxy
 	k8s.io/kube-scheduler => ./staging/src/k8s.io/kube-scheduler
-	k8s.io/kubectl => ./staging/src/k8s.io/kubectl
+	k8s.io/kubectl => ../kubectl
 	k8s.io/kubelet => ./staging/src/k8s.io/kubelet
 	k8s.io/legacy-cloud-providers => ./staging/src/k8s.io/legacy-cloud-providers
 	k8s.io/metrics => ./staging/src/k8s.io/metrics
@@ -553,7 +553,7 @@ replace (
 	k8s.io/sample-cli-plugin => ./staging/src/k8s.io/sample-cli-plugin
 	k8s.io/sample-controller => ./staging/src/k8s.io/sample-controller
 	k8s.io/system-validators => k8s.io/system-validators v1.0.4
-	k8s.io/utils => k8s.io/utils v0.0.0-20191114184206-e782cd3c129f
+	k8s.io/utils => ../kube-utils
 	modernc.org/cc => modernc.org/cc v1.0.0
 	modernc.org/golex => modernc.org/golex v1.0.0
 	modernc.org/mathutil => modernc.org/mathutil v1.0.0

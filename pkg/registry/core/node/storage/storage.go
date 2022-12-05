@@ -107,6 +107,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, kubeletClientConfig client
 	statusREST := &StatusREST{store: &statusStore}
 	proxyREST := &noderest.ProxyREST{Store: store, ProxyTransport: proxyTransport}
 
+	// 这里的 client.NodeGetterFunc() 是一个类型转换的行为.
 	// Build a NodeGetter that looks up nodes using the REST handler
 	nodeGetter := client.NodeGetterFunc(func(ctx context.Context, nodeName string, options metav1.GetOptions) (*v1.Node, error) {
 		obj, err := nodeREST.Get(ctx, nodeName, &options)

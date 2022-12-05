@@ -41,6 +41,9 @@ const (
 type HostUtil struct {
 }
 
+// caller: 
+// 	1. cmd/kubelet/app/server.go -> UnsecuredDependencies()
+//
 // NewHostUtil returns a struct that implements the HostUtils interface on
 // linux platforms
 func NewHostUtil() *HostUtil {
@@ -175,12 +178,17 @@ func isShared(mount string, mountInfoPath string) (bool, error) {
 	return false, nil
 }
 
+// findMountInfo 寻找当前kubelet进程的mount信息中, 以path变量为前缀的路径.
+// 一般path为/var/lib/kubelet, 其下有很多子目录, 不过只要找到其中的一行就可以代表其他所有.
 func findMountInfo(path, mountInfoPath string) (mount.MountInfo, error) {
+	// 解析当前kubelet进程的mount信息.
 	infos, err := mount.ParseMountInfo(mountInfoPath)
 	if err != nil {
 		return mount.MountInfo{}, err
 	}
 
+	// 反向遍历infos数组, 寻找前缀为path变量(/var/lib/kubelet)的行, 因为同一目录下的子目录的挂载参数相同.
+	//
 	// process /proc/xxx/mountinfo in backward order and find the first mount
 	// point that is prefix of 'path' - that's the mount where path resides
 	var info *mount.MountInfo

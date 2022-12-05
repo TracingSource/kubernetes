@@ -358,6 +358,10 @@ type Controller struct {
 	podUpdateQueue  workqueue.RateLimitingInterface
 }
 
+// caller: 
+// 	1. cmd/kube-controller-manager/app/core.go -> startNodeLifecycleController() 
+//     在 controller manager 启动过程中被调用.
+//
 // NewNodeLifecycleController returns a new taint controller.
 func NewNodeLifecycleController(
 	leaseInformer coordinformers.LeaseInformer,
@@ -547,6 +551,10 @@ func NewNodeLifecycleController(
 	return nc, nil
 }
 
+// caller:
+// 	1. cmd/kube-controller-manager/app/core.go -> startNodeLifecycleController()
+//  在 controller-manager 启动过程中被调用
+//
 // Run starts an asynchronous loop that monitors the status of cluster nodes.
 func (nc *Controller) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
@@ -600,6 +608,8 @@ func (nc *Controller) Run(stopCh <-chan struct{}) {
 	<-stopCh
 }
 
+// caller: 
+// 	1. Controller.Run()
 func (nc *Controller) doNodeProcessingPassWorker() {
 	for {
 		obj, shutdown := nc.nodeUpdateQueue.Get()
@@ -623,6 +633,8 @@ func (nc *Controller) doNodeProcessingPassWorker() {
 	}
 }
 
+// caller:
+// 	1. Controller.doNodeProcessingPassWorker()
 func (nc *Controller) doNoScheduleTaintingPass(nodeName string) error {
 	node, err := nc.nodeLister.Get(nodeName)
 	if err != nil {
@@ -678,6 +690,8 @@ func (nc *Controller) doNoScheduleTaintingPass(nodeName string) error {
 	return nil
 }
 
+// caller: 
+// 	1. Controller.Run()
 func (nc *Controller) doNoExecuteTaintingPass() {
 	nc.evictorLock.Lock()
 	defer nc.evictorLock.Unlock()
@@ -722,11 +736,14 @@ func (nc *Controller) doNoExecuteTaintingPass() {
 	}
 }
 
+// caller: 
+// 	1. Controller.Run()
 func (nc *Controller) doEvictionPass() {
 	nc.evictorLock.Lock()
 	defer nc.evictorLock.Unlock()
 	for k := range nc.zonePodEvictor {
-		// Function should return 'false' and a time after which it should be retried, or 'true' if it shouldn't (it succeeded).
+		// Function should return 'false' and a time after which it should be retried,
+		// or 'true' if it shouldn't (it succeeded).
 		nc.zonePodEvictor[k].Try(func(value scheduler.TimedValue) (bool, time.Duration) {
 			node, err := nc.nodeLister.Get(value.Value)
 			if apierrors.IsNotFound(err) {
@@ -765,8 +782,11 @@ func (nc *Controller) doEvictionPass() {
 	}
 }
 
-// monitorNodeHealth verifies node health are constantly updated by kubelet, and
-// if not, post "NodeReady==ConditionUnknown".
+// caller: 
+// 	1. Controller.Run()
+//
+// monitorNodeHealth verifies node health are constantly updated by kubelet,
+// and if not, post "NodeReady==ConditionUnknown".
 // For nodes who are not ready or not reachable for a long period of time.
 // This function will taint them if TaintBasedEvictions feature was enabled.
 // Otherwise, it would evict it directly.

@@ -74,17 +74,25 @@ const (
 type KubeletConfiguration struct {
 	metav1.TypeMeta
 
+	// StaticPodPath /etc/kubernetes/manifests 目录
+	//
 	// staticPodPath is the path to the directory containing local (static) pods to
 	// run, or the path to a single static pod file.
 	StaticPodPath string
 	// syncFrequency is the max period between synchronizing running
 	// containers and config
 	SyncFrequency metav1.Duration
+	// fileCheckFrequency 表示对 manifests 目录下的 staticPod 文件的监听频率, 一般为20s.
+	// 每隔一段时间, 就算没有监测到变动事件发生, kubelet 也会定时进行一次同步,
+	// 维持该目录下"期望"的 staticPod 与本地正在运行的 staticPod 的一致性.
+	//
 	// fileCheckFrequency is the duration between checking config files for
 	// new data
 	FileCheckFrequency metav1.Duration
 	// httpCheckFrequency is the duration between checking http for new data
 	HTTPCheckFrequency metav1.Duration
+	// StaticPodURL 一般为""空字符串.
+	//
 	// staticPodURL is the URL for accessing static pods to run
 	StaticPodURL string
 	// staticPodURLHeader is a map of slices with HTTP headers to use when accessing the podURL
@@ -156,6 +164,9 @@ type KubeletConfiguration struct {
 	// configure all containers to search this domain in addition to the
 	// host's search domains.
 	ClusterDomain string
+	// ClusterDNS 默认 container 使用宿主机的 DNS 解析, 如果设置了这个列表, 
+	// 应该会修改容器内部的 /etc/resolv.conf 文件的内容.
+	//
 	// clusterDNS is a list of IP addresses for a cluster DNS server. If set,
 	// kubelet will configure all containers to use this for DNS resolution
 	// instead of the host's DNS servers.
@@ -190,10 +201,14 @@ type KubeletConfiguration struct {
 	VolumeStatsAggPeriod metav1.Duration
 	// KubeletCgroups is the absolute name of cgroups to isolate the kubelet in
 	KubeletCgroups string
+	// SystemCgroups 一般为 ""
+	//
 	// SystemCgroups is absolute name of cgroups in which to place
 	// all non-kernel processes that are not already in a container. Empty
 	// for no container. Rolling back the flag requires a reboot.
 	SystemCgroups string
+	// CgroupRoot 一般为 ""
+	//
 	// CgroupRoot is the root cgroup to use for pods.
 	// If CgroupsPerQOS is enabled, this is the root of the QoS cgroup hierarchy.
 	CgroupRoot string
@@ -201,6 +216,8 @@ type KubeletConfiguration struct {
 	// And all Burstable and BestEffort pods are brought up under their
 	// specific top level QoS cgroup.
 	CgroupsPerQOS bool
+	// CgroupDriver 一般为 systemd
+	//
 	// driver that the kubelet uses to manipulate cgroups on the host (cgroupfs or systemd)
 	CgroupDriver string
 	// CPUManagerPolicy is the name of the policy to use.
@@ -245,20 +262,24 @@ type KubeletConfiguration struct {
 	CPUCFSQuotaPeriod metav1.Duration
 	// maxOpenFiles is Number of files that can be opened by Kubelet process.
 	MaxOpenFiles int64
+	// ContentType 默认为 application/vnd.kubernetes.protobuf
+	//
 	// contentType is contentType of requests sent to apiserver.
 	ContentType string
 	// kubeAPIQPS is the QPS to use while talking with kubernetes apiserver
 	KubeAPIQPS int32
-	// kubeAPIBurst is the burst to allow while talking with kubernetes
-	// apiserver
+	// kubeAPIBurst is the burst to allow while talking with kubernetes apiserver
 	KubeAPIBurst int32
 	// serializeImagePulls when enabled, tells the Kubelet to pull images one at a time.
 	SerializeImagePulls bool
-	// Map of signal names to quantities that defines hard eviction thresholds. For example: {"memory.available": "300Mi"}.
+	// Map of signal names to quantities that defines hard eviction thresholds.
+	// For example: {"memory.available": "300Mi"}.
 	EvictionHard map[string]string
-	// Map of signal names to quantities that defines soft eviction thresholds.  For example: {"memory.available": "300Mi"}.
+	// Map of signal names to quantities that defines soft eviction thresholds. 
+	// For example: {"memory.available": "300Mi"}.
 	EvictionSoft map[string]string
-	// Map of signal names to quantities that defines grace periods for each soft eviction signal. For example: {"memory.available": "30s"}.
+	// Map of signal names to quantities that defines grace periods for each soft eviction signal.
+	// For example: {"memory.available": "30s"}.
 	EvictionSoftGracePeriod map[string]string
 	// Duration for which the kubelet has to wait before transitioning out of an eviction pressure condition.
 	EvictionPressureTransitionPeriod metav1.Duration
@@ -266,7 +287,8 @@ type KubeletConfiguration struct {
 	EvictionMaxPodGracePeriod int32
 	// Map of signal names to quantities that defines minimum reclaims, which describe the minimum
 	// amount of a given resource the kubelet will reclaim when performing a pod eviction while
-	// that resource is under pressure. For example: {"imagefs.available": "2Gi"}
+	// that resource is under pressure.
+	// For example: {"imagefs.available": "2Gi"}
 	EvictionMinimumReclaim map[string]string
 	// podsPerCore is the maximum number of pods per core. Cannot exceed MaxPods.
 	// If 0, this field is ignored.

@@ -26,6 +26,14 @@ import (
 // Logs adds handlers for the /logs path serving log files from /var/log.
 type Logs struct{}
 
+// Install 调试神器...注册一个可查询 /var/log 目录的静态路由.
+//
+// 比如, 请求 'https://127.0.0.1:6443/logs/' 可以查看 apiserver 所在容器/主机的 /var/log/ 目录下的文件列表.
+// 请求 'https://127.0.0.1:16443/logs/messages' 则可以查看 /var/log/messages 文件的内容.
+//
+// caller: 
+// 	1. pkg/master/master.go -> completedConfig.New()
+//
 // Install func registers the logs handler.
 func (l Logs) Install(c *restful.Container) {
 	// use restful: ws.Route(ws.GET("/logs/{logpath:*}").To(fileHandler))
@@ -33,7 +41,9 @@ func (l Logs) Install(c *restful.Container) {
 	ws := new(restful.WebService)
 	ws.Path("/logs")
 	ws.Doc("get log files")
-	ws.Route(ws.GET("/{logpath:*}").To(logFileHandler).Param(ws.PathParameter("logpath", "path to the log").DataType("string")))
+	ws.Route(ws.GET("/{logpath:*}").To(logFileHandler).Param(
+		ws.PathParameter("logpath", "path to the log").DataType("string"),
+	))
 	ws.Route(ws.GET("/").To(logFileListHandler))
 
 	c.Add(ws)

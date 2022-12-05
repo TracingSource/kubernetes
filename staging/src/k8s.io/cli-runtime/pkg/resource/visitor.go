@@ -65,6 +65,9 @@ type ResourceMapping interface {
 type Info struct {
 	// Client will only be present if this builder was not local
 	Client RESTClient
+	// 就是资源的 GVK 信息, 另外该类型还有一个 Scope 成员, 表示当前这个 info 资源的生效范围, 是 root 还是 namepsace.
+	// root 表示的应该就是 cluster 范围吧...???
+	//
 	// Mapping will only be present if this builder was not local
 	Mapping *meta.RESTMapping
 

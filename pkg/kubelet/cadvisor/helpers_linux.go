@@ -49,6 +49,11 @@ func (i *imageFsInfoProvider) ImageFsInfoLabel() (string, error) {
 	return "", fmt.Errorf("no imagefs label for configured runtime")
 }
 
+// NewImageFsInfoProvider 直接返回 imageFsInfoProvider{} 结构体
+//
+// caller: 
+// 	1. cmd/kubelet/app/server.go -> run()
+//
 // NewImageFsInfoProvider returns a provider for the specified runtime configuration.
 func NewImageFsInfoProvider(runtime, runtimeEndpoint string) ImageFsInfoProvider {
 	return &imageFsInfoProvider{runtime: runtime, runtimeEndpoint: runtimeEndpoint}

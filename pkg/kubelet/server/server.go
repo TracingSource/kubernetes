@@ -127,6 +127,9 @@ func (a *filteringContainer) RegisteredHandlePaths() []string {
 	return a.registeredHandlePaths
 }
 
+// caller: 
+// 	1. pkg/kubelet/kubelet.go -> Kubelet.ListenAndServe()
+//
 // ListenAndServeKubeletServer initializes a server to respond to HTTP network requests on the Kubelet.
 func ListenAndServeKubeletServer(
 	host HostInterface,
@@ -141,7 +144,11 @@ func ListenAndServeKubeletServer(
 	redirectContainerStreaming bool,
 	criHandler http.Handler) {
 	klog.Infof("Starting to listen on %s:%d", address, port)
-	handler := NewServer(host, resourceAnalyzer, auth, enableCAdvisorJSONEndpoints, enableDebuggingHandlers, enableContentionProfiling, redirectContainerStreaming, criHandler)
+	handler := NewServer(
+		host, resourceAnalyzer, auth, enableCAdvisorJSONEndpoints, 
+		enableDebuggingHandlers, enableContentionProfiling, 
+		redirectContainerStreaming, criHandler,
+	)
 	s := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
 		Handler:        &handler,
@@ -160,8 +167,12 @@ func ListenAndServeKubeletServer(
 	}
 }
 
-// ListenAndServeKubeletReadOnlyServer initializes a server to respond to HTTP network requests on the Kubelet.
-func ListenAndServeKubeletReadOnlyServer(host HostInterface, resourceAnalyzer stats.ResourceAnalyzer, address net.IP, port uint, enableCAdvisorJSONEndpoints bool) {
+// ListenAndServeKubeletReadOnlyServer initializes a server to 
+// respond to HTTP network requests on the Kubelet.
+func ListenAndServeKubeletReadOnlyServer(
+	host HostInterface, resourceAnalyzer stats.ResourceAnalyzer, 
+	address net.IP, port uint, enableCAdvisorJSONEndpoints bool,
+) {
 	klog.V(1).Infof("Starting to listen read-only on %s:%d", address, port)
 	s := NewServer(host, resourceAnalyzer, nil, enableCAdvisorJSONEndpoints, false, false, false, nil)
 
@@ -174,9 +185,14 @@ func ListenAndServeKubeletReadOnlyServer(host HostInterface, resourceAnalyzer st
 }
 
 // ListenAndServePodResources initializes a gRPC server to serve the PodResources service
-func ListenAndServePodResources(socket string, podsProvider podresources.PodsProvider, devicesProvider podresources.DevicesProvider) {
+func ListenAndServePodResources(
+	socket string, podsProvider podresources.PodsProvider, 
+	devicesProvider podresources.DevicesProvider,
+) {
 	server := grpc.NewServer()
-	podresourcesapi.RegisterPodResourcesListerServer(server, podresources.NewPodResourcesServer(podsProvider, devicesProvider))
+	podresourcesapi.RegisterPodResourcesListerServer(
+		server, podresources.NewPodResourcesServer(podsProvider, devicesProvider),
+	)
 	l, err := util.CreateListener(socket)
 	if err != nil {
 		klog.Fatalf("Failed to create listener for podResources endpoint: %v", err)
@@ -209,6 +225,9 @@ type HostInterface interface {
 	GetPortForward(podName, podNamespace string, podUID types.UID, portForwardOpts portforward.V4Options) (*url.URL, error)
 }
 
+// caller:
+// 	1. ListenAndServeKubeletServer()
+//
 // NewServer initializes and configures a kubelet.Server object to handle HTTP requests.
 func NewServer(
 	host HostInterface,
@@ -218,7 +237,8 @@ func NewServer(
 	enableDebuggingHandlers,
 	enableContentionProfiling,
 	redirectContainerStreaming bool,
-	criHandler http.Handler) Server {
+	criHandler http.Handler,
+) Server {
 	server := Server{
 		host:                       host,
 		resourceAnalyzer:           resourceAnalyzer,

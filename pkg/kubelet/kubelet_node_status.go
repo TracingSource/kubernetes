@@ -410,6 +410,9 @@ func (kl *Kubelet) updateNodeStatus() error {
 // tryUpdateNodeStatus tries to update node status to master if there is any
 // change or enough time passed from the last sync.
 func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
+	// 大型集群中, node 向 apiserver 上报节点状态将是 apiserver 与 etcd 的
+	// 主要压力来源.
+	// 
 	// In large clusters, GET and PUT operations on Node objects coming
 	// from here are the majority of load on apiserver and etcd.
 	// To reduce the load on etcd, we are serving GET operations from
@@ -431,6 +434,8 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 	}
 
 	podCIDRChanged := false
+	// node 的 PodCIDRs 应该就是在 kubeadm 在 setup 集群时配置范围.
+	// 没有见过为 node 指定这个值的.
 	if len(node.Spec.PodCIDRs) != 0 {
 		// Pod CIDR could have been updated before, so we cannot rely on
 		// node.Spec.PodCIDR being non-empty. We also need to know if pod CIDR is
@@ -444,6 +449,8 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 	kl.setNodeStatus(node)
 
 	now := kl.clock.Now()
+	// 1.16.2 版本中, NodeLease 特性是默认开启的, 当前为 1.17.2, 已经不再是 feature 了.
+	// 如果此时还没到下次更新的时间点, 判断一下直接返回.
 	if now.Before(kl.lastStatusReportTime.Add(kl.nodeStatusReportFrequency)) {
 		if !podCIDRChanged && !nodeStatusHasChanged(&originalNode.Status, &node.Status) {
 			// We must mark the volumes as ReportedInUse in volume manager's dsw even

@@ -17,7 +17,6 @@ limitations under the License.
 package kubelet
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -27,7 +26,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -40,7 +38,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
@@ -60,10 +57,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/kubernetes/pkg/volume/util/hostutil"
-	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
-	volumevalidation "k8s.io/kubernetes/pkg/volume/validation"
 	"k8s.io/kubernetes/third_party/forked/golang/expansion"
 )
 
@@ -87,6 +81,8 @@ func (kl *Kubelet) listPodsFromDisk() ([]types.UID, error) {
 	return pods, nil
 }
 
+// GetActivePods 返回非 terminating 状态的 pod 列表.
+//
 // GetActivePods returns non-terminal pods
 func (kl *Kubelet) GetActivePods() []*v1.Pod {
 	allPods := kl.podManager.GetPods()
@@ -127,282 +123,6 @@ func (kl *Kubelet) makeBlockVolumes(pod *v1.Pod, container *v1.Container, podVol
 	return devices, nil
 }
 
-// makeMounts determines the mount points for the given container.
-func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, hostDomain string, podIPs []string, podVolumes kubecontainer.VolumeMap, hu hostutil.HostUtils, subpather subpath.Interface, expandEnvs []kubecontainer.EnvVar) ([]kubecontainer.Mount, func(), error) {
-	// Kubernetes only mounts on /etc/hosts if:
-	// - container is not an infrastructure (pause) container
-	// - container is not already mounting on /etc/hosts
-	// - OS is not Windows
-	// Kubernetes will not mount /etc/hosts if:
-	// - when the Pod sandbox is being created, its IP is still unknown. Hence, PodIP will not have been set.
-	mountEtcHostsFile := len(podIPs) > 0 && runtime.GOOS != "windows"
-	klog.V(3).Infof("container: %v/%v/%v podIPs: %q creating hosts mount: %v", pod.Namespace, pod.Name, container.Name, podIPs, mountEtcHostsFile)
-	mounts := []kubecontainer.Mount{}
-	var cleanupAction func()
-	for i, mount := range container.VolumeMounts {
-		// do not mount /etc/hosts if container is already mounting on the path
-		mountEtcHostsFile = mountEtcHostsFile && (mount.MountPath != etcHostsPath)
-		vol, ok := podVolumes[mount.Name]
-		if !ok || vol.Mounter == nil {
-			klog.Errorf("Mount cannot be satisfied for container %q, because the volume is missing or the volume mounter is nil: %+v", container.Name, mount)
-			return nil, cleanupAction, fmt.Errorf("cannot find volume %q to mount into container %q", mount.Name, container.Name)
-		}
-
-		relabelVolume := false
-		// If the volume supports SELinux and it has not been
-		// relabeled already and it is not a read-only volume,
-		// relabel it and mark it as labeled
-		if vol.Mounter.GetAttributes().Managed && vol.Mounter.GetAttributes().SupportsSELinux && !vol.SELinuxLabeled {
-			vol.SELinuxLabeled = true
-			relabelVolume = true
-		}
-		hostPath, err := volumeutil.GetPath(vol.Mounter)
-		if err != nil {
-			return nil, cleanupAction, err
-		}
-
-		subPath := mount.SubPath
-		if mount.SubPathExpr != "" {
-			if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpath) {
-				return nil, cleanupAction, fmt.Errorf("volume subpaths are disabled")
-			}
-
-			if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpathEnvExpansion) {
-				return nil, cleanupAction, fmt.Errorf("volume subpath expansion is disabled")
-			}
-
-			subPath, err = kubecontainer.ExpandContainerVolumeMounts(mount, expandEnvs)
-
-			if err != nil {
-				return nil, cleanupAction, err
-			}
-		}
-
-		if subPath != "" {
-			if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpath) {
-				return nil, cleanupAction, fmt.Errorf("volume subpaths are disabled")
-			}
-
-			if filepath.IsAbs(subPath) {
-				return nil, cleanupAction, fmt.Errorf("error SubPath `%s` must not be an absolute path", subPath)
-			}
-
-			err = volumevalidation.ValidatePathNoBacksteps(subPath)
-			if err != nil {
-				return nil, cleanupAction, fmt.Errorf("unable to provision SubPath `%s`: %v", subPath, err)
-			}
-
-			volumePath := hostPath
-			hostPath = filepath.Join(volumePath, subPath)
-
-			if subPathExists, err := hu.PathExists(hostPath); err != nil {
-				klog.Errorf("Could not determine if subPath %s exists; will not attempt to change its permissions", hostPath)
-			} else if !subPathExists {
-				// Create the sub path now because if it's auto-created later when referenced, it may have an
-				// incorrect ownership and mode. For example, the sub path directory must have at least g+rwx
-				// when the pod specifies an fsGroup, and if the directory is not created here, Docker will
-				// later auto-create it with the incorrect mode 0750
-				// Make extra care not to escape the volume!
-				perm, err := hu.GetMode(volumePath)
-				if err != nil {
-					return nil, cleanupAction, err
-				}
-				if err := subpather.SafeMakeDir(subPath, volumePath, perm); err != nil {
-					// Don't pass detailed error back to the user because it could give information about host filesystem
-					klog.Errorf("failed to create subPath directory for volumeMount %q of container %q: %v", mount.Name, container.Name, err)
-					return nil, cleanupAction, fmt.Errorf("failed to create subPath directory for volumeMount %q of container %q", mount.Name, container.Name)
-				}
-			}
-			hostPath, cleanupAction, err = subpather.PrepareSafeSubpath(subpath.Subpath{
-				VolumeMountIndex: i,
-				Path:             hostPath,
-				VolumeName:       vol.InnerVolumeSpecName,
-				VolumePath:       volumePath,
-				PodDir:           podDir,
-				ContainerName:    container.Name,
-			})
-			if err != nil {
-				// Don't pass detailed error back to the user because it could give information about host filesystem
-				klog.Errorf("failed to prepare subPath for volumeMount %q of container %q: %v", mount.Name, container.Name, err)
-				return nil, cleanupAction, fmt.Errorf("failed to prepare subPath for volumeMount %q of container %q", mount.Name, container.Name)
-			}
-		}
-
-		// Docker Volume Mounts fail on Windows if it is not of the form C:/
-		if volumeutil.IsWindowsLocalPath(runtime.GOOS, hostPath) {
-			hostPath = volumeutil.MakeAbsolutePath(runtime.GOOS, hostPath)
-		}
-
-		containerPath := mount.MountPath
-		// IsAbs returns false for UNC path/SMB shares/named pipes in Windows. So check for those specifically and skip MakeAbsolutePath
-		if !volumeutil.IsWindowsUNCPath(runtime.GOOS, containerPath) && !filepath.IsAbs(containerPath) {
-			containerPath = volumeutil.MakeAbsolutePath(runtime.GOOS, containerPath)
-		}
-
-		propagation, err := translateMountPropagation(mount.MountPropagation)
-		if err != nil {
-			return nil, cleanupAction, err
-		}
-		klog.V(5).Infof("Pod %q container %q mount %q has propagation %q", format.Pod(pod), container.Name, mount.Name, propagation)
-
-		mustMountRO := vol.Mounter.GetAttributes().ReadOnly
-
-		mounts = append(mounts, kubecontainer.Mount{
-			Name:           mount.Name,
-			ContainerPath:  containerPath,
-			HostPath:       hostPath,
-			ReadOnly:       mount.ReadOnly || mustMountRO,
-			SELinuxRelabel: relabelVolume,
-			Propagation:    propagation,
-		})
-	}
-	if mountEtcHostsFile {
-		hostAliases := pod.Spec.HostAliases
-		hostsMount, err := makeHostsMount(podDir, podIPs, hostName, hostDomain, hostAliases, pod.Spec.HostNetwork)
-		if err != nil {
-			return nil, cleanupAction, err
-		}
-		mounts = append(mounts, *hostsMount)
-	}
-	return mounts, cleanupAction, nil
-}
-
-// translateMountPropagation transforms v1.MountPropagationMode to
-// runtimeapi.MountPropagation.
-func translateMountPropagation(mountMode *v1.MountPropagationMode) (runtimeapi.MountPropagation, error) {
-	if runtime.GOOS == "windows" {
-		// Windows containers doesn't support mount propagation, use private for it.
-		// Refer https://docs.docker.com/storage/bind-mounts/#configure-bind-propagation.
-		return runtimeapi.MountPropagation_PROPAGATION_PRIVATE, nil
-	}
-
-	switch {
-	case mountMode == nil:
-		// PRIVATE is the default
-		return runtimeapi.MountPropagation_PROPAGATION_PRIVATE, nil
-	case *mountMode == v1.MountPropagationHostToContainer:
-		return runtimeapi.MountPropagation_PROPAGATION_HOST_TO_CONTAINER, nil
-	case *mountMode == v1.MountPropagationBidirectional:
-		return runtimeapi.MountPropagation_PROPAGATION_BIDIRECTIONAL, nil
-	case *mountMode == v1.MountPropagationNone:
-		return runtimeapi.MountPropagation_PROPAGATION_PRIVATE, nil
-	default:
-		return 0, fmt.Errorf("invalid MountPropagation mode: %q", *mountMode)
-	}
-}
-
-// makeHostsMount makes the mountpoint for the hosts file that the containers
-// in a pod are injected with. podIPs is provided instead of podIP as podIPs
-// are present even if dual-stack feature flag is not enabled.
-func makeHostsMount(podDir string, podIPs []string, hostName, hostDomainName string, hostAliases []v1.HostAlias, useHostNetwork bool) (*kubecontainer.Mount, error) {
-	hostsFilePath := path.Join(podDir, "etc-hosts")
-	if err := ensureHostsFile(hostsFilePath, podIPs, hostName, hostDomainName, hostAliases, useHostNetwork); err != nil {
-		return nil, err
-	}
-	return &kubecontainer.Mount{
-		Name:           "k8s-managed-etc-hosts",
-		ContainerPath:  etcHostsPath,
-		HostPath:       hostsFilePath,
-		ReadOnly:       false,
-		SELinuxRelabel: true,
-	}, nil
-}
-
-// ensureHostsFile ensures that the given host file has an up-to-date ip, host
-// name, and domain name.
-func ensureHostsFile(fileName string, hostIPs []string, hostName, hostDomainName string, hostAliases []v1.HostAlias, useHostNetwork bool) error {
-	var hostsFileContent []byte
-	var err error
-
-	if useHostNetwork {
-		// if Pod is using host network, read hosts file from the node's filesystem.
-		// `etcHostsPath` references the location of the hosts file on the node.
-		// `/etc/hosts` for *nix systems.
-		hostsFileContent, err = nodeHostsFileContent(etcHostsPath, hostAliases)
-		if err != nil {
-			return err
-		}
-	} else {
-		// if Pod is not using host network, create a managed hosts file with Pod IP and other information.
-		hostsFileContent = managedHostsFileContent(hostIPs, hostName, hostDomainName, hostAliases)
-	}
-
-	return ioutil.WriteFile(fileName, hostsFileContent, 0644)
-}
-
-// nodeHostsFileContent reads the content of node's hosts file.
-func nodeHostsFileContent(hostsFilePath string, hostAliases []v1.HostAlias) ([]byte, error) {
-	hostsFileContent, err := ioutil.ReadFile(hostsFilePath)
-	if err != nil {
-		return nil, err
-	}
-	var buffer bytes.Buffer
-	buffer.WriteString(managedHostsHeaderWithHostNetwork)
-	buffer.Write(hostsFileContent)
-	buffer.Write(hostsEntriesFromHostAliases(hostAliases))
-	return buffer.Bytes(), nil
-}
-
-// managedHostsFileContent generates the content of the managed etc hosts based on Pod IPs and other
-// information.
-func managedHostsFileContent(hostIPs []string, hostName, hostDomainName string, hostAliases []v1.HostAlias) []byte {
-	var buffer bytes.Buffer
-	buffer.WriteString(managedHostsHeader)
-	buffer.WriteString("127.0.0.1\tlocalhost\n")                      // ipv4 localhost
-	buffer.WriteString("::1\tlocalhost ip6-localhost ip6-loopback\n") // ipv6 localhost
-	buffer.WriteString("fe00::0\tip6-localnet\n")
-	buffer.WriteString("fe00::0\tip6-mcastprefix\n")
-	buffer.WriteString("fe00::1\tip6-allnodes\n")
-	buffer.WriteString("fe00::2\tip6-allrouters\n")
-	if len(hostDomainName) > 0 {
-		// host entry generated for all IPs in podIPs
-		// podIPs field is populated for clusters even
-		// dual-stack feature flag is not enabled.
-		for _, hostIP := range hostIPs {
-			buffer.WriteString(fmt.Sprintf("%s\t%s.%s\t%s\n", hostIP, hostName, hostDomainName, hostName))
-		}
-	} else {
-		for _, hostIP := range hostIPs {
-			buffer.WriteString(fmt.Sprintf("%s\t%s\n", hostIP, hostName))
-		}
-	}
-	buffer.Write(hostsEntriesFromHostAliases(hostAliases))
-	return buffer.Bytes()
-}
-
-func hostsEntriesFromHostAliases(hostAliases []v1.HostAlias) []byte {
-	if len(hostAliases) == 0 {
-		return []byte{}
-	}
-
-	var buffer bytes.Buffer
-	buffer.WriteString("\n")
-	buffer.WriteString("# Entries added by HostAliases.\n")
-	// for each IP, write all aliases onto single line in hosts file
-	for _, hostAlias := range hostAliases {
-		buffer.WriteString(fmt.Sprintf("%s\t%s\n", hostAlias.IP, strings.Join(hostAlias.Hostnames, "\t")))
-	}
-	return buffer.Bytes()
-}
-
-// truncatePodHostnameIfNeeded truncates the pod hostname if it's longer than 63 chars.
-func truncatePodHostnameIfNeeded(podName, hostname string) (string, error) {
-	// Cap hostname at 63 chars (specification is 64bytes which is 63 chars and the null terminating char).
-	const hostnameMaxLen = 63
-	if len(hostname) <= hostnameMaxLen {
-		return hostname, nil
-	}
-	truncated := hostname[:hostnameMaxLen]
-	klog.Errorf("hostname for pod:%q was longer than %d. Truncated hostname to :%q", podName, hostnameMaxLen, truncated)
-	// hostname should not end with '-' or '.'
-	truncated = strings.TrimRight(truncated, "-.")
-	if len(truncated) == 0 {
-		// This should never happen.
-		return "", fmt.Errorf("hostname for pod %q was invalid: %q", podName, hostname)
-	}
-	return truncated, nil
-}
-
 // GeneratePodHostNameAndDomain creates a hostname and domain name for a pod,
 // given that pod's spec and annotations or returns an error.
 func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *v1.Pod) (string, string, error) {
@@ -439,9 +159,17 @@ func (kl *Kubelet) GetPodCgroupParent(pod *v1.Pod) string {
 	return cgroupParent
 }
 
+// GenerateRunContainerOptions 返回一个 opt 对象, 包含该 Pod 的 env 环境变量, 
+// volume 卷列表(同时创建 hostPath 类型的目录), 端口映射信息, hostname 等.
+//
+// caller: pkg/kubelet/kuberuntime/kuberuntime_container.go ->
+//             kubeGenericRuntimeManager.generateContainerConfig()
+//
 // GenerateRunContainerOptions generates the RunContainerOptions, which can be used by
 // the container runtime to set parameters for launching a container.
-func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string, podIPs []string) (*kubecontainer.RunContainerOptions, func(), error) {
+func (kl *Kubelet) GenerateRunContainerOptions(
+	pod *v1.Pod, container *v1.Container, podIP string, podIPs []string,
+) (*kubecontainer.RunContainerOptions, func(), error) {
 	opts, err := kl.containerManager.GetResources(pod, container)
 	if err != nil {
 		return nil, nil, err
@@ -453,8 +181,9 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 	}
 	opts.Hostname = hostname
 	podName := volumeutil.GetUniquePodName(pod)
+	// 从 actualStateOfWorld 中获取该 Pod 已经声明的 volume 列表(map).
 	volumes := kl.volumeManager.GetMountedVolumesForPod(podName)
-
+	// 获取端口映射配置记录(不过并没有做什么操作(比如iptables))
 	opts.PortMappings = kubecontainer.MakePortMappings(container)
 
 	// TODO: remove feature gate check after no longer needed
@@ -466,22 +195,26 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 		}
 		opts.Devices = append(opts.Devices, blkVolumes...)
 	}
-
+	// 解析环境变量
 	envs, err := kl.makeEnvironmentVariables(pod, container, podIP, podIPs)
 	if err != nil {
 		return nil, nil, err
 	}
 	opts.Envs = append(opts.Envs, envs...)
 
-	// only podIPs is sent to makeMounts, as podIPs is populated even if dual-stack feature flag is not enabled.
-	mounts, cleanupAction, err := makeMounts(pod, kl.getPodDir(pod.UID), container, hostname, hostDomainName, podIPs, volumes, kl.hostutil, kl.subpather, opts.Envs)
+	// only podIPs is sent to makeMounts, as podIPs is populated
+	// even if dual-stack feature flag is not enabled.
+	mounts, cleanupAction, err := makeMounts(
+		pod, kl.getPodDir(pod.UID), container, hostname, hostDomainName, podIPs, 
+		volumes, kl.hostutil, kl.subpather, opts.Envs,
+	)
 	if err != nil {
 		return nil, cleanupAction, err
 	}
 	opts.Mounts = append(opts.Mounts, mounts...)
 
-	// adding TerminationMessagePath on Windows is only allowed if ContainerD is used. Individual files cannot
-	// be mounted as volumes using Docker for Windows.
+	// adding TerminationMessagePath on Windows is only allowed if ContainerD is used.
+	// Individual files cannot be mounted as volumes using Docker for Windows.
 	supportsSingleFileMapping := kl.containerRuntime.SupportsSingleFileMapping()
 	if len(container.TerminationMessagePath) != 0 && supportsSingleFileMapping {
 		p := kl.getPodContainerDir(pod.UID, container.Name)
@@ -554,10 +287,22 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string, enableServiceLinks bool) (map[
 	return m, nil
 }
 
+// makeEnvironmentVariables 读取Pod中的环境变量, 同时合并 configmap, secret 中解析出的环境变量.
+//
+// 在此函数中, 有通过 kube client 获取 configmap, secret 的操作.
+//
+// 注意: 此时已有 PodIP 传入, 说明 pause 已经启动, cni ipam 过程已经完成.
+//
+// caller: Kubelet.GenerateRunContainerOptions()
+//
 // Make the environment variables for a pod in the given namespace.
-func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container, podIP string, podIPs []string) ([]kubecontainer.EnvVar, error) {
+func (kl *Kubelet) makeEnvironmentVariables(
+	pod *v1.Pod, container *v1.Container, podIP string, podIPs []string,
+) ([]kubecontainer.EnvVar, error) {
 	if pod.Spec.EnableServiceLinks == nil {
-		return nil, fmt.Errorf("nil pod.spec.enableServiceLinks encountered, cannot construct envvars")
+		return nil, fmt.Errorf(
+			"nil pod.spec.enableServiceLinks encountered, cannot construct envvars",
+		)
 	}
 
 	var result []kubecontainer.EnvVar
@@ -670,6 +415,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 	var (
 		mappingFunc = expansion.MappingFuncFor(tmpEnv, serviceEnv)
 	)
+	// 注意: 上面是 envFrom, 这里是 valueFrom, 想一想 podIP 的注入方式.
 	for _, envVar := range container.Env {
 		runtimeVal := envVar.Value
 		if runtimeVal != "" {
@@ -679,7 +425,10 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 			// Step 1b: resolve alternate env var sources
 			switch {
 			case envVar.ValueFrom.FieldRef != nil:
-				runtimeVal, err = kl.podFieldSelectorRuntimeValue(envVar.ValueFrom.FieldRef, pod, podIP, podIPs)
+				// 这里是从 Pod status 中注入的过程.
+				runtimeVal, err = kl.podFieldSelectorRuntimeValue(
+					envVar.ValueFrom.FieldRef, pod, podIP, podIPs,
+				)
 				if err != nil {
 					return result, err
 				}
@@ -688,7 +437,9 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 				if err != nil {
 					return result, err
 				}
-				runtimeVal, err = containerResourceRuntimeValue(envVar.ValueFrom.ResourceFieldRef, defaultedPod, defaultedContainer)
+				runtimeVal, err = containerResourceRuntimeValue(
+					envVar.ValueFrom.ResourceFieldRef, defaultedPod, defaultedContainer,
+				)
 				if err != nil {
 					return result, err
 				}
@@ -778,9 +529,16 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 	return result, nil
 }
 
+// podFieldSelectorRuntimeValue 从 开始执行的 Pod spec, status 等部分获取可引用的环境变量.
+// 不过要注意, 这种方式可引用的字段是有限的.
+//
+// caller: Kubelet.makeEnvironmentVariables()
+//
 // podFieldSelectorRuntimeValue returns the runtime value of the given
 // selector for a pod.
-func (kl *Kubelet) podFieldSelectorRuntimeValue(fs *v1.ObjectFieldSelector, pod *v1.Pod, podIP string, podIPs []string) (string, error) {
+func (kl *Kubelet) podFieldSelectorRuntimeValue(
+	fs *v1.ObjectFieldSelector, pod *v1.Pod, podIP string, podIPs []string,
+) (string, error) {
 	internalFieldPath, _, err := podshelper.ConvertDownwardAPIFieldLabel(fs.APIVersion, fs.FieldPath, "")
 	if err != nil {
 		return "", err
@@ -813,10 +571,17 @@ func containerResourceRuntimeValue(fs *v1.ResourceFieldSelector, pod *v1.Pod, co
 	return resource.ExtractResourceValueByContainerName(fs, pod, containerName)
 }
 
+// caller:
+// 	1. pkg/kubelet/kubelet.go -> Kubelet.syncPod()
+//
 // One of the following arguments must be non-nil: runningPod, status.
 // TODO: Modify containerRuntime.KillPod() to accept the right arguments.
-func (kl *Kubelet) killPod(pod *v1.Pod, runningPod *kubecontainer.Pod, status *kubecontainer.PodStatus, gracePeriodOverride *int64) error {
+func (kl *Kubelet) killPod(
+	pod *v1.Pod, runningPod *kubecontainer.Pod, status *kubecontainer.PodStatus, 
+	gracePeriodOverride *int64,
+) error {
 	var p kubecontainer.Pod
+	// runningPod 与 status 不可同时为 nil
 	if runningPod != nil {
 		p = *runningPod
 	} else if status != nil {
@@ -835,6 +600,11 @@ func (kl *Kubelet) killPod(pod *v1.Pod, runningPod *kubecontainer.Pod, status *k
 	return nil
 }
 
+// makePodDataDirs 分别在 /var/lib/kubelet 的 pods, volumes, plugins 目录下,
+// 创建名为 pod uid 的子目录.
+//
+// caller: pkg/kubelet/kubelet.go -> Kubelet.syncPod()
+//
 // makePodDataDirs creates the dirs for the pod datas.
 func (kl *Kubelet) makePodDataDirs(pod *v1.Pod) error {
 	uid := pod.UID
@@ -1080,6 +850,9 @@ func (kl *Kubelet) HandlePodCleanups() error {
 	return nil
 }
 
+// Kubelet.podKillingCh 成员在 NewMainKubelet() 函数中被初始化,
+// 在 Kubelet.deletePod() 函数中写入数据.
+//
 // podKiller launches a goroutine to kill a pod received from the channel if
 // another goroutine isn't already in action.
 func (kl *Kubelet) podKiller() {

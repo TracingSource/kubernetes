@@ -28,9 +28,14 @@ import (
 
 var ImplicitContainerPrefix string = "implicitly required container "
 
-// GenerateContainerRef returns an *v1.ObjectReference which references the given container
-// within the given pod. Returns an error if the reference can't be constructed or the
-// container doesn't actually belong to the pod.
+// GenerateContainerRef 其实就是根据传入的 Pod 对象, 选取其中的 container 部分,
+// 组成一个 container Ref 对象.
+// 其实这个 Ref 的 Kind 都是 Pod, 不过其中还包括了该 Pod 的 uid, name, ns 等信息.
+//
+// GenerateContainerRef returns an *v1.ObjectReference which references
+// the given container within the given pod.
+// Returns an error if the reference can't be constructed or 
+// the container doesn't actually belong to the pod.
 //
 // This function will return an error if the provided Pod does not have a selfLink,
 // but we expect selfLink to be populated at all call sites for the function.

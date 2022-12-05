@@ -103,13 +103,28 @@ func getReclaimableThreshold(thresholds []evictionapi.Threshold) (evictionapi.Th
 		if resourceToReclaim, ok := signalToResource[thresholdToReclaim.Signal]; ok {
 			return thresholdToReclaim, resourceToReclaim, true
 		}
-		klog.V(3).Infof("eviction manager: threshold %s was crossed, but reclaim is not implemented for this threshold.", thresholdToReclaim.Signal)
+		klog.V(3).Infof(
+			"eviction manager: threshold %s was crossed, but reclaim is not implemented for this threshold.", 
+			thresholdToReclaim.Signal,
+		)
 	}
 	return evictionapi.Threshold{}, "", false
 }
 
+// ParseThresholdConfig ...
+//
+// 	@param evictionHard: /var/lib/kubelet/config.yaml 文件中的 evictionHard 字段
+// 	@param evictionSoft: 一般为 nil
+//
+// caller: 
+// 	1. cmd/kubelet/app/server.go -> run()
+//
 // ParseThresholdConfig parses the flags for thresholds.
-func ParseThresholdConfig(allocatableConfig []string, evictionHard, evictionSoft, evictionSoftGracePeriod, evictionMinimumReclaim map[string]string) ([]evictionapi.Threshold, error) {
+func ParseThresholdConfig(
+	allocatableConfig []string, 
+	evictionHard, evictionSoft, evictionSoftGracePeriod, 
+	evictionMinimumReclaim map[string]string,
+) ([]evictionapi.Threshold, error) {
 	results := []evictionapi.Threshold{}
 	hardThresholds, err := parseThresholdStatements(evictionHard)
 	if err != nil {

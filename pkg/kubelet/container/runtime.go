@@ -56,6 +56,8 @@ type ImageStats struct {
 	TotalStorageBytes uint64
 }
 
+// Runtime 由 pkg/kubelet/kuberuntime/kuberuntime_manager.go -> kubeGenericRuntimeManager{} 实现
+//
 // Runtime interface defines the interfaces that should be implemented
 // by a container runtime.
 // Thread safety is required from implementations of this interface.
@@ -90,6 +92,10 @@ type Runtime interface {
 	// that are terminated, but not deleted will be evicted.  Otherwise, only deleted pods will be GC'd.
 	// TODO: Revisit this method and make it cleaner.
 	GarbageCollect(gcPolicy ContainerGCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error
+
+	// 具体实现见 pkg/kubelet/kuberuntime/kuberuntime_manager.go ->
+	// kubeGenericRuntimeManager.SyncPod() 方法.
+	//
 	// Syncs the running pod into the desired pod.
 	SyncPod(pod *v1.Pod, podStatus *PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) PodSyncResult
 	// KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.

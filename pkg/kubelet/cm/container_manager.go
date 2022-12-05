@@ -41,6 +41,8 @@ import (
 
 type ActivePodsFunc func() []*v1.Pod
 
+// 由 pkg/kubelet/cm/container_manager_linux.go -> containerManagerImpl{} 结体体实现.
+//
 // Manages the containers running on a machine.
 type ContainerManager interface {
 	// Runs the container manager's housekeeping.
@@ -119,6 +121,7 @@ type NodeConfig struct {
 	RuntimeCgroupsName    string
 	SystemCgroupsName     string
 	KubeletCgroupsName    string
+	// ContainerRuntime 一般为 "docker"
 	ContainerRuntime      string
 	CgroupsPerQOS         bool
 	CgroupRoot            string

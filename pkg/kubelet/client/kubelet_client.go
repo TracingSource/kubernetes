@@ -174,8 +174,15 @@ type NodeConnectionInfoGetter struct {
 	preferredAddressTypes []v1.NodeAddressType
 }
 
+// NewNodeConnectionInfoGetter ...
+//
+// caller:
+// 	1. pkg/registry/core/node/storage/storage.go -> NewStorage()
+//
 // NewNodeConnectionInfoGetter creates a new NodeConnectionInfoGetter.
-func NewNodeConnectionInfoGetter(nodes NodeGetter, config KubeletClientConfig) (ConnectionInfoGetter, error) {
+func NewNodeConnectionInfoGetter(
+	nodes NodeGetter, config KubeletClientConfig,
+) (ConnectionInfoGetter, error) {
 	scheme := "http"
 	if config.EnableHTTPS {
 		scheme = "https"

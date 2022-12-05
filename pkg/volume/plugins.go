@@ -49,7 +49,9 @@ import (
 
 type ProbeOperation uint32
 type ProbeEvent struct {
-	Plugin     VolumePlugin // VolumePlugin that was added/updated/removed. if ProbeEvent.Op is 'ProbeRemove', Plugin should be nil
+	// VolumePlugin that was added/updated/removed.
+	// if ProbeEvent.Op is 'ProbeRemove', Plugin should be nil
+	Plugin     VolumePlugin 
 	PluginName string
 	Op         ProbeOperation // The operation to the plugin
 }
@@ -132,6 +134,9 @@ type DynamicPluginProber interface {
 	Probe() (events []ProbeEvent, err error)
 }
 
+// VolumePlugin 由 hostPath, emptydir, nfs, glusterfs 等各插件自行实现.
+// 比如 pkg/volume/hostpath/host_path.go -> hostPathPlugin{}
+//
 // VolumePlugin is an interface to volume plugins that can be used on a
 // kubernetes node (e.g. by kubelet) to instantiate and manage volumes.
 type VolumePlugin interface {
@@ -646,9 +651,11 @@ func (pm *VolumePluginMgr) initProbedPlugin(probedPlugin VolumePlugin) error {
 	return nil
 }
 
-// FindPluginBySpec looks for a plugin that can support a given volume
-// specification.  If no plugins can support or more than one plugin can
-// support it, return error.
+// caller: 
+// 	1. pkg/volume/util/operationexecutor/operation_generator.go -> operationGenerator.GenerateMountVolumeFunc()
+//
+// FindPluginBySpec looks for a plugin that can support a given volume specification. 
+// If no plugins can support or more than one plugin can support it, return error.
 func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 	pm.mutex.Lock()
 	defer pm.mutex.Unlock()

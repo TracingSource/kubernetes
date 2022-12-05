@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+## Makefile 调试(日志打印), 如:
+## make generated_files DBG_MAKEFILE=1
+
 DBG_MAKEFILE ?=
 ifeq ($(DBG_MAKEFILE),1)
     $(warning ***** starting Makefile for goal(s) "$(MAKECMDGOALS)")

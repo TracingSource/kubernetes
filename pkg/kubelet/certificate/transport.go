@@ -32,6 +32,11 @@ import (
 	"k8s.io/client-go/util/connrotation"
 )
 
+// UpdateTransport ...
+//
+// caller:
+// 	1. cmd/kubelet/app/server.go -> buildKubeletClientConfig()
+//
 // UpdateTransport instruments a restconfig with a transport that dynamically uses
 // certificates provided by the manager for TLS client auth.
 //
@@ -52,13 +57,19 @@ import (
 //
 // stopCh should be used to indicate when the transport is unused and doesn't need
 // to continue checking the manager.
-func UpdateTransport(stopCh <-chan struct{}, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitAfter time.Duration) (func(), error) {
+func UpdateTransport(
+	stopCh <-chan struct{}, clientConfig *restclient.Config, 
+	clientCertificateManager certificate.Manager, exitAfter time.Duration,
+) (func(), error) {
 	return updateTransport(stopCh, 10*time.Second, clientConfig, clientCertificateManager, exitAfter)
 }
 
-// updateTransport is an internal method that exposes how often this method checks that the
-// client cert has changed.
-func updateTransport(stopCh <-chan struct{}, period time.Duration, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitAfter time.Duration) (func(), error) {
+// updateTransport is an internal method that exposes how often this method checks
+// that the client cert has changed.
+func updateTransport(
+	stopCh <-chan struct{}, period time.Duration, clientConfig *restclient.Config, 
+	clientCertificateManager certificate.Manager, exitAfter time.Duration,
+) (func(), error) {
 	if clientConfig.Transport != nil || clientConfig.Dial != nil {
 		return nil, fmt.Errorf("there is already a transport or dialer configured")
 	}
@@ -76,7 +87,11 @@ func updateTransport(stopCh <-chan struct{}, period time.Duration, clientConfig 
 	return d.CloseAll, nil
 }
 
-func addCertRotation(stopCh <-chan struct{}, period time.Duration, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitAfter time.Duration, d *connrotation.Dialer) error {
+func addCertRotation(
+	stopCh <-chan struct{}, period time.Duration, clientConfig *restclient.Config, 
+	clientCertificateManager certificate.Manager, 
+	exitAfter time.Duration, d *connrotation.Dialer,
+) error {
 	tlsConfig, err := restclient.TLSConfigFor(clientConfig)
 	if err != nil {
 		return fmt.Errorf("unable to configure TLS for the rest client: %v", err)

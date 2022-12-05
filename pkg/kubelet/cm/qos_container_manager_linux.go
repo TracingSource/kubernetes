@@ -52,13 +52,18 @@ type qosContainerManagerImpl struct {
 	qosContainersInfo  QOSContainersInfo
 	subsystems         *CgroupSubsystems
 	cgroupManager      CgroupManager
+	// 获取所有非 terminating 状态的 pod
+	// 此值将取自 pkg/kubelet/kubelet_pods.go -> Kubelet.GetActivePods()
 	activePods         ActivePodsFunc
 	getNodeAllocatable func() v1.ResourceList
 	cgroupRoot         CgroupName
 	qosReserved        map[v1.ResourceName]int64
 }
 
-func NewQOSContainerManager(subsystems *CgroupSubsystems, cgroupRoot CgroupName, nodeConfig NodeConfig, cgroupManager CgroupManager) (QOSContainerManager, error) {
+func NewQOSContainerManager(
+	subsystems *CgroupSubsystems, cgroupRoot CgroupName, nodeConfig NodeConfig, 
+	cgroupManager CgroupManager,
+) (QOSContainerManager, error) {
 	if !nodeConfig.CgroupsPerQOS {
 		return &qosContainerManagerNoop{
 			cgroupRoot: cgroupRoot,
@@ -77,7 +82,14 @@ func (m *qosContainerManagerImpl) GetQOSContainersInfo() QOSContainersInfo {
 	return m.qosContainersInfo
 }
 
-func (m *qosContainerManagerImpl) Start(getNodeAllocatable func() v1.ResourceList, activePods ActivePodsFunc) error {
+// Start ...
+//
+// caller: 
+// 	1. pkg/kubelet/cm/container_manager_linux.go -> containerManagerImpl.setupNode()
+//
+func (m *qosContainerManagerImpl) Start(
+	getNodeAllocatable func() v1.ResourceList, activePods ActivePodsFunc,
+) error {
 	cm := m.cgroupManager
 	rootContainer := m.cgroupRoot
 	if !cm.Exists(rootContainer) {
@@ -165,12 +177,23 @@ func (m *qosContainerManagerImpl) setHugePagesConfig(configs map[v1.PodQOSClass]
 	return nil
 }
 
-func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]*CgroupConfig) error {
+// setCPUCgroupConfig 遍历所有 Pod, 将其中 burstable 类型的, 
+// requests.cpu 有值的加起来, 填写到 config 字段中, 
+// 同时设置 bestEffort 的值, 这个种类的值是一个定值 2, 
+// ...难道所有的 bestEffort 类型的 pod 都共享 2个 cpu?
+//
+// caller: 
+// 	1. qosContainerManagerImpl.UpdateCgroups()
+func (m *qosContainerManagerImpl) setCPUCgroupConfig(
+	configs map[v1.PodQOSClass]*CgroupConfig,
+) error {
 	pods := m.activePods()
 	burstablePodCPURequest := int64(0)
 	for i := range pods {
 		pod := pods[i]
+		// qosClass 如 Guaranteed Burstable BestEffort
 		qosClass := v1qos.GetPodQOS(pod)
+		// 只处理 burstable 的 pod
 		if qosClass != v1.PodQOSBurstable {
 			// we only care about the burstable qos tier
 			continue
@@ -194,7 +217,9 @@ func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]
 // setMemoryReserve sums the memory limits of all pods in a QOS class,
 // calculates QOS class memory limits, and set those limits in the
 // CgroupConfig for each QOS class.
-func (m *qosContainerManagerImpl) setMemoryReserve(configs map[v1.PodQOSClass]*CgroupConfig, percentReserve int64) {
+func (m *qosContainerManagerImpl) setMemoryReserve(
+	configs map[v1.PodQOSClass]*CgroupConfig, percentReserve int64,
+) {
 	qosMemoryRequests := map[v1.PodQOSClass]int64{
 		v1.PodQOSGuaranteed: 0,
 		v1.PodQOSBurstable:  0,
@@ -266,6 +291,10 @@ func (m *qosContainerManagerImpl) retrySetMemoryReserve(configs map[v1.PodQOSCla
 	}
 }
 
+// 不过实际的调用方其实是 pkg/kubelet/kubelet.go -> Kubelet.syncPod()
+//
+// caller: 
+// 	1. pkg/kubelet/cm/container_manager_linux.go -> UpdateQOSCgroups()
 func (m *qosContainerManagerImpl) UpdateCgroups() error {
 	m.Lock()
 	defer m.Unlock()
@@ -301,6 +330,7 @@ func (m *qosContainerManagerImpl) UpdateCgroups() error {
 
 		updateSuccess := true
 		for _, config := range qosConfigs {
+			// 这里调用是 pkg/kubelet/cm/cgroup_manager_linux.go -> cgroupManagerImpl.Update()
 			err := m.cgroupManager.Update(config)
 			if err != nil {
 				updateSuccess = false

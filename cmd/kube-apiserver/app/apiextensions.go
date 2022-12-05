@@ -95,6 +95,16 @@ func createAPIExtensionsConfig(
 	return apiextensionsConfig, nil
 }
 
-func createAPIExtensionsServer(apiextensionsConfig *apiextensionsapiserver.Config, delegateAPIServer genericapiserver.DelegationTarget) (*apiextensionsapiserver.CustomResourceDefinitions, error) {
+// createAPIExtensionsServer ...
+//
+// 	@param delegateAPIServer: 一个 emptyDelegate{} 结构体对象.
+//
+// caller: 
+// 	1. cmd/kube-apiserver/app/server.go -> CreateServerChain()
+//
+func createAPIExtensionsServer(
+	apiextensionsConfig *apiextensionsapiserver.Config, 
+	delegateAPIServer genericapiserver.DelegationTarget,
+) (*apiextensionsapiserver.CustomResourceDefinitions, error) {
 	return apiextensionsConfig.Complete().New(delegateAPIServer)
 }

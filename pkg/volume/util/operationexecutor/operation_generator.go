@@ -484,6 +484,8 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 	}, nil
 }
 
+// caller: 
+// 	1. pkg/volume/util/operationexecutor/operation_executor.go -> operationExecutor.MountVolume()
 func (og *operationGenerator) GenerateMountVolumeFunc(
 	waitForAttachTimeout time.Duration,
 	volumeToMount VolumeToMount,
@@ -508,7 +510,8 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		if affinityErr != nil {
 			return volumeToMount.GenerateError("MountVolume.NodeAffinity check failed", affinityErr)
 		}
-
+		// NewMounter() 的实现可以见
+		// pkg/volume/hostpath/host_path.go -> hostPathPlugin.NewMounter()
 		volumeMounter, newMounterErr := volumePlugin.NewMounter(
 			volumeToMount.VolumeSpec,
 			volumeToMount.Pod,
@@ -663,7 +666,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		}
 
 		return nil, nil
-	}
+	} // mountVolumeFunc end ...
 
 	eventRecorderFunc := func(err *error) {
 		if *err != nil {
@@ -1555,7 +1558,13 @@ func checkMountOptionSupport(og *operationGenerator, volumeToMount VolumeToMount
 	return nil
 }
 
-// checkNodeAffinity looks at the PV node affinity, and checks if the node has the same corresponding labels
+// checkNodeAffinity 判断当前 node 是否满足 volume 中 pv 的亲和性配置.
+//
+// caller: 
+// 	1. operationGenerator.GenerateMountVolumeFunc()
+//
+// checkNodeAffinity looks at the PV node affinity,
+// and checks if the node has the same corresponding labels
 // This ensures that we don't mount a volume that doesn't belong to this node
 func checkNodeAffinity(og *operationGenerator, volumeToMount VolumeToMount) error {
 	pv := volumeToMount.VolumeSpec.PersistentVolume

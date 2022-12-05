@@ -188,16 +188,26 @@ func NewDockerClientFromConfig(config *ClientConfig) libdocker.Interface {
 	return nil
 }
 
+// caller: 
+// 	1. cmd/kubelet/app/server.go -> RunDockershim(),
+// 	2. pkg/kubelet/kubelet.go -> NewMainKubelet()
+//
 // NewDockerService creates a new `DockerService` struct.
-// NOTE: Anything passed to DockerService should be eventually handled in another way when we switch to running the shim as a different process.
-func NewDockerService(config *ClientConfig, podSandboxImage string, streamingConfig *streaming.Config, pluginSettings *NetworkPluginSettings,
-	cgroupsName string, kubeCgroupDriver string, dockershimRootDir string, startLocalStreamingServer bool) (DockerService, error) {
+// NOTE: Anything passed to DockerService should be eventually handled in another way
+// when we switch to running the shim as a different process.
+func NewDockerService(
+	config *ClientConfig, podSandboxImage string, streamingConfig *streaming.Config, 
+	pluginSettings *NetworkPluginSettings, cgroupsName string,
+	kubeCgroupDriver string, dockershimRootDir string, startLocalStreamingServer bool,
+) (DockerService, error) {
 
 	client := NewDockerClientFromConfig(config)
 
 	c := libdocker.NewInstrumentedInterface(client)
 
-	checkpointManager, err := checkpointmanager.NewCheckpointManager(filepath.Join(dockershimRootDir, sandboxCheckpointDir))
+	checkpointManager, err := checkpointmanager.NewCheckpointManager(
+		filepath.Join(dockershimRootDir, sandboxCheckpointDir),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -241,15 +251,32 @@ func NewDockerService(config *ClientConfig, podSandboxImage string, streamingCon
 
 	// dockershim currently only supports CNI plugins.
 	pluginSettings.PluginBinDirs = cni.SplitDirs(pluginSettings.PluginBinDirString)
-	cniPlugins := cni.ProbeNetworkPlugins(pluginSettings.PluginConfDir, pluginSettings.PluginCacheDir, pluginSettings.PluginBinDirs)
-	cniPlugins = append(cniPlugins, kubenet.NewPlugin(pluginSettings.PluginBinDirs, pluginSettings.PluginCacheDir))
+	// cni 的这几个 settings 其实是定值, 见 cmd/kubelet/app/options/container_runtime.go
+	// 中的 NewContainerRuntimeOptions() 函数.
+	// 这里 cniPlugins 是读取 /etc/cni/net.d 目录下 cni 配置文件与 /opt 目录的可执行文件,
+	// 得到的默认使用的插件, 下面使用的 kubenet.NewPlugin() 创建的是 kubenet 插件(kuber官方内置插件).
+	// 且 kubenet 排在后面, 一般不使用.
+	cniPlugins := cni.ProbeNetworkPlugins(
+		pluginSettings.PluginConfDir,  	// /etc/cni/net.d
+		pluginSettings.PluginCacheDir, 	// /var/lib/cni/cache
+		pluginSettings.PluginBinDirs, 	// /opt/cni/bin
+	)
+	cniPlugins = append(cniPlugins, kubenet.NewPlugin(
+		pluginSettings.PluginBinDirs, pluginSettings.PluginCacheDir),
+	)
 	netHost := &dockerNetworkHost{
 		&namespaceGetter{ds},
 		&portMappingGetter{ds},
 	}
-	plug, err := network.InitNetworkPlugin(cniPlugins, pluginSettings.PluginName, netHost, pluginSettings.HairpinMode, pluginSettings.NonMasqueradeCIDR, pluginSettings.MTU)
+	plug, err := network.InitNetworkPlugin(
+		cniPlugins, pluginSettings.PluginName, netHost, pluginSettings.HairpinMode, 
+		pluginSettings.NonMasqueradeCIDR, pluginSettings.MTU,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("didn't find compatible CNI plugin with given settings %+v: %v", pluginSettings, err)
+		return nil, fmt.Errorf(
+			"didn't find compatible CNI plugin with given settings %+v: %v", 
+			pluginSettings, err,
+		)
 	}
 	ds.network = network.NewPluginManager(plug)
 	klog.Infof("Docker cri networking managed by %v", plug.Name())
@@ -267,8 +294,12 @@ func NewDockerService(config *ClientConfig, podSandboxImage string, streamingCon
 	} else {
 		cgroupDriver = dockerInfo.CgroupDriver
 	}
+	// kubelet 中配置的 cgroup driver 与 dockerd 使用的不同, 会直接使用 dockerd 的 driver
 	if len(kubeCgroupDriver) != 0 && kubeCgroupDriver != cgroupDriver {
-		return nil, fmt.Errorf("misconfiguration: kubelet cgroup driver: %q is different from docker cgroup driver: %q", kubeCgroupDriver, cgroupDriver)
+		return nil, fmt.Errorf(
+			"misconfiguration: kubelet cgroup driver: %q is different from docker cgroup driver: %q", 
+			kubeCgroupDriver, cgroupDriver,
+		)
 	}
 	klog.Infof("Setting cgroupDriver to %s", cgroupDriver)
 	ds.cgroupDriver = cgroupDriver
@@ -285,9 +316,11 @@ func NewDockerService(config *ClientConfig, podSandboxImage string, streamingCon
 	return ds, nil
 }
 
+// dockerService 实现 DockerService 接口
 type dockerService struct {
 	client           libdocker.Interface
 	os               kubecontainer.OSInterface
+	// 默认sandbox就是pause镜像, 这里写的是镜像地址(含版本).
 	podSandboxImage  string
 	streamingRuntime *streamingRuntime
 	streamingServer  streaming.Server

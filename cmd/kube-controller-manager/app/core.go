@@ -192,6 +192,8 @@ func startNodeIpamController(ctx ControllerContext) (http.Handler, bool, error) 
 	return nil, true, nil
 }
 
+// caller:
+// 	1. cmd/kube-controller-manager/app/controllermanager.go -> StartControllers()
 func startNodeLifecycleController(ctx ControllerContext) (http.Handler, bool, error) {
 	lifecycleController, err := lifecyclecontroller.NewNodeLifecycleController(
 		ctx.InformerFactory.Coordination().V1().Leases(),
@@ -354,9 +356,13 @@ func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, err
 
 func startVolumeExpandController(ctx ControllerContext) (http.Handler, bool, error) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
-		plugins, err := ProbeExpandableVolumePlugins(ctx.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration)
+		plugins, err := ProbeExpandableVolumePlugins(
+			ctx.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration,
+		)
 		if err != nil {
-			return nil, true, fmt.Errorf("failed to probe volume plugins when starting volume expand controller: %v", err)
+			return nil, true, fmt.Errorf(
+				"failed to probe volume plugins when starting volume expand controller: %v", err,
+			)
 		}
 		csiTranslator := csitrans.New()
 		expandController, expandControllerErr := expand.NewExpandController(
@@ -418,7 +424,9 @@ func startResourceQuotaController(ctx ControllerContext) (http.Handler, bool, er
 	resourceQuotaControllerOptions := &resourcequotacontroller.ResourceQuotaControllerOptions{
 		QuotaClient:               resourceQuotaControllerClient.CoreV1(),
 		ResourceQuotaInformer:     ctx.InformerFactory.Core().V1().ResourceQuotas(),
-		ResyncPeriod:              controller.StaticResyncPeriodFunc(ctx.ComponentConfig.ResourceQuotaController.ResourceQuotaSyncPeriod.Duration),
+		ResyncPeriod:              controller.StaticResyncPeriodFunc(
+			ctx.ComponentConfig.ResourceQuotaController.ResourceQuotaSyncPeriod.Duration,
+		),
 		InformerFactory:           ctx.ObjectOrMetadataInformerFactory,
 		ReplenishmentResyncPeriod: ctx.ResyncPeriod,
 		DiscoveryFunc:             discoveryFunc,
@@ -427,16 +435,25 @@ func startResourceQuotaController(ctx ControllerContext) (http.Handler, bool, er
 		Registry:                  generic.NewRegistry(quotaConfiguration.Evaluators()),
 	}
 	if resourceQuotaControllerClient.CoreV1().RESTClient().GetRateLimiter() != nil {
-		if err := ratelimiter.RegisterMetricAndTrackRateLimiterUsage("resource_quota_controller", resourceQuotaControllerClient.CoreV1().RESTClient().GetRateLimiter()); err != nil {
+		err := ratelimiter.RegisterMetricAndTrackRateLimiterUsage(
+			"resource_quota_controller", 
+			resourceQuotaControllerClient.CoreV1().RESTClient().GetRateLimiter(),
+		)
+		if err != nil {
 			return nil, true, err
 		}
 	}
 
-	resourceQuotaController, err := resourcequotacontroller.NewResourceQuotaController(resourceQuotaControllerOptions)
+	resourceQuotaController, err := resourcequotacontroller.NewResourceQuotaController(
+		resourceQuotaControllerOptions,
+	)
 	if err != nil {
 		return nil, false, err
 	}
-	go resourceQuotaController.Run(int(ctx.ComponentConfig.ResourceQuotaController.ConcurrentResourceQuotaSyncs), ctx.Stop)
+	go resourceQuotaController.Run(
+		int(ctx.ComponentConfig.ResourceQuotaController.ConcurrentResourceQuotaSyncs), 
+		ctx.Stop,
+	)
 
 	// Periodically the quota controller to detect new resource types
 	go resourceQuotaController.Sync(discoveryFunc, 30*time.Second, ctx.Stop)
@@ -444,9 +461,15 @@ func startResourceQuotaController(ctx ControllerContext) (http.Handler, bool, er
 	return nil, true, nil
 }
 
+// startNamespaceController ...
+//
+// caller: 
+// 	1. cmd/kube-controller-manager/app/controllermanager.go -> StartControllers()
 func startNamespaceController(ctx ControllerContext) (http.Handler, bool, error) {
-	// the namespace cleanup controller is very chatty.  It makes lots of discovery calls and then it makes lots of delete calls
-	// the ratelimiter negatively affects its speed.  Deleting 100 total items in a namespace (that's only a few of each resource
+	// the namespace cleanup controller is very chatty. 
+	// It makes lots of discovery calls and then it makes lots of delete calls
+	// the ratelimiter negatively affects its speed. 
+	// Deleting 100 total items in a namespace (that's only a few of each resource
 	// including events), takes ~10 seconds by default.
 	nsKubeconfig := ctx.ClientBuilder.ConfigOrDie("namespace-controller")
 	nsKubeconfig.QPS *= 20
@@ -455,7 +478,9 @@ func startNamespaceController(ctx ControllerContext) (http.Handler, bool, error)
 	return startModifiedNamespaceController(ctx, namespaceKubeClient, nsKubeconfig)
 }
 
-func startModifiedNamespaceController(ctx ControllerContext, namespaceKubeClient clientset.Interface, nsKubeconfig *restclient.Config) (http.Handler, bool, error) {
+func startModifiedNamespaceController(
+	ctx ControllerContext, namespaceKubeClient clientset.Interface, nsKubeconfig *restclient.Config,
+) (http.Handler, bool, error) {
 
 	metadataClient, err := metadata.NewForConfig(nsKubeconfig)
 	if err != nil {
@@ -472,7 +497,10 @@ func startModifiedNamespaceController(ctx ControllerContext, namespaceKubeClient
 		ctx.ComponentConfig.NamespaceController.NamespaceSyncPeriod.Duration,
 		v1.FinalizerKubernetes,
 	)
-	go namespaceController.Run(int(ctx.ComponentConfig.NamespaceController.ConcurrentNamespaceSyncs), ctx.Stop)
+	go namespaceController.Run(
+		int(ctx.ComponentConfig.NamespaceController.ConcurrentNamespaceSyncs), 
+		ctx.Stop,
+	)
 
 	return nil, true, nil
 }

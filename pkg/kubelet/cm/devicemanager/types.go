@@ -29,6 +29,8 @@ import (
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
+// 由 pkg/kubelet/cm/devicemanager/manager.go -> ManagerImpl{} 结构体实现
+//
 // Manager manages all the Device Plugins running on a node.
 type Manager interface {
 	// Start starts device plugin registration service.

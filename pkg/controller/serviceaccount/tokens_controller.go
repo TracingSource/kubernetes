@@ -68,8 +68,16 @@ type TokensControllerOptions struct {
 	MaxRetries int
 }
 
+// caller: 
+// 	1. cmd/kube-controller-manager/app/controllermanager_sa_token_controller_starter.go ->
+// serviceAccountTokenControllerStarter.startServiceAccountTokenController()
+//
 // NewTokensController returns a new *TokensController.
-func NewTokensController(serviceAccounts informers.ServiceAccountInformer, secrets informers.SecretInformer, cl clientset.Interface, options TokensControllerOptions) (*TokensController, error) {
+func NewTokensController(
+	serviceAccounts informers.ServiceAccountInformer, 
+	secrets informers.SecretInformer, 
+	cl clientset.Interface, options TokensControllerOptions,
+) (*TokensController, error) {
 	maxRetries := options.MaxRetries
 	if maxRetries == 0 {
 		maxRetries = 10
@@ -161,6 +169,12 @@ type TokensController struct {
 	maxRetries int
 }
 
+// Run ...
+//
+// caller: 
+// 	1. cmd/kube-controller-manager/app/controllermanager_sa_token_controller_starter.go ->
+// 	serviceAccountTokenControllerStarter.startServiceAccountTokenController()
+//
 // Run runs controller blocks until stopCh is closed
 func (e *TokensController) Run(workers int, stopCh <-chan struct{}) {
 	// Shut down queues

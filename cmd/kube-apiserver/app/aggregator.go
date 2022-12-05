@@ -123,36 +123,58 @@ func createAggregatorConfig(
 	return aggregatorConfig, nil
 }
 
-func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delegateAPIServer genericapiserver.DelegationTarget, apiExtensionInformers apiextensionsinformers.SharedInformerFactory) (*aggregatorapiserver.APIAggregator, error) {
+// createAggregatorServer ...
+//
+// 	@param delegateAPIServer: 前面的核心 APIserver启动流程中, 生成的 GenericServer{} 对象
+//
+// caller: 
+// 	1. cmd/kube-apiserver/app/server.go -> CreateServerChain()
+//
+func createAggregatorServer(
+	aggregatorConfig *aggregatorapiserver.Config, 
+	delegateAPIServer genericapiserver.DelegationTarget, 
+	apiExtensionInformers apiextensionsinformers.SharedInformerFactory,
+) (*aggregatorapiserver.APIAggregator, error) {
 	aggregatorServer, err := aggregatorConfig.Complete().NewWithDelegate(delegateAPIServer)
 	if err != nil {
 		return nil, err
 	}
 
 	// create controllers for auto-registration
-	apiRegistrationClient, err := apiregistrationclient.NewForConfig(aggregatorConfig.GenericConfig.LoopbackClientConfig)
+	apiRegistrationClient, err := apiregistrationclient.NewForConfig(
+		aggregatorConfig.GenericConfig.LoopbackClientConfig,
+	)
 	if err != nil {
 		return nil, err
 	}
-	autoRegistrationController := autoregister.NewAutoRegisterController(aggregatorServer.APIRegistrationInformers.Apiregistration().V1().APIServices(), apiRegistrationClient)
+	autoRegistrationController := autoregister.NewAutoRegisterController(
+		aggregatorServer.APIRegistrationInformers.Apiregistration().V1().APIServices(), 
+		apiRegistrationClient,
+	)
 	apiServices := apiServicesToRegister(delegateAPIServer, autoRegistrationController)
 	crdRegistrationController := crdregistration.NewCRDRegistrationController(
 		apiExtensionInformers.Apiextensions().InternalVersion().CustomResourceDefinitions(),
 		autoRegistrationController)
 
-	err = aggregatorServer.GenericAPIServer.AddPostStartHook("kube-apiserver-autoregistration", func(context genericapiserver.PostStartHookContext) error {
-		go crdRegistrationController.Run(5, context.StopCh)
-		go func() {
-			// let the CRD controller process the initial set of CRDs before starting the autoregistration controller.
-			// this prevents the autoregistration controller's initial sync from deleting APIServices for CRDs that still exist.
-			// we only need to do this if CRDs are enabled on this server.  We can't use discovery because we are the source for discovery.
-			if aggregatorConfig.GenericConfig.MergedResourceConfig.AnyVersionForGroupEnabled("apiextensions.k8s.io") {
-				crdRegistrationController.WaitForInitialSync()
-			}
-			autoRegistrationController.Run(5, context.StopCh)
-		}()
-		return nil
-	})
+	err = aggregatorServer.GenericAPIServer.AddPostStartHook(
+		"kube-apiserver-autoregistration", 
+		func(context genericapiserver.PostStartHookContext) error {
+			go crdRegistrationController.Run(5, context.StopCh)
+			go func() {
+				// let the CRD controller process the initial set of CRDs 
+				// before starting the autoregistration controller.
+				// this prevents the autoregistration controller's initial sync 
+				// from deleting APIServices for CRDs that still exist.
+				// we only need to do this if CRDs are enabled on this server. 
+				// We can't use discovery because we are the source for discovery.
+				if aggregatorConfig.GenericConfig.MergedResourceConfig.AnyVersionForGroupEnabled("apiextensions.k8s.io") {
+					crdRegistrationController.WaitForInitialSync()
+				}
+				autoRegistrationController.Run(5, context.StopCh)
+			}()
+			return nil
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -171,10 +193,13 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 	return aggregatorServer, nil
 }
 
+// caller: 
+// 	1. apiServicesToRegister() 聚合 APIServer 启动时被调用.
 func makeAPIService(gv schema.GroupVersion) *v1.APIService {
 	apiServicePriority, ok := apiVersionPriorities[gv]
 	if !ok {
-		// if we aren't found, then we shouldn't register ourselves because it could result in a CRD group version
+		// if we aren't found, then we shouldn't register ourselves because
+		// it could result in a CRD group version
 		// being permanently stuck in the APIServices list.
 		klog.Infof("Skipping APIService creation for %v", gv)
 		return nil
@@ -192,7 +217,10 @@ func makeAPIService(gv schema.GroupVersion) *v1.APIService {
 
 // makeAPIServiceAvailableHealthCheck returns a healthz check that returns healthy
 // once all of the specified services have been observed to be available at least once.
-func makeAPIServiceAvailableHealthCheck(name string, apiServices []*v1.APIService, apiServiceInformer informers.APIServiceInformer) healthz.HealthChecker {
+func makeAPIServiceAvailableHealthCheck(
+	name string, apiServices []*v1.APIService, 
+	apiServiceInformer informers.APIServiceInformer,
+) healthz.HealthChecker {
 	// Track the auto-registered API services that have not been observed to be available yet
 	pendingServiceNamesLock := &sync.RWMutex{}
 	pendingServiceNames := sets.NewString()
@@ -292,7 +320,14 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	// Version can be set to 9 (to have space around) for a new group.
 }
 
-func apiServicesToRegister(delegateAPIServer genericapiserver.DelegationTarget, registration autoregister.AutoAPIServiceRegistration) []*v1.APIService {
+// apiServicesToRegister 在聚合 APIServer 启动过程中, 注册原生内置的 APIService 资源对象.
+// 
+// caller: createAggregatorServer()
+//
+func apiServicesToRegister(
+	delegateAPIServer genericapiserver.DelegationTarget, 
+	registration autoregister.AutoAPIServiceRegistration,
+) []*v1.APIService {
 	apiServices := []*v1.APIService{}
 
 	for _, curr := range delegateAPIServer.ListedPaths() {
@@ -311,7 +346,7 @@ func apiServicesToRegister(delegateAPIServer genericapiserver.DelegationTarget, 
 		if len(tokens) != 4 {
 			continue
 		}
-
+		// curr 为 /apis/admissionregistration.k8s.io/v1 时, 可以运行到这里.
 		apiService := makeAPIService(schema.GroupVersion{Group: tokens[2], Version: tokens[3]})
 		if apiService == nil {
 			continue

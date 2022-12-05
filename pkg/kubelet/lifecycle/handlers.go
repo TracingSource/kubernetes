@@ -37,6 +37,8 @@ const (
 	maxRespBodyLength = 10 * 1 << 10 // 10KB
 )
 
+// HandlerRunner 实现了 pkg/kubelet/container/helpers.go -> HandlerRunner 接口
+// 用于配置 pod 的健康检测探针, 其3个成员正好对应的3种检测方式(http, exec, tcp)
 type HandlerRunner struct {
 	httpGetter       kubetypes.HttpGetter
 	commandRunner    kubecontainer.ContainerCommandRunner
@@ -47,7 +49,13 @@ type podStatusProvider interface {
 	GetPodStatus(uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error)
 }
 
-func NewHandlerRunner(httpGetter kubetypes.HttpGetter, commandRunner kubecontainer.ContainerCommandRunner, containerManager podStatusProvider) kubecontainer.HandlerRunner {
+// caller: 
+// 	1. pkg/kubelet/kuberuntime/kuberuntime_manager.go -> NewKubeGenericRuntimeManager()
+func NewHandlerRunner(
+	httpGetter kubetypes.HttpGetter, 
+	commandRunner kubecontainer.ContainerCommandRunner, 
+	containerManager podStatusProvider,
+) kubecontainer.HandlerRunner {
 	return &HandlerRunner{
 		httpGetter:       httpGetter,
 		commandRunner:    commandRunner,
@@ -55,21 +63,35 @@ func NewHandlerRunner(httpGetter kubetypes.HttpGetter, commandRunner kubecontain
 	}
 }
 
-func (hr *HandlerRunner) Run(containerID kubecontainer.ContainerID, pod *v1.Pod, container *v1.Container, handler *v1.Handler) (string, error) {
+// Run 根据 handler 各字段选择(钩子函数, 健康检查等)执行方式, 如 exec, httpGet 等.
+//
+// caller: 
+// 	1. pkg/kubelet/kuberuntime/kuberuntime_container.go -> kubeGenericRuntimeManager.startContainer()
+// 	在容器启动后执行 postStart 钩子时被调用.
+func (hr *HandlerRunner) Run(
+	containerID kubecontainer.ContainerID, pod *v1.Pod, container *v1.Container, 
+	handler *v1.Handler,
+) (string, error) {
 	switch {
 	case handler.Exec != nil:
 		var msg string
 		// TODO(tallclair): Pass a proper timeout value.
 		output, err := hr.commandRunner.RunInContainer(containerID, handler.Exec.Command, 0)
 		if err != nil {
-			msg = fmt.Sprintf("Exec lifecycle hook (%v) for Container %q in Pod %q failed - error: %v, message: %q", handler.Exec.Command, container.Name, format.Pod(pod), err, string(output))
+			msg = fmt.Sprintf(
+				"Exec lifecycle hook (%v) for Container %q in Pod %q failed - error: %v, message: %q", 
+				handler.Exec.Command, container.Name, format.Pod(pod), err, string(output),
+			)
 			klog.V(1).Infof(msg)
 		}
 		return msg, err
 	case handler.HTTPGet != nil:
 		msg, err := hr.runHTTPHandler(pod, container, handler)
 		if err != nil {
-			msg = fmt.Sprintf("Http lifecycle hook (%s) for Container %q in Pod %q failed - error: %v, message: %q", handler.HTTPGet.Path, container.Name, format.Pod(pod), err, msg)
+			msg = fmt.Sprintf(
+				"Http lifecycle hook (%s) for Container %q in Pod %q failed - error: %v, message: %q", 
+				handler.HTTPGet.Path, container.Name, format.Pod(pod), err, msg,
+			)
 			klog.V(1).Infof(msg)
 		}
 		return msg, err

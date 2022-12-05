@@ -163,8 +163,12 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.Options, regist
 	return Run(ctx, cc, registryOptions...)
 }
 
-// Run executes the scheduler based on the given configuration. It only returns on error or when context is done.
-func Run(ctx context.Context, cc schedulerserverconfig.CompletedConfig, outOfTreeRegistryOptions ...Option) error {
+// Run executes the scheduler based on the given configuration.
+// It only returns on error or when context is done.
+func Run(
+	ctx context.Context, cc schedulerserverconfig.CompletedConfig, 
+	outOfTreeRegistryOptions ...Option,
+) error {
 	// To help debugging, immediately log version
 	klog.V(1).Infof("Starting Kubernetes Scheduler version %+v", version.Get())
 
@@ -176,23 +180,35 @@ func Run(ctx context.Context, cc schedulerserverconfig.CompletedConfig, outOfTre
 	}
 
 	// Prepare event clients.
-	if _, err := cc.Client.Discovery().ServerResourcesForGroupVersion(eventsv1beta1.SchemeGroupVersion.String()); err == nil {
-		cc.Broadcaster = events.NewBroadcaster(&events.EventSinkImpl{Interface: cc.EventClient.Events("")})
-		cc.Recorder = cc.Broadcaster.NewRecorder(scheme.Scheme, cc.ComponentConfig.SchedulerName)
+	_, err := cc.Client.Discovery().ServerResourcesForGroupVersion(
+		eventsv1beta1.SchemeGroupVersion.String(),
+	)
+	if err == nil {
+		cc.Broadcaster = events.NewBroadcaster(
+			&events.EventSinkImpl{Interface: cc.EventClient.Events("")},
+		)
+		cc.Recorder = cc.Broadcaster.NewRecorder(
+			scheme.Scheme, cc.ComponentConfig.SchedulerName,
+		)
 	} else {
-		recorder := cc.CoreBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: cc.ComponentConfig.SchedulerName})
+		recorder := cc.CoreBroadcaster.NewRecorder(
+			scheme.Scheme, v1.EventSource{Component: cc.ComponentConfig.SchedulerName},
+		)
 		cc.Recorder = record.NewEventRecorderAdapter(recorder)
 	}
 
 	// Create the scheduler.
-	sched, err := scheduler.New(cc.Client,
+	sched, err := scheduler.New(
+		cc.Client,
 		cc.InformerFactory,
 		cc.PodInformer,
 		cc.Recorder,
 		ctx.Done(),
 		scheduler.WithName(cc.ComponentConfig.SchedulerName),
 		scheduler.WithAlgorithmSource(cc.ComponentConfig.AlgorithmSource),
-		scheduler.WithHardPodAffinitySymmetricWeight(cc.ComponentConfig.HardPodAffinitySymmetricWeight),
+		scheduler.WithHardPodAffinitySymmetricWeight(
+			cc.ComponentConfig.HardPodAffinitySymmetricWeight,
+		),
 		scheduler.WithPreemptionDisabled(cc.ComponentConfig.DisablePreemption),
 		scheduler.WithPercentageOfNodesToScore(cc.ComponentConfig.PercentageOfNodesToScore),
 		scheduler.WithBindTimeoutSeconds(cc.ComponentConfig.BindTimeoutSeconds),
@@ -211,7 +227,9 @@ func Run(ctx context.Context, cc schedulerserverconfig.CompletedConfig, outOfTre
 		cc.Broadcaster.StartRecordingToSink(ctx.Done())
 	}
 	if cc.CoreBroadcaster != nil && cc.CoreEventClient != nil {
-		cc.CoreBroadcaster.StartRecordingToSink(&corev1.EventSinkImpl{Interface: cc.CoreEventClient.Events("")})
+		cc.CoreBroadcaster.StartRecordingToSink(
+			&corev1.EventSinkImpl{Interface: cc.CoreEventClient.Events("")},
+		)
 	}
 	// Setup healthz checks.
 	var checks []healthz.HealthChecker
@@ -222,7 +240,9 @@ func Run(ctx context.Context, cc schedulerserverconfig.CompletedConfig, outOfTre
 	// Start up the healthz server.
 	if cc.InsecureServing != nil {
 		separateMetrics := cc.InsecureMetricsServing != nil
-		handler := buildHandlerChain(newHealthzHandler(&cc.ComponentConfig, separateMetrics, checks...), nil, nil)
+		handler := buildHandlerChain(newHealthzHandler(
+			&cc.ComponentConfig, separateMetrics, checks...), nil, nil,
+		)
 		if err := cc.InsecureServing.Serve(handler, 0, ctx.Done()); err != nil {
 			return fmt.Errorf("failed to start healthz server: %v", err)
 		}
@@ -234,7 +254,10 @@ func Run(ctx context.Context, cc schedulerserverconfig.CompletedConfig, outOfTre
 		}
 	}
 	if cc.SecureServing != nil {
-		handler := buildHandlerChain(newHealthzHandler(&cc.ComponentConfig, false, checks...), cc.Authentication.Authenticator, cc.Authorization.Authorizer)
+		handler := buildHandlerChain(
+			newHealthzHandler(&cc.ComponentConfig, false, checks...), 
+			cc.Authentication.Authenticator, cc.Authorization.Authorizer,
+		)
 		// TODO: handle stoppedCh returned by c.SecureServing.Serve
 		if _, err := cc.SecureServing.Serve(handler, 0, ctx.Done()); err != nil {
 			// fail early for secure handlers, removing the old error loop from above
@@ -319,7 +342,10 @@ func newMetricsHandler(config *kubeschedulerconfig.KubeSchedulerConfiguration) h
 // newHealthzHandler creates a healthz server from the config, and will also
 // embed the metrics handler if the healthz and metrics address configurations
 // are the same.
-func newHealthzHandler(config *kubeschedulerconfig.KubeSchedulerConfiguration, separateMetrics bool, checks ...healthz.HealthChecker) http.Handler {
+func newHealthzHandler(
+	config *kubeschedulerconfig.KubeSchedulerConfiguration, separateMetrics bool, 
+	checks ...healthz.HealthChecker,
+) http.Handler {
 	pathRecorderMux := mux.NewPathRecorderMux("kube-scheduler")
 	healthz.InstallHandler(pathRecorderMux, checks...)
 	if !separateMetrics {

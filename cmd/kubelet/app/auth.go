@@ -35,8 +35,21 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/server"
 )
 
-// BuildAuth creates an authenticator, an authorizer, and a matching authorizer attributes getter compatible with the kubelet's needs
-func BuildAuth(nodeName types.NodeName, client clientset.Interface, config kubeletconfig.KubeletConfiguration) (server.AuthInterface, error) {
+// BuildAuth ...
+//
+// 	@param nodeName: 当前 kubelet 所在主机的主机名
+// 	@param client: 常规的 kube client 对象
+// 	@param config: /var/lib/kubelet/config.yaml 文件的内容
+//
+// caller: 
+// 	1. cmd/kubelet/app/server.go -> run()
+//
+// BuildAuth creates an authenticator, an authorizer, 
+// and a matching authorizer attributes getter compatible with the kubelet's needs
+func BuildAuth(
+	nodeName types.NodeName, client clientset.Interface, 
+	config kubeletconfig.KubeletConfiguration,
+) (server.AuthInterface, error) {
 	// Get clients, if provided
 	var (
 		tokenClient authenticationclient.TokenReviewInterface
@@ -62,12 +75,21 @@ func BuildAuth(nodeName types.NodeName, client clientset.Interface, config kubel
 	return server.NewKubeletAuth(authenticator, attributes, authorizer), nil
 }
 
+// BuildAuthn ...
+//
+// caller: 
+// 	1. BuildAuth()
+//
 // BuildAuthn creates an authenticator compatible with the kubelet's needs
-func BuildAuthn(client authenticationclient.TokenReviewInterface, authn kubeletconfig.KubeletAuthentication) (authenticator.Request, error) {
+func BuildAuthn(
+	client authenticationclient.TokenReviewInterface, authn kubeletconfig.KubeletAuthentication,
+) (authenticator.Request, error) {
 	var clientCertificateCAContentProvider authenticatorfactory.CAContentProvider
 	var err error
 	if len(authn.X509.ClientCAFile) > 0 {
-		clientCertificateCAContentProvider, err = dynamiccertificates.NewDynamicCAContentFromFile("client-ca-bundle", authn.X509.ClientCAFile)
+		clientCertificateCAContentProvider, err = dynamiccertificates.NewDynamicCAContentFromFile(
+			"client-ca-bundle", authn.X509.ClientCAFile,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -90,12 +112,21 @@ func BuildAuthn(client authenticationclient.TokenReviewInterface, authn kubeletc
 	return authenticator, err
 }
 
+// BuildAuthz ...
+//
+// caller: 
+// 	1. BuildAuth()
+//
 // BuildAuthz creates an authorizer compatible with the kubelet's needs
-func BuildAuthz(client authorizationclient.SubjectAccessReviewInterface, authz kubeletconfig.KubeletAuthorization) (authorizer.Authorizer, error) {
+func BuildAuthz(
+	client authorizationclient.SubjectAccessReviewInterface, 
+	authz kubeletconfig.KubeletAuthorization,
+) (authorizer.Authorizer, error) {
 	switch authz.Mode {
 	case kubeletconfig.KubeletAuthorizationModeAlwaysAllow:
 		return authorizerfactory.NewAlwaysAllowAuthorizer(), nil
 
+	// 会进入该 case
 	case kubeletconfig.KubeletAuthorizationModeWebhook:
 		if client == nil {
 			return nil, errors.New("no client provided, cannot use webhook authorization")

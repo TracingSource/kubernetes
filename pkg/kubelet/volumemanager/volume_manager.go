@@ -141,6 +141,9 @@ type VolumeManager interface {
 	MarkVolumesAsReportedInUse(volumesReportedAsInUse []v1.UniqueVolumeName)
 }
 
+// caller: 
+// 	1. pkg/kubelet/kubelet__new.go -> NewMainKubelet()
+//
 // NewVolumeManager returns a new concrete instance implementing the
 // VolumeManager interface.
 //
@@ -162,19 +165,23 @@ func NewVolumeManager(
 	recorder record.EventRecorder,
 	checkNodeCapabilitiesBeforeMount bool,
 	keepTerminatedPodVolumes bool,
-	blockVolumePathHandler volumepathhandler.BlockVolumePathHandler) VolumeManager {
+	blockVolumePathHandler volumepathhandler.BlockVolumePathHandler,
+) VolumeManager {
 
 	vm := &volumeManager{
 		kubeClient:          kubeClient,
 		volumePluginMgr:     volumePluginMgr,
 		desiredStateOfWorld: cache.NewDesiredStateOfWorld(volumePluginMgr),
 		actualStateOfWorld:  cache.NewActualStateOfWorld(nodeName, volumePluginMgr),
-		operationExecutor: operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
-			kubeClient,
-			volumePluginMgr,
-			recorder,
-			checkNodeCapabilitiesBeforeMount,
-			blockVolumePathHandler)),
+		operationExecutor: operationexecutor.NewOperationExecutor(
+			operationexecutor.NewOperationGenerator(
+				kubeClient,
+				volumePluginMgr,
+				recorder,
+				checkNodeCapabilitiesBeforeMount,
+				blockVolumePathHandler,
+			),
+		),
 	}
 
 	intreeToCSITranslator := csitrans.New()
@@ -256,6 +263,10 @@ type volumeManager struct {
 	intreeToCSITranslator csimigration.InTreeToCSITranslator
 }
 
+// Run kubelet 启动时会启动多个工作协程, 这是其中一个.
+//
+// caller: 
+// 	1. pkg/kubelet/kubelet.go -> Kubelet.Run()
 func (vm *volumeManager) Run(sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
 	defer runtime.HandleCrash()
 
@@ -276,6 +287,7 @@ func (vm *volumeManager) Run(sourcesReady config.SourcesReady, stopCh <-chan str
 	klog.Infof("Shutting down Kubelet Volume Manager")
 }
 
+// GetMountedVolumesForPod 从 actualStateOfWorld 中获取该 Pod 已经声明的 volume 列表(map).
 func (vm *volumeManager) GetMountedVolumesForPod(podName types.UniquePodName) container.VolumeMap {
 	podVolumes := make(container.VolumeMap)
 	for _, mountedVolume := range vm.actualStateOfWorld.GetMountedVolumesForPod(podName) {

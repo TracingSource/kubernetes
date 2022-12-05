@@ -51,6 +51,12 @@ type ServerRunOptions struct {
 	EgressSelector          *genericoptions.EgressSelectorOptions
 
 	AllowPrivileged           bool
+	// EnableLogsHandler 调试神器...注册一个可查询 /var/log 目录的静态路由.
+	//
+	// 比如, 请求 'https://127.0.0.1:6443/logs/' 可以查看 apiserver 所在容器/主机的 /var/log/ 目录下的文件列表.
+	// 请求 'https://127.0.0.1:16443/logs/messages' 则可以查看 /var/log/messages 文件的内容.
+	//
+	// 初始化时被赋值为 true (在 CreateKubeAPIServerConfig() 中)
 	EnableLogsHandler         bool
 	EventTTL                  time.Duration
 	KubeletConfig             kubeletclient.KubeletClientConfig

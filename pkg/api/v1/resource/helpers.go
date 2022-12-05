@@ -54,6 +54,8 @@ func maxResourceList(list, new v1.ResourceList) {
 	}
 }
 
+// PodRequestsAndLimits 分别取得 pod 的 requests/limits 对象.
+//
 // PodRequestsAndLimits returns a dictionary of all defined resources summed up for all
 // containers of the pod. If PodOverhead feature is enabled, pod overhead is added to the
 // total container resource requests and to the total container limits which have a

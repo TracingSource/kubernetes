@@ -25,10 +25,16 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 )
 
-// createCloudProvider helps consolidate what is needed for cloud providers, we explicitly list the things
-// that the cloud providers need as parameters, so we can control
-func createCloudProvider(cloudProvider string, externalCloudVolumePlugin string, cloudConfigFile string,
-	allowUntaggedCloud bool, sharedInformers informers.SharedInformerFactory) (cloudprovider.Interface, ControllerLoopMode, error) {
+// caller: 
+// 	1. cmd/kube-controller-manager/app/controllermanager.go -> CreateControllerContext()
+//
+// createCloudProvider helps consolidate what is needed for cloud providers, 
+// we explicitly list the things that the cloud providers need as parameters,
+// so we can control
+func createCloudProvider(
+	cloudProvider string, externalCloudVolumePlugin string, cloudConfigFile string,
+	allowUntaggedCloud bool, sharedInformers informers.SharedInformerFactory,
+) (cloudprovider.Interface, ControllerLoopMode, error) {
 	var cloud cloudprovider.Interface
 	var loopMode ControllerLoopMode
 	var err error

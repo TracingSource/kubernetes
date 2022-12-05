@@ -36,6 +36,8 @@ const (
 	podCgroupNamePrefix = "pod"
 )
 
+// 实现了 pkg/kubelet/cm/types.go -> PodContainerManager 接口.
+//
 // podContainerManagerImpl implements podContainerManager interface.
 // It is the general implementation which allows pod level container
 // management if qos Cgroup is enabled.
@@ -67,6 +69,10 @@ func (m *podContainerManagerImpl) applyLimits(pod *v1.Pod) error {
 	return nil
 }
 
+// Exists 取得 pod 名称, 然后调用 cgroupManager.Exists() 同名函数.
+//
+// caller: 
+// 	1. pkg/kubelet/kubelet.go -> Kubelet.syncPod()
 // Exists checks if the pod's cgroup already exists
 func (m *podContainerManagerImpl) Exists(pod *v1.Pod) bool {
 	podContainerName, _ := m.GetPodContainerName(pod)

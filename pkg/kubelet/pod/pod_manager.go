@@ -31,6 +31,8 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
+// Manager 由当前源文件的 basicManager{} 结构体实现
+//
 // Manager stores and manages access to pods, maintaining the mappings
 // between static pods and mirror pods.
 //
@@ -91,7 +93,10 @@ type Manager interface {
 	TranslatePodUID(uid types.UID) kubetypes.ResolvedPodUID
 	// GetUIDTranslations returns the mappings of static pod UIDs to mirror pod
 	// UIDs and mirror pod UIDs to static pod UIDs.
-	GetUIDTranslations() (podToMirror map[kubetypes.ResolvedPodUID]kubetypes.MirrorPodUID, mirrorToPod map[kubetypes.MirrorPodUID]kubetypes.ResolvedPodUID)
+	GetUIDTranslations() (
+		podToMirror map[kubetypes.ResolvedPodUID]kubetypes.MirrorPodUID, 
+		mirrorToPod map[kubetypes.MirrorPodUID]kubetypes.ResolvedPodUID,
+	)
 	// IsMirrorPodOf returns true if mirrorPod is a correct representation of
 	// pod; false otherwise.
 	IsMirrorPodOf(mirrorPod, pod *v1.Pod) bool
@@ -107,6 +112,9 @@ type basicManager struct {
 	// Protects all internal maps.
 	lock sync.RWMutex
 
+	// podByUID 包含当前主机上所有正在运行的 Pod 信息, 包含静态 Pod. 
+	// key 为 podUID, val 为 Pod 对象
+	//
 	// Regular pods indexed by UID.
 	podByUID map[kubetypes.ResolvedPodUID]*v1.Pod
 	// Mirror pods indexed by UID.
@@ -116,20 +124,31 @@ type basicManager struct {
 	podByFullName       map[string]*v1.Pod
 	mirrorPodByFullName map[string]*v1.Pod
 
+	// key 为 mirrorPod uid, 格式为; val 为 PodUID
+	//
 	// Mirror pod UID to pod UID map.
 	translationByUID map[kubetypes.MirrorPodUID]kubetypes.ResolvedPodUID
 
 	// basicManager is keeping secretManager and configMapManager up-to-date.
 	secretManager     secret.Manager
 	configMapManager  configmap.Manager
+	// checkpointManager 一般为 nil
 	checkpointManager checkpointmanager.CheckpointManager
 
 	// A mirror pod client to create/delete mirror pods.
 	MirrorClient
 }
 
+// 	@param cpm: 一般为 nil
+//
+// caller:
+// 	1. pkg/kubelet/kubelet__new.go -> NewMainKubelet()
+//
 // NewBasicPodManager returns a functional Manager.
-func NewBasicPodManager(client MirrorClient, secretManager secret.Manager, configMapManager configmap.Manager, cpm checkpointmanager.CheckpointManager) Manager {
+func NewBasicPodManager(
+	client MirrorClient, secretManager secret.Manager, 
+	configMapManager configmap.Manager, cpm checkpointmanager.CheckpointManager,
+) Manager {
 	pm := &basicManager{}
 	pm.secretManager = secretManager
 	pm.configMapManager = configMapManager
@@ -139,6 +158,9 @@ func NewBasicPodManager(client MirrorClient, secretManager secret.Manager, confi
 	return pm
 }
 
+// caller:
+// 	1. NewBasicPodManager() 在 kubelet 启动过程中被调用. 
+//
 // Set the internal pods based on the new pods.
 func (pm *basicManager) SetPods(newPods []*v1.Pod) {
 	pm.lock.Lock()
@@ -149,29 +171,43 @@ func (pm *basicManager) SetPods(newPods []*v1.Pod) {
 	pm.mirrorPodByUID = make(map[kubetypes.MirrorPodUID]*v1.Pod)
 	pm.mirrorPodByFullName = make(map[string]*v1.Pod)
 	pm.translationByUID = make(map[kubetypes.MirrorPodUID]kubetypes.ResolvedPodUID)
-
+	// 本函数好像只有一处调用, 但 newPods 参数为 nil, updatePodsInternal() 相当于没执行...
 	pm.updatePodsInternal(newPods...)
 }
 
+// AddPod ...
+//
+// caller: 
+// 	1. pkg/kubelet/kubelet.go -> Kubelet.HandlePodAdditions() 目前来看, 只有这一处
 func (pm *basicManager) AddPod(pod *v1.Pod) {
 	pm.UpdatePod(pod)
 }
 
+// UpdatePod kubelet 在监听到 apiserver/manifests 的 Pod 发生变动时, 会进入这里.
+//
+// caller: 
+// 	1. basicManager.AddPod() 目前来看, 只有这一处
 func (pm *basicManager) UpdatePod(pod *v1.Pod) {
 	pm.lock.Lock()
 	defer pm.lock.Unlock()
 	pm.updatePodsInternal(pod)
-	if pm.checkpointManager != nil {
+	if pm.checkpointManager != nil { // 一般不会进到这个 case 里
 		if err := checkpoint.WritePod(pm.checkpointManager, pod); err != nil {
 			klog.Errorf("Error writing checkpoint for pod: %v", pod.GetName())
 		}
 	}
 }
 
+// caller: 
+// 	1. basicManager.updatePodsInternal()
 func isPodInTerminatedState(pod *v1.Pod) bool {
 	return pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded
 }
 
+// caller:
+// 	1. basicManager.SetPods() 传入参数为 nil, 根本没用.
+// 	2. basicManager.UpdatePod()
+//
 // updatePodsInternal replaces the given pods in the current state of the
 // manager, updating the various indices. The caller is assumed to hold the
 // lock.
@@ -214,6 +250,7 @@ func (pm *basicManager) updatePodsInternal(pods ...*v1.Pod) {
 				pm.translationByUID[mirrorPodUID] = kubetypes.ResolvedPodUID(p.UID)
 			}
 		} else {
+			// 这里 ResolvedPodUID() 只是一个类型转换操作.
 			resolvedPodUID := kubetypes.ResolvedPodUID(pod.UID)
 			pm.podByUID[resolvedPodUID] = pod
 			pm.podByFullName[podFullName] = pod
@@ -251,6 +288,8 @@ func (pm *basicManager) DeletePod(pod *v1.Pod) {
 	}
 }
 
+// caller: 
+// 	1. pkg/kubelet/kubelet_pods.go -> Kubelet.GetActivePods()
 func (pm *basicManager) GetPods() []*v1.Pod {
 	pm.lock.RLock()
 	defer pm.lock.RUnlock()
@@ -268,7 +307,8 @@ func (pm *basicManager) GetPodsAndMirrorPods() ([]*v1.Pod, []*v1.Pod) {
 func (pm *basicManager) GetPodByUID(uid types.UID) (*v1.Pod, bool) {
 	pm.lock.RLock()
 	defer pm.lock.RUnlock()
-	pod, ok := pm.podByUID[kubetypes.ResolvedPodUID(uid)] // Safe conversion, map only holds non-mirrors.
+	// Safe conversion, map only holds non-mirrors.
+	pod, ok := pm.podByUID[kubetypes.ResolvedPodUID(uid)] 
 	return pod, ok
 }
 
@@ -298,6 +338,8 @@ func (pm *basicManager) TranslatePodUID(uid types.UID) kubetypes.ResolvedPodUID 
 	return kubetypes.ResolvedPodUID(uid)
 }
 
+// caller: 
+// 	1. pkg/kubelet/status/status_manager.go -> manager.syncBatch()
 func (pm *basicManager) GetUIDTranslations() (podToMirror map[kubetypes.ResolvedPodUID]kubetypes.MirrorPodUID,
 	mirrorToPod map[kubetypes.MirrorPodUID]kubetypes.ResolvedPodUID) {
 	pm.lock.RLock()
@@ -305,6 +347,10 @@ func (pm *basicManager) GetUIDTranslations() (podToMirror map[kubetypes.Resolved
 
 	podToMirror = make(map[kubetypes.ResolvedPodUID]kubetypes.MirrorPodUID, len(pm.translationByUID))
 	mirrorToPod = make(map[kubetypes.MirrorPodUID]kubetypes.ResolvedPodUID, len(pm.translationByUID))
+	// 理论上, 经过如下2个 for 循环, podToMirror 与 pm.translationByUID 的内容应该是一样的.
+	// 但可能存在一种情况就是, 一个 staticPod 还没有生成 ta 对应的 mirrorPod,
+	// 那么
+	//
 	// Insert empty translation mapping for all static pods.
 	for uid, pod := range pm.podByUID {
 		if !kubetypes.IsStaticPod(pod) {
@@ -370,6 +416,8 @@ func mirrorPodsMapToMirrorPods(UIDMap map[kubetypes.MirrorPodUID]*v1.Pod) []*v1.
 	return pods
 }
 
+// caller: 
+// 	1. pkg/kubelet/kubelet.go -> Kubelet.HandlePodSyncs()
 func (pm *basicManager) GetMirrorPodByPod(pod *v1.Pod) (*v1.Pod, bool) {
 	pm.lock.RLock()
 	defer pm.lock.RUnlock()

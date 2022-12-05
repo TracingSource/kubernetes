@@ -36,13 +36,16 @@ type ContainerGCPolicy struct {
 	MaxContainers int
 }
 
+// ContainerGC 由 realContainerGC{} 结构体实现
+//
 // Manages garbage collection of dead containers.
 //
 // Implementation is thread-compatible.
 type ContainerGC interface {
 	// Garbage collect containers.
 	GarbageCollect() error
-	// Deletes all unused containers, including containers belonging to pods that are terminated but not deleted
+	// Deletes all unused containers, including containers belonging to pods
+	// that are terminated but not deleted
 	DeleteAllUnusedContainers() error
 }
 
@@ -54,6 +57,8 @@ type SourcesReadyProvider interface {
 
 // TODO(vmarmol): Preferentially remove pod infra containers.
 type realContainerGC struct {
+	// pkg/kubelet/kuberuntime/kuberuntime_manager.go -> kubeGenericRuntimeManager{}
+	//
 	// Container runtime
 	runtime Runtime
 
@@ -64,8 +69,15 @@ type realContainerGC struct {
 	sourcesReadyProvider SourcesReadyProvider
 }
 
+// ContainerGC ...
+//
+// caller: 
+// 	1. pkg/kubelet/kubelet.go -> NewMainKubelet()
+//
 // New ContainerGC instance with the specified policy.
-func NewContainerGC(runtime Runtime, policy ContainerGCPolicy, sourcesReadyProvider SourcesReadyProvider) (ContainerGC, error) {
+func NewContainerGC(
+	runtime Runtime, policy ContainerGCPolicy, sourcesReadyProvider SourcesReadyProvider,
+) (ContainerGC, error) {
 	if policy.MinAge < 0 {
 		return nil, fmt.Errorf("invalid minimum garbage collection age: %v", policy.MinAge)
 	}
@@ -77,11 +89,17 @@ func NewContainerGC(runtime Runtime, policy ContainerGCPolicy, sourcesReadyProvi
 	}, nil
 }
 
+// GarbageCollect ...
+//
+// caller:
+// 	1. pkg/kubelet/kubelet.go -> Kubelet.StartGarbageCollection()
 func (cgc *realContainerGC) GarbageCollect() error {
 	return cgc.runtime.GarbageCollect(cgc.policy, cgc.sourcesReadyProvider.AllReady(), false)
 }
 
 func (cgc *realContainerGC) DeleteAllUnusedContainers() error {
 	klog.Infof("attempting to delete unused containers")
-	return cgc.runtime.GarbageCollect(cgc.policy, cgc.sourcesReadyProvider.AllReady(), true)
+	return cgc.runtime.GarbageCollect(
+		cgc.policy, cgc.sourcesReadyProvider.AllReady(), true,
+	)
 }

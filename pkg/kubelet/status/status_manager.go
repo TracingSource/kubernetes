@@ -40,8 +40,8 @@ import (
 	statusutil "k8s.io/kubernetes/pkg/util/pod"
 )
 
-// A wrapper around v1.PodStatus that includes a version to enforce that stale pod statuses are
-// not sent to the API server.
+// A wrapper around v1.PodStatus that includes a version to enforce
+// that stale pod statuses are not sent to the API server.
 type versionedPodStatus struct {
 	status v1.PodStatus
 	// Monotonically increasing version number (per pod).
@@ -65,17 +65,20 @@ type manager struct {
 	podStatuses      map[types.UID]versionedPodStatus
 	podStatusesLock  sync.RWMutex
 	podStatusChannel chan podStatusSyncRequest
+	// apiStatusVersions 与 apiserver 中存储着的 Pod 对应的本地缓存, 
+	// 包含静态 Pod 对应的 mirrorPod.
+	//
 	// Map from (mirror) pod UID to latest status version successfully sent to the API server.
 	// apiStatusVersions must only be accessed from the sync thread.
 	apiStatusVersions map[kubetypes.MirrorPodUID]uint64
 	podDeletionSafety PodDeletionSafetyProvider
 }
 
-// PodStatusProvider knows how to provide status for a pod. It's intended to be used by other components
-// that need to introspect status.
+// PodStatusProvider knows how to provide status for a pod.
+// It's intended to be used by other components that need to introspect status.
 type PodStatusProvider interface {
-	// GetPodStatus returns the cached status for the provided pod UID, as well as whether it
-	// was a cache hit.
+	// GetPodStatus returns the cached status for the provided pod UID,
+	// as well as whether it was a cache hit.
 	GetPodStatus(uid types.UID) (v1.PodStatus, bool)
 }
 
@@ -85,11 +88,17 @@ type PodDeletionSafetyProvider interface {
 	PodResourcesAreReclaimed(pod *v1.Pod, status v1.PodStatus) bool
 }
 
-// Manager is the Source of truth for kubelet pod status, and should be kept up-to-date with
-// the latest v1.PodStatus. It also syncs updates back to the API server.
+// Manager 由 manager{} 结构体实现(就在当前源文件)
+//
+// Manager is the Source of truth for kubelet pod status,
+// and should be kept up-to-date with the latest v1.PodStatus.
+// It also syncs updates back to the API server.
 type Manager interface {
 	PodStatusProvider
 
+	// Start 与 apiserver 保持通信, 同步当前主机上的 pod 状态.
+	// 基本逻辑为, 10s无Pod变动时强制同步, 如有Pod变动时立即触发同步.
+	//
 	// Start the API server status sync loop.
 	Start()
 
@@ -115,13 +124,22 @@ type Manager interface {
 
 const syncPeriod = 10 * time.Second
 
+// NewManager 构造 manager{} 结构体并返回, 很简单.
+//
+// caller: 
+// 	1. pkg/kubelet/kubelet__new.go -> NewMainKubelet()
+//
 // NewManager returns a functional Manager.
-func NewManager(kubeClient clientset.Interface, podManager kubepod.Manager, podDeletionSafety PodDeletionSafetyProvider) Manager {
+func NewManager(
+	kubeClient clientset.Interface, podManager kubepod.Manager, 
+	podDeletionSafety PodDeletionSafetyProvider,
+) Manager {
 	return &manager{
 		kubeClient:        kubeClient,
 		podManager:        podManager,
 		podStatuses:       make(map[types.UID]versionedPodStatus),
-		podStatusChannel:  make(chan podStatusSyncRequest, 1000), // Buffer up to 1000 statuses
+		// Buffer up to 1000 statuses
+		podStatusChannel:  make(chan podStatusSyncRequest, 1000), 
 		apiStatusVersions: make(map[kubetypes.MirrorPodUID]uint64),
 		podDeletionSafety: podDeletionSafety,
 	}
@@ -145,10 +163,15 @@ func isPodStatusByKubeletEqual(oldStatus, status *v1.PodStatus) bool {
 	return apiequality.Semantic.DeepEqual(oldCopy, status)
 }
 
+// Start 与 apiserver 保持通信, 同步当前主机上的 pod 状态.
+// 基本逻辑为, 10s无Pod变动时强制同步, 如有Pod变动时立即触发同步.
+//
+// caller: 
+// 	1. pkg/kubelet/kubelet.go -> Kubelet.Run()
 func (m *manager) Start() {
-	// Don't start the status manager if we don't have a client. This will happen
-	// on the master, where the kubelet is responsible for bootstrapping the pods
-	// of the master components.
+	// Don't start the status manager if we don't have a client.
+	// This will happen on the master, where the kubelet is responsible for
+	// bootstrapping the pods of the master components.
 	if m.kubeClient == nil {
 		klog.Infof("Kubernetes client is nil, not starting status manager.")
 		return
@@ -159,6 +182,8 @@ func (m *manager) Start() {
 	syncTicker := time.Tick(syncPeriod)
 	// syncPod and syncBatch share the same go routine to avoid sync races.
 	go wait.Forever(func() {
+		// 2 个 case, 10s无Pod变动时强制同步, 如有Pod变动时立即触发同步.
+		//
 		select {
 		case syncRequest := <-m.podStatusChannel:
 			klog.V(5).Infof("Status Manager: syncing pod: %q, with status: (%d, %v) from podStatusChannel",
@@ -177,6 +202,8 @@ func (m *manager) GetPodStatus(uid types.UID) (v1.PodStatus, bool) {
 	return status.status, ok
 }
 
+// caller: 
+// 	1. pkg/kubelet/kubelet.go -> Kubelet.syncPod() (在此函数中有三处调用)
 func (m *manager) SetPodStatus(pod *v1.Pod, status v1.PodStatus) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
@@ -196,7 +223,11 @@ func (m *manager) SetPodStatus(pod *v1.Pod, status v1.PodStatus) {
 	m.updateStatusInternal(pod, status, pod.DeletionTimestamp != nil)
 }
 
-func (m *manager) SetContainerReadiness(podUID types.UID, containerID kubecontainer.ContainerID, ready bool) {
+// caller: 
+// 	1. pkg/kubelet/prober/prober_manager.go -> updateReadiness()
+func (m *manager) SetContainerReadiness(
+	podUID types.UID, containerID kubecontainer.ContainerID, ready bool,
+) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
 
@@ -357,6 +388,12 @@ func checkContainerStateTransition(oldStatuses, newStatuses []v1.ContainerStatus
 	return nil
 }
 
+// caller:
+// 	1. manager.SetPodStatus()
+// 	2. manager.TerminatePod()
+// 	3. manager.SetContainerReadiness()
+// 	4. manager.SetContainerStartup()
+//
 // updateStatusInternal updates the internal status cache, and queues an update to the api server if
 // necessary. Returns whether an update was triggered.
 // This method IS NOT THREAD SAFE and must be called from a locked function.
@@ -372,11 +409,17 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 	}
 
 	// Check for illegal state transition in containers
-	if err := checkContainerStateTransition(oldStatus.ContainerStatuses, status.ContainerStatuses, pod.Spec.RestartPolicy); err != nil {
+	err := checkContainerStateTransition(
+		oldStatus.ContainerStatuses, status.ContainerStatuses, pod.Spec.RestartPolicy,
+	)
+	if err != nil {
 		klog.Errorf("Status update on pod %v/%v aborted: %v", pod.Namespace, pod.Name, err)
 		return false
 	}
-	if err := checkContainerStateTransition(oldStatus.InitContainerStatuses, status.InitContainerStatuses, pod.Spec.RestartPolicy); err != nil {
+	err = checkContainerStateTransition(
+		oldStatus.InitContainerStatuses, status.InitContainerStatuses, pod.Spec.RestartPolicy,
+	)
+	if err != nil {
 		klog.Errorf("Status update on pod %v/%v aborted: %v", pod.Namespace, pod.Name, err)
 		return false
 	}
@@ -466,6 +509,12 @@ func (m *manager) RemoveOrphanedStatuses(podUIDs map[types.UID]bool) {
 	}
 }
 
+// syncBatch 向 apiserver 批量上报当前主机上的 Pod 状态信息.
+// 由主调函数定时调用.
+//
+// caller:
+// 	1. manager.Start()
+//
 // syncBatch syncs pods statuses with the apiserver.
 func (m *manager) syncBatch() {
 	var updatedStatuses []podStatusSyncRequest
@@ -476,8 +525,8 @@ func (m *manager) syncBatch() {
 
 		// Clean up orphaned versions.
 		for uid := range m.apiStatusVersions {
-			_, hasPod := m.podStatuses[types.UID(uid)]
-			_, hasMirror := mirrorToPod[uid]
+			_, hasPod := m.podStatuses[types.UID(uid)] // kubelet 本地 Pod
+			_, hasMirror := mirrorToPod[uid] // kubelet 本地缓存的 mirrorPod
 			if !hasPod && !hasMirror {
 				delete(m.apiStatusVersions, uid)
 			}
@@ -487,7 +536,10 @@ func (m *manager) syncBatch() {
 			syncedUID := kubetypes.MirrorPodUID(uid)
 			if mirrorUID, ok := podToMirror[kubetypes.ResolvedPodUID(uid)]; ok {
 				if mirrorUID == "" {
-					klog.V(5).Infof("Static pod %q (%s/%s) does not have a corresponding mirror pod; skipping", uid, status.podName, status.podNamespace)
+					klog.V(5).Infof(
+						"Static pod %q (%s/%s) does not have a corresponding mirror pod; skipping", 
+						uid, status.podName, status.podNamespace,
+					)
 					continue
 				}
 				syncedUID = mirrorUID
@@ -511,6 +563,9 @@ func (m *manager) syncBatch() {
 	}
 }
 
+// caller: 
+// 	1. manager.syncBatch()
+//
 // syncPod syncs the given status with the API server. The caller must not hold the lock.
 func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	if !m.needsUpdate(uid, status) {
@@ -566,6 +621,9 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	}
 }
 
+// caller: 
+// 	1. manager.syncBatch()
+//
 // needsUpdate returns whether the status is stale for the given pod UID.
 // This method is not thread safe, and must only be accessed by the sync thread.
 func (m *manager) needsUpdate(uid types.UID, status versionedPodStatus) bool {
@@ -587,6 +645,9 @@ func (m *manager) canBeDeleted(pod *v1.Pod, status v1.PodStatus) bool {
 	return m.podDeletionSafety.PodResourcesAreReclaimed(pod, status)
 }
 
+// caller: 
+// 	1. manager.syncBatch()
+//
 // needsReconcile compares the given status with the status in the pod manager (which
 // in fact comes from apiserver), returns whether the status needs to be reconciled with
 // the apiserver. Now when pod status is inconsistent between apiserver and kubelet,
@@ -603,7 +664,8 @@ func (m *manager) needsReconcile(uid types.UID, status v1.PodStatus) bool {
 		klog.V(4).Infof("Pod %q has been deleted, no need to reconcile", string(uid))
 		return false
 	}
-	// If the pod is a static pod, we should check its mirror pod, because only status in mirror pod is meaningful to us.
+	// If the pod is a static pod, we should check its mirror pod,
+	// because only status in mirror pod is meaningful to us.
 	if kubetypes.IsStaticPod(pod) {
 		mirrorPod, ok := m.podManager.GetMirrorPodByPod(pod)
 		if !ok {
@@ -621,12 +683,17 @@ func (m *manager) needsReconcile(uid types.UID, status v1.PodStatus) bool {
 		// reconcile is not needed. Just return.
 		return false
 	}
-	klog.V(3).Infof("Pod status is inconsistent with cached status for pod %q, a reconciliation should be triggered:\n %+v", format.Pod(pod),
-		diff.ObjectDiff(podStatus, status))
+	klog.V(3).Infof(
+		"Pod status is inconsistent with cached status for pod %q, a reconciliation should be triggered:\n %+v", 
+		format.Pod(pod), diff.ObjectDiff(podStatus, status),
+	)
 
 	return true
 }
 
+// caller:
+// 	1. manager.needsReconcile()
+//
 // normalizeStatus normalizes nanosecond precision timestamps in podStatus
 // down to second precision (*RFC339NANO* -> *RFC3339*). This must be done
 // before comparing podStatus to the status returned by apiserver because

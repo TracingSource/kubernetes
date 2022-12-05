@@ -161,6 +161,8 @@ const (
 	// Enable resource managers to make NUMA aligned decisions
 	TopologyManager featuregate.Feature = "TopologyManager"
 
+	// 1.16.2 版本默认为 true
+	//
 	// owner: @sjenning
 	// beta: v1.11
 	//
@@ -263,6 +265,7 @@ const (
 	// to the API server.
 	BoundServiceAccountTokenVolume featuregate.Feature = "BoundServiceAccountTokenVolume"
 
+	// 1.16.2 默认为 true
 	// owner: @Random-Liu
 	// beta: v1.11
 	//

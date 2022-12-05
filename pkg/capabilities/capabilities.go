@@ -52,7 +52,11 @@ var capInstance struct {
 	capabilities *Capabilities
 }
 
-// Initialize the capability set.  This can only be done once per binary, subsequent calls are ignored.
+// caller: 
+// 	1. cmd/kubelet/app/server.go -> RunKubelet()
+//
+// Initialize the capability set. 
+// This can only be done once per binary, subsequent calls are ignored.
 func Initialize(c Capabilities) {
 	// Only do this once
 	capInstance.once.Do(func() {
@@ -68,7 +72,8 @@ func Setup(allowPrivileged bool, perConnectionBytesPerSec int64) {
 	})
 }
 
-// SetForTests sets capabilities for tests.  Convenience method for testing.  This should only be called from tests.
+// SetForTests sets capabilities for tests. Convenience method for testing. 
+// This should only be called from tests.
 func SetForTests(c Capabilities) {
 	capInstance.lock.Lock()
 	defer capInstance.lock.Unlock()

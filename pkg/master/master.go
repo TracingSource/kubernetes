@@ -124,6 +124,8 @@ const (
 	DefaultEndpointReconcilerTTL = 15 * time.Second
 )
 
+// 在 cmd/kube-apiserver/app/server.go -> CreateKubeAPIServerConfig() 中被初始化
+//
 // ExtraConfig defines extra configuration for the master
 type ExtraConfig struct {
 	ClusterAuthenticationInfo clusterauthenticationtrust.ClusterAuthenticationInfo
@@ -136,6 +138,12 @@ type ExtraConfig struct {
 
 	// Used to start and monitor tunneling
 	Tunneler          tunneler.Tunneler
+	// EnableLogsSupport 调试神器...注册一个可查询 /var/log 目录的静态路由.
+	//
+	// 比如, 请求 'https://127.0.0.1:6443/logs/' 可以查看 apiserver 所在容器/主机的 /var/log/ 目录下的文件列表.
+	// 请求 'https://127.0.0.1:16443/logs/messages' 则可以查看 /var/log/messages 文件的内容.
+	//
+	// 初始化时被赋值为 true (在 CreateKubeAPIServerConfig() 中)
 	EnableLogsSupport bool
 	ProxyTransport    http.RoundTripper
 
@@ -279,7 +287,11 @@ func (c *Config) createEndpointReconciler() reconcilers.EndpointReconciler {
 	return nil
 }
 
-// Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
+// caller: 
+// 	1. cmd/kube-apiserver/app/server.go -> CreateKubeAPIServer()
+//
+// Complete fills in any fields not set that are required to have valid data.
+// It's mutating the receiver.
 func (c *Config) Complete() CompletedConfig {
 	cfg := completedConfig{
 		c.GenericConfig.Complete(c.ExtraConfig.VersionedInformers),
@@ -297,9 +309,17 @@ func (c *Config) Complete() CompletedConfig {
 		cfg.ExtraConfig.APIServerServiceIP = apiServerServiceIP
 	}
 
-	discoveryAddresses := discovery.DefaultAddresses{DefaultAddress: cfg.GenericConfig.ExternalAddress}
-	discoveryAddresses.CIDRRules = append(discoveryAddresses.CIDRRules,
-		discovery.CIDRRule{IPRange: cfg.ExtraConfig.ServiceIPRange, Address: net.JoinHostPort(cfg.ExtraConfig.APIServerServiceIP.String(), strconv.Itoa(cfg.ExtraConfig.APIServerServicePort))})
+	discoveryAddresses := discovery.DefaultAddresses{
+		DefaultAddress: cfg.GenericConfig.ExternalAddress,
+	}
+	discoveryAddresses.CIDRRules = append(
+		discoveryAddresses.CIDRRules,
+		discovery.CIDRRule{
+			IPRange: cfg.ExtraConfig.ServiceIPRange, 
+			Address: net.JoinHostPort(cfg.ExtraConfig.APIServerServiceIP.String(), 
+			strconv.Itoa(cfg.ExtraConfig.APIServerServicePort)),
+		},
+	)
 	cfg.GenericConfig.DiscoveryAddresses = discoveryAddresses
 
 	if cfg.ExtraConfig.ServiceNodePortRange.Size == 0 {
@@ -326,6 +346,13 @@ func (c *Config) Complete() CompletedConfig {
 	return CompletedConfig{&cfg}
 }
 
+// New 根据已有的配置文件创建 Master{} 对象, 初始化其中的 GenericAPIServer 成员.
+// 并挂载了几条内置路由如 /, /swagger-ui等(在c.GenericConfig.New()函数中).
+// 对于部分未配置的选项, 可以使用默认配置; 但是对于KubeletClientConfig这样的配置, 必须手动指定.
+//
+// caller:
+// 	1. cmd/kube-apiserver/app/server.go -> CreateKubeAPIServer()
+//
 // New returns a new instance of Master from the given config.
 // Certain config fields will be set to a default value if unset.
 // Certain config fields must be specified, including:
@@ -335,11 +362,13 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		return nil, fmt.Errorf("Master.New() called with empty config.KubeletClientConfig")
 	}
 
+	// New 初始化 apiServerHandler 对象, 并赋值给 GenericAPIServer.Handler 成员,
+	// 同时挂载了几条内置路由, 包括: /、/swagger-ui、/debug/*、/metrics、/version
 	s, err := c.GenericConfig.New("kube-apiserver", delegationTarget)
 	if err != nil {
 		return nil, err
 	}
-
+	// 判断是否支持logs相关的路由，如果支持，则添加/logs 路由；
 	if c.ExtraConfig.EnableLogsSupport {
 		routes.Logs{}.Install(s.Handler.GoRestfulContainer)
 	}
@@ -349,6 +378,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		ClusterAuthenticationInfo: c.ExtraConfig.ClusterAuthenticationInfo,
 	}
 
+	// 添加以api开头的路由, 在集群中对应的路由有/api和/api/v1, 比较常用的资源像Pods就是该路由对应的资源; 
 	// install legacy rest storage
 	if c.ExtraConfig.APIResourceConfigSource.VersionEnabled(apiv1.SchemeGroupVersion) {
 		legacyRESTStorageProvider := corerest.LegacyRESTStorageProvider{
@@ -369,17 +399,29 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		}
 	}
 
+	// 添加以apis开头的路由, 在集群中对应的路由有, /apis/apps, /apis/batch, /apis/policy等.
+	// apis开头的路由比api更多, 应该是由于kubernetes设计之初的版本都是以api/v1开头,
+	// 后续扩展的版本以apis开头命名. 现在更多的是通过CRD与自定义Controller的方法扩展API, 不再进行api版本的扩展.
+	// 
 	// The order here is preserved in discovery.
-	// If resources with identical names exist in more than one of these groups (e.g. "deployments.apps"" and "deployments.extensions"),
-	// the order of this list determines which group an unqualified resource name (e.g. "deployments") should prefer.
-	// This priority order is used for local discovery, but it ends up aggregated in `k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go
-	// with specific priorities.
-	// TODO: describe the priority all the way down in the RESTStorageProviders and plumb it back through the various discovery
-	// handlers that we have.
+	// If resources with identical names exist in more than one of these groups
+	// (e.g. "deployments.apps"" and "deployments.extensions"),
+	// the order of this list determines which group an unqualified resource name
+	// (e.g. "deployments") should prefer.
+	// This priority order is used for local discovery, but it ends up aggregated in
+	// `k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go` with specific priorities.
+	// TODO: describe the priority all the way down in the RESTStorageProviders
+	// and plumb it back through the various discovery handlers that we have.
 	restStorageProviders := []RESTStorageProvider{
 		auditregistrationrest.RESTStorageProvider{},
-		authenticationrest.RESTStorageProvider{Authenticator: c.GenericConfig.Authentication.Authenticator, APIAudiences: c.GenericConfig.Authentication.APIAudiences},
-		authorizationrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorization.Authorizer, RuleResolver: c.GenericConfig.RuleResolver},
+		authenticationrest.RESTStorageProvider{
+			Authenticator: c.GenericConfig.Authentication.Authenticator, 
+			APIAudiences: c.GenericConfig.Authentication.APIAudiences,
+		},
+		authorizationrest.RESTStorageProvider{
+			Authorizer: c.GenericConfig.Authorization.Authorizer, 
+			RuleResolver: c.GenericConfig.RuleResolver,
+		},
 		autoscalingrest.RESTStorageProvider{},
 		batchrest.RESTStorageProvider{},
 		certificatesrest.RESTStorageProvider{},
@@ -400,12 +442,20 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		admissionregistrationrest.RESTStorageProvider{},
 		eventsrest.RESTStorageProvider{TTL: c.ExtraConfig.EventTTL},
 	}
-	if err := m.InstallAPIs(c.ExtraConfig.APIResourceConfigSource, c.GenericConfig.RESTOptionsGetter, restStorageProviders...); err != nil {
+	err = m.InstallAPIs(
+		c.ExtraConfig.APIResourceConfigSource, 
+		c.GenericConfig.RESTOptionsGetter, 
+		restStorageProviders...,
+	)
+	if err != nil {
 		return nil, err
 	}
 
 	if c.ExtraConfig.Tunneler != nil {
-		m.installTunneler(c.ExtraConfig.Tunneler, corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig).Nodes())
+		m.installTunneler(
+			c.ExtraConfig.Tunneler, 
+			corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig).Nodes(),
+		)
 	}
 
 	m.GenericAPIServer.AddPostStartHookOrDie("start-cluster-authentication-info-controller", func(hookContext genericapiserver.PostStartHookContext) error {
@@ -448,16 +498,28 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	return m, nil
 }
 
+// InstallLegacyAPI 创建Legacy资源的 namestring -> storage 的对象(apiGroupInfo), 
+// 并注册 bootstrap-controller(用于创建内置ns和service),
+// 然后调用 InstallLegacyAPIGroup() 方法注册 /api, /apis 等路由.
+//
+// caller: 
+// 	1. Master.New()
+//
 // InstallLegacyAPI will install the legacy APIs for the restStorageProviders if they are enabled.
-func (m *Master) InstallLegacyAPI(c *completedConfig, restOptionsGetter generic.RESTOptionsGetter, legacyRESTStorageProvider corerest.LegacyRESTStorageProvider) error {
+func (m *Master) InstallLegacyAPI(
+	c *completedConfig, restOptionsGetter generic.RESTOptionsGetter, 
+	legacyRESTStorageProvider corerest.LegacyRESTStorageProvider,
+) error {
 	legacyRESTStorage, apiGroupInfo, err := legacyRESTStorageProvider.NewLegacyRESTStorage(restOptionsGetter)
 	if err != nil {
 		return fmt.Errorf("Error building core storage: %v", err)
 	}
-
+	// 这个 controller 是apiserver自己用的, 用来创建内置的ns及名为kubernetes service对象等.
 	controllerName := "bootstrap-controller"
 	coreClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
-	bootstrapController := c.NewBootstrapController(legacyRESTStorage, coreClient, coreClient, coreClient, coreClient.RESTClient())
+	bootstrapController := c.NewBootstrapController(
+		legacyRESTStorage, coreClient, coreClient, coreClient, coreClient.RESTClient(),
+	)
 	m.GenericAPIServer.AddPostStartHookOrDie(controllerName, bootstrapController.PostStartHook)
 	m.GenericAPIServer.AddPreShutdownHookOrDie(controllerName, bootstrapController.PreShutdownHook)
 
@@ -467,7 +529,9 @@ func (m *Master) InstallLegacyAPI(c *completedConfig, restOptionsGetter generic.
 	return nil
 }
 
-func (m *Master) installTunneler(nodeTunneler tunneler.Tunneler, nodeClient corev1client.NodeInterface) {
+func (m *Master) installTunneler(
+	nodeTunneler tunneler.Tunneler, nodeClient corev1client.NodeInterface,
+) {
 	nodeTunneler.Run(nodeAddressProvider{nodeClient}.externalAddresses)
 	m.GenericAPIServer.AddHealthChecks(healthz.NamedCheck("SSH Tunnel Check", tunneler.TunnelSyncHealthChecker(nodeTunneler)))
 	prometheus.NewGaugeFunc(prometheus.GaugeOpts{
@@ -483,11 +547,18 @@ func (m *Master) installTunneler(nodeTunneler tunneler.Tunneler, nodeClient core
 // RESTStorageProvider is a factory type for REST storage.
 type RESTStorageProvider interface {
 	GroupName() string
-	NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool, error)
+	NewRESTStorage(
+		apiResourceConfigSource serverstorage.APIResourceConfigSource, 
+		restOptionsGetter generic.RESTOptionsGetter,
+	) (genericapiserver.APIGroupInfo, bool, error)
 }
 
 // InstallAPIs will install the APIs for the restStorageProviders if they are enabled.
-func (m *Master) InstallAPIs(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter, restStorageProviders ...RESTStorageProvider) error {
+func (m *Master) InstallAPIs(
+	apiResourceConfigSource serverstorage.APIResourceConfigSource, 
+	restOptionsGetter generic.RESTOptionsGetter, 
+	restStorageProviders ...RESTStorageProvider,
+) error {
 	apiGroupsInfo := []*genericapiserver.APIGroupInfo{}
 
 	for _, restStorageBuilder := range restStorageProviders {

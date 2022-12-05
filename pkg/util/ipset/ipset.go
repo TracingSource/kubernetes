@@ -28,7 +28,8 @@ import (
 	utilexec "k8s.io/utils/exec"
 )
 
-// Interface is an injectable interface for running ipset commands.  Implementations must be goroutine-safe.
+// Interface is an injectable interface for running ipset commands. 
+// Implementations must be goroutine-safe.
 type Interface interface {
 	// FlushSet deletes all entries from a named set.
 	FlushSet(set string) error
@@ -36,9 +37,11 @@ type Interface interface {
 	DestroySet(set string) error
 	// DestroyAllSets deletes all sets.
 	DestroyAllSets() error
-	// CreateSet creates a new set.  It will ignore error when the set already exists if ignoreExistErr=true.
+	// CreateSet creates a new set. 
+	// It will ignore error when the set already exists if ignoreExistErr=true.
 	CreateSet(set *IPSet, ignoreExistErr bool) error
-	// AddEntry adds a new entry to the named set.  It will ignore error when the entry already exists if ignoreExistErr=true.
+	// AddEntry adds a new entry to the named set. 
+	// It will ignore error when the entry already exists if ignoreExistErr=true.
 	AddEntry(entry string, set *IPSet, ignoreExistErr bool) error
 	// DelEntry deletes one entry from the named set
 	DelEntry(entry string, set string) error
@@ -271,6 +274,8 @@ func New(exec utilexec.Interface) Interface {
 
 // CreateSet creates a new set, it will ignore error when the set already exists if ignoreExistErr=true.
 func (runner *runner) CreateSet(set *IPSet, ignoreExistErr bool) error {
+	// 这里只是设置几个默认值, 真正执行写入操作的是runner.createSet()函数.
+	//
 	// sets some IPSet fields if not present to their default values.
 	set.setIPSetDefaults()
 

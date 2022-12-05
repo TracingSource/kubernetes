@@ -38,11 +38,18 @@ import (
 	utilsnet "k8s.io/utils/net"
 )
 
+// 由 pkg/kubelet/lifecycle/handlers.go -> HandlerRunner{} 实现
+//
 // HandlerRunner runs a lifecycle handler for a container.
 type HandlerRunner interface {
-	Run(containerID ContainerID, pod *v1.Pod, container *v1.Container, handler *v1.Handler) (string, error)
+	// Run 根据 handler 各字段选择(钩子函数, 健康检查等)执行方式, 如 exec, httpGet 等.
+	Run(
+		containerID ContainerID, pod *v1.Pod, container *v1.Container, handler *v1.Handler,
+	) (string, error)
 }
 
+// RuntimeHelper 由 Kubelet{} 结构体本身实现该接口.
+//
 // RuntimeHelper wraps kubelet to make container runtime
 // able to get necessary informations like the RunContainerOptions, DNS settings, Host IP.
 type RuntimeHelper interface {
@@ -156,7 +163,10 @@ func ExpandContainerVolumeMounts(mount v1.VolumeMount, envs []EnvVar) (string, e
 	return expanded, nil
 }
 
-func ExpandContainerCommandAndArgs(container *v1.Container, envs []EnvVar) (command []string, args []string) {
+// ExpandContainerCommandAndArgs 应该是将 command 列表中的环境变量, 用 env 列表中的值替换掉.
+func ExpandContainerCommandAndArgs(
+	container *v1.Container, envs []EnvVar,
+) (command []string, args []string) {
 	mapping := expansion.MappingFuncFor(EnvVarsToMap(envs))
 
 	if len(container.Command) != 0 {
@@ -174,7 +184,8 @@ func ExpandContainerCommandAndArgs(container *v1.Container, envs []EnvVar) (comm
 	return command, args
 }
 
-// Create an event recorder to record object's event except implicitly required container's, like infra container.
+// Create an event recorder to record object's event except implicitly required container's,
+// like infra container.
 func FilterEventRecorder(recorder record.EventRecorder) record.EventRecorder {
 	return &innerEventRecorder{
 		recorder: recorder,
@@ -309,6 +320,8 @@ func HasPrivilegedContainer(pod *v1.Pod) bool {
 	return hasPrivileged
 }
 
+// MakePortMappings 只是返回格式化的端口映射记录而已, 这里并没有实际做什么.
+//
 // MakePortMappings creates internal port mapping from api port mapping.
 func MakePortMappings(container *v1.Container) (ports []PortMapping) {
 	names := make(map[string]struct{})

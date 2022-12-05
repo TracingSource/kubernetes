@@ -14,9 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package app implements a server that runs a set of active
-// components.  This includes replication controllers, service endpoints and
-// nodes.
+// Package app implements a server that runs a set of active components. 
+// This includes replication controllers, service endpoints and nodes.
 //
 package app
 

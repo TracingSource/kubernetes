@@ -44,6 +44,8 @@ type StatsProvider interface {
 	ImageFsStats() (*statsapi.FsStats, error)
 }
 
+// ImageGCManager 由 realImageGCManager{} 结构体实现
+//
 // ImageGCManager is an interface for managing lifecycle of all images.
 // Implementation is thread-safe.
 type ImageGCManager interface {
@@ -51,6 +53,9 @@ type ImageGCManager interface {
 	// enough space as per the garbage collection policy.
 	GarbageCollect() error
 
+	// Start 定时请求(30s) docker api, 获取全量镜像列表, 将其写入本地缓存.
+	// 并维护该缓存中, 被 Pod 引用的镜像标记.
+	//
 	// Start async garbage collection of images.
 	Start()
 
@@ -60,8 +65,8 @@ type ImageGCManager interface {
 	DeleteUnusedImages() error
 }
 
-// ImageGCPolicy is a policy for garbage collecting images. Policy defines an allowed band in
-// which garbage collection will be run.
+// ImageGCPolicy is a policy for garbage collecting images.
+// Policy defines an allowed band in which garbage collection will be run.
 type ImageGCPolicy struct {
 	// Any usage above this threshold will always trigger garbage collection.
 	// This is the highest usage we will allow.
@@ -76,9 +81,17 @@ type ImageGCPolicy struct {
 }
 
 type realImageGCManager struct {
+	// pkg/kubelet/kuberuntime/kuberuntime_manager.go -> kubeGenericRuntimeManager{}
+	//
 	// Container runtime
 	runtime container.Runtime
 
+	// imageRecords 包含当前主机上所有镜像信息, 并将其中被 Pod 引用的信息标记出来
+	//
+	// key 为镜像ID(sha256:xxx), value 则包含该镜像被探测到的时间, 最近被 Pod 引用的时间等信息
+	// 
+	// 注意与 imageCache 成员的区别.
+	//
 	// Records of images and their use.
 	imageRecords     map[string]*imageRecord
 	imageRecordsLock sync.Mutex
@@ -98,6 +111,8 @@ type realImageGCManager struct {
 	// Track initialization
 	initialized bool
 
+	// imageCache 主机上镜像列表缓存信息
+	//
 	// imageCache is the cache of latest image list.
 	imageCache imageCache
 
@@ -144,16 +159,29 @@ type imageRecord struct {
 }
 
 // NewImageGCManager instantiates a new ImageGCManager object.
-func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, recorder record.EventRecorder, nodeRef *v1.ObjectReference, policy ImageGCPolicy, sandboxImage string) (ImageGCManager, error) {
+func NewImageGCManager(
+	runtime container.Runtime, statsProvider StatsProvider, 
+	recorder record.EventRecorder, nodeRef *v1.ObjectReference, 
+	policy ImageGCPolicy, sandboxImage string,
+) (ImageGCManager, error) {
 	// Validate policy.
 	if policy.HighThresholdPercent < 0 || policy.HighThresholdPercent > 100 {
-		return nil, fmt.Errorf("invalid HighThresholdPercent %d, must be in range [0-100]", policy.HighThresholdPercent)
+		return nil, fmt.Errorf(
+			"invalid HighThresholdPercent %d, must be in range [0-100]", 
+			policy.HighThresholdPercent,
+		)
 	}
 	if policy.LowThresholdPercent < 0 || policy.LowThresholdPercent > 100 {
-		return nil, fmt.Errorf("invalid LowThresholdPercent %d, must be in range [0-100]", policy.LowThresholdPercent)
+		return nil, fmt.Errorf(
+			"invalid LowThresholdPercent %d, must be in range [0-100]", 
+			policy.LowThresholdPercent,
+		)
 	}
 	if policy.LowThresholdPercent > policy.HighThresholdPercent {
-		return nil, fmt.Errorf("LowThresholdPercent %d can not be higher than HighThresholdPercent %d", policy.LowThresholdPercent, policy.HighThresholdPercent)
+		return nil, fmt.Errorf(
+			"LowThresholdPercent %d can not be higher than HighThresholdPercent %d", 
+			policy.LowThresholdPercent, policy.HighThresholdPercent,
+		)
 	}
 	im := &realImageGCManager{
 		runtime:       runtime,
@@ -169,6 +197,11 @@ func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, r
 	return im, nil
 }
 
+// Start 定时请求(30s) docker api, 获取全量镜像列表, 将其写入本地缓存.
+// 并维护该缓存中, 被 Pod 引用的镜像标记.
+//
+// caller: 
+// 	1. pkg/kubelet/kubelet__init.go -> Kubelet.initializeModules() 在 kubelet启动过程中被调用.
 func (im *realImageGCManager) Start() {
 	go wait.Until(func() {
 		// Initial detection make detected time "unknown" in the past.
@@ -197,14 +230,24 @@ func (im *realImageGCManager) Start() {
 
 }
 
+// GetImageList 从本地缓存中获取镜像列表信息.
+//
 // Get a list of images on this node
 func (im *realImageGCManager) GetImageList() ([]container.Image, error) {
 	return im.imageCache.get(), nil
 }
 
+// detectImages 获取当前主机上的所有镜像列表, 缓存到本地.
+// 同时将缓存中失效的(从主机中被移除的)镜像, 也从缓存中移除, 保证双方一致. 
+// 
+// 并根据 Pod 列表中的信息, 将被引用的镜像标记出来.
+//
+// caller:
+// 	1. realImageGCManager.Start()
 func (im *realImageGCManager) detectImages(detectTime time.Time) (sets.String, error) {
 	imagesInUse := sets.NewString()
 
+	// imageRef 镜像信息中含 sha256:xxx 的字符串
 	// Always consider the container runtime pod sandbox image in use
 	imageRef, err := im.runtime.GetImageRef(container.ImageSpec{Image: im.sandboxImage})
 	if err == nil && imageRef != "" {
@@ -220,16 +263,23 @@ func (im *realImageGCManager) detectImages(detectTime time.Time) (sets.String, e
 		return imagesInUse, err
 	}
 
+	// 遍历当前被 pod 占用的镜像列表
+	//
 	// Make a set of images in use by containers.
 	for _, pod := range pods {
 		for _, container := range pod.Containers {
-			klog.V(5).Infof("Pod %s/%s, container %s uses image %s(%s)", pod.Namespace, pod.Name, container.Name, container.Image, container.ImageID)
+			klog.V(5).Infof(
+				"Pod %s/%s, container %s uses image %s(%s)", 
+				pod.Namespace, pod.Name, container.Name, container.Image, container.ImageID,
+			)
 			imagesInUse.Insert(container.ImageID)
 		}
 	}
 
 	// Add new images and record those being used.
 	now := time.Now()
+	// currentImages 当前存在于主机上的镜像列表, 接下来要和 im.imageRecords 中的镜像列表缓存做对比,
+	// 将过期的(已经从主机上移除的)镜像从缓存中删除.
 	currentImages := sets.NewString()
 	im.imageRecordsLock.Lock()
 	defer im.imageRecordsLock.Unlock()

@@ -59,6 +59,10 @@ type PodConfig struct {
 	pods *podStorage
 	mux  *config.Mux
 
+	// updates 一个存储着 Pod 更新事件的通道
+	// 	podStorage.Merge() 将事件写入该通道.
+	// 	PodConfig.Updates() 将此通道返回给主调函数, 由主调函数从这个通道里读取事件并处理.
+	// 
 	// the channel of denormalized changes passed to listeners
 	updates chan kubetypes.PodUpdate
 
@@ -68,9 +72,16 @@ type PodConfig struct {
 	checkpointManager checkpointmanager.CheckpointManager
 }
 
+// 	@param mode: PodConfigNotificationIncremental (在当前源文件中声明)
+//
+// caller:
+//	1. pkg/kubelet/kubelet.go -> makePodSourceConfig() 在 kubelet 启动过程中被调用.
+//
 // NewPodConfig creates an object that can merge many configuration sources into a stream
 // of normalized updates to a pod configuration.
-func NewPodConfig(mode PodConfigNotificationMode, recorder record.EventRecorder) *PodConfig {
+func NewPodConfig(
+	mode PodConfigNotificationMode, recorder record.EventRecorder,
+) *PodConfig {
 	updates := make(chan kubetypes.PodUpdate, 50)
 	storage := newPodStorage(updates, mode, recorder)
 	podConfig := &PodConfig{
@@ -82,8 +93,18 @@ func NewPodConfig(mode PodConfigNotificationMode, recorder record.EventRecorder)
 	return podConfig
 }
 
-// Channel creates or returns a config source channel.  The channel
-// only accepts PodUpdates
+// Channel 根据传入的 source 不同, 创建不同的 channel 通道. 
+//
+// 	@param source: 表示 Pod 的数据来源, 一般可有2个值:
+//     file: 表示 manifests 目录下的 staticPod, 当该目录下的文件发生变动时, 将变动事件写入通道.
+//     api: 表示从 apiserver 获取的常规 Pod
+//
+// caller: 
+// 	1. pkg/kubelet/kubelet.go -> makePodSourceConfig() 
+//     会有2次调用, 参数分别为 "file", "api".
+//
+// Channel creates or returns a config source channel. 
+// The channel only accepts PodUpdates
 func (c *PodConfig) Channel(source string) chan<- interface{} {
 	c.sourcesLock.Lock()
 	defer c.sourcesLock.Unlock()
@@ -101,6 +122,11 @@ func (c *PodConfig) SeenAllSources(seenSources sets.String) bool {
 	return seenSources.HasAll(c.sources.List()...) && c.pods.seenSources(c.sources.List()...)
 }
 
+// Updates 返回的是一个存储着 Pod 更新事件的通道, 主调函数将从这个通道里读取事件并处理.
+//
+// caller: 
+// 	1. cmd/kubelet/app/server.go -> startKubelet() 在 kubelet 启动过程中被调用.
+//
 // Updates returns a channel of updates to the configuration, properly denormalized.
 func (c *PodConfig) Updates() <-chan kubetypes.PodUpdate {
 	return c.updates
@@ -129,19 +155,23 @@ func (c *PodConfig) Restore(path string, updates chan<- interface{}) error {
 	return nil
 }
 
-// podStorage manages the current pod state at any point in time and ensures updates
-// to the channel are delivered in order.  Note that this object is an in-memory source of
-// "truth" and on creation contains zero entries.  Once all previously read sources are
-// available, then this object should be considered authoritative.
+// podStorage manages the current pod state at any point in time 
+// and ensures updates to the channel are delivered in order. 
+// Note that this object is an in-memory source of
+// "truth" and on creation contains zero entries. 
+// Once all previously read sources are available, 
+// then this object should be considered authoritative.
 type podStorage struct {
 	podLock sync.RWMutex
 	// map of source name to pod uid to pod reference
 	pods map[string]map[types.UID]*v1.Pod
+	// mode PodConfigNotificationIncremental (在当前源文件中声明)
 	mode PodConfigNotificationMode
 
 	// ensures that updates are delivered in strict order
 	// on the updates channel
 	updateLock sync.Mutex
+	// updates 一个存储着 Pod 更新事件的通道, 来自 PodConfig{} 对象.
 	updates    chan<- kubetypes.PodUpdate
 
 	// contains the set of all sources that have sent at least one SET
@@ -152,10 +182,18 @@ type podStorage struct {
 	recorder record.EventRecorder
 }
 
+// 	@param mode: PodConfigNotificationIncremental (在当前源文件中声明)
+//
+// caller:
+// 	1. NewPodConfig()
+//
 // TODO: PodConfigNotificationMode could be handled by a listener to the updates channel
 // in the future, especially with multiple listeners.
 // TODO: allow initialization of the current state of the store with snapshotted version.
-func newPodStorage(updates chan<- kubetypes.PodUpdate, mode PodConfigNotificationMode, recorder record.EventRecorder) *podStorage {
+func newPodStorage(
+	updates chan<- kubetypes.PodUpdate, mode PodConfigNotificationMode, 
+	recorder record.EventRecorder,
+) *podStorage {
 	return &podStorage{
 		pods:        make(map[string]map[types.UID]*v1.Pod),
 		mode:        mode,
@@ -165,6 +203,12 @@ func newPodStorage(updates chan<- kubetypes.PodUpdate, mode PodConfigNotificatio
 	}
 }
 
+// Merge 将传入的 change 对象进行分类, 确认是 Pod 的 Add, Update 还是 Delete 操作.
+// 分类后, 将ta们写入 updates 通道.
+//
+// caller:
+// 	1. pkg/util/config/config.go -> Mux.listen()
+//
 // Merge normalizes a set of incoming changes from different sources into a map of all Pods
 // and ensures that redundant changes are filtered out, and then pushes zero or more minimal
 // updates onto the update channel.  Ensures that updates are delivered in order.
@@ -194,7 +238,9 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 		if len(restores.Pods) > 0 {
 			s.updates <- *restores
 		}
-		if firstSet && len(adds.Pods) == 0 && len(updates.Pods) == 0 && len(deletes.Pods) == 0 {
+		if firstSet && len(adds.Pods) == 0 && 
+			len(updates.Pods) == 0 && 
+			len(deletes.Pods) == 0 {
 			// Send an empty update when first seeing the source and there are
 			// no ADD or UPDATE or DELETE pods from the source. This signals kubelet that
 			// the source is ready.
@@ -207,7 +253,9 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 
 	case PodConfigNotificationSnapshotAndUpdates:
 		if len(removes.Pods) > 0 || len(adds.Pods) > 0 || firstSet {
-			s.updates <- kubetypes.PodUpdate{Pods: s.MergedState().([]*v1.Pod), Op: kubetypes.SET, Source: source}
+			s.updates <- kubetypes.PodUpdate{
+				Pods: s.MergedState().([]*v1.Pod), Op: kubetypes.SET, Source: source,
+			}
 		}
 		if len(updates.Pods) > 0 {
 			s.updates <- *updates
@@ -230,7 +278,13 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 	return nil
 }
 
-func (s *podStorage) merge(source string, change interface{}) (adds, updates, deletes, removes, reconciles, restores *kubetypes.PodUpdate) {
+// merge ...
+//
+// caller: 
+// 	1. podStorage.Merge()
+func (s *podStorage) merge(
+	source string, change interface{},
+) (adds, updates, deletes, removes, reconciles, restores *kubetypes.PodUpdate) {
 	s.podLock.Lock()
 	defer s.podLock.Unlock()
 

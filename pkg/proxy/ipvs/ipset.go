@@ -32,9 +32,17 @@ const (
 	MinIPSetCheckVersion = "6.0"
 
 	kubeLoopBackIPSetComment = "Kubernetes endpoints dst ip:port, source ip for solving hairpin purpose"
+	// kubeLoopBackIPSet 该集合中存储的都是当前集群中的endpoints, 但不是全部, 而是恰好在当前宿主机上的ep.
+	// 比如一个service下有两个pod, 那该service衍生的ep会有两个目标: PodIP1和PodIP2.
+	// 如果pod分别调度在两个不同的节点上, pod1在worker1上, pod2在worker2上, 
+	// 那么worker1上的kubeLoopBackIPSet就只有PodIP1, worker2则只有PodIP2.
+	// 名字叫作KUBE-LOOP-BACK应该是为了体现就近原则, 如果访问的目标Pod刚好在本机, 那么直接在本机处理不香吗?
 	kubeLoopBackIPSet        = "KUBE-LOOP-BACK"
 
 	kubeClusterIPSetComment = "Kubernetes service cluster ip + port for masquerade purpose"
+	// kubeClusterIPSet 的type为ip,port 存的是各service对象的clusterIP:port
+	// kube-dns服务有3个port(53/UDP,53/TCP,9153/TCP), 那么在这个ipset中, 
+	// 就会有3个成员, clusterIP相同而port不同.
 	kubeClusterIPSet        = "KUBE-CLUSTER-IP"
 
 	kubeExternalIPSetComment = "Kubernetes service external ip + port for masquerade and filter purpose"
@@ -80,6 +88,8 @@ type IPSetVersioner interface {
 	GetVersion() (string, error)
 }
 
+// IPSet 继承 utilipset.IPSet 结构
+//
 // IPSet wraps util/ipset which is used by IPVS proxier.
 type IPSet struct {
 	utilipset.IPSet
@@ -89,8 +99,16 @@ type IPSet struct {
 	handle utilipset.Interface
 }
 
+// @param handle: pkg/util/ipset/ipset.go -> New(), 之后会通过exec接口进行操作.
+//
+// caller: 
+// 	1. proxier.go -> NewProxier()
+//
 // NewIPSet initialize a new IPSet struct
-func NewIPSet(handle utilipset.Interface, name string, setType utilipset.Type, isIPv6 bool, comment string) *IPSet {
+func NewIPSet(
+	handle utilipset.Interface, name string, setType utilipset.Type, 
+	isIPv6 bool, comment string,
+) *IPSet {
 	hashFamily := utilipset.ProtocolFamilyIPV4
 	if isIPv6 {
 		hashFamily = utilipset.ProtocolFamilyIPV6
@@ -173,6 +191,7 @@ func (set *IPSet) syncIPSetEntries() {
 	}
 }
 
+// ensureIPSet 创建ipset项
 func ensureIPSet(set *IPSet) error {
 	if err := set.handle.CreateSet(&set.IPSet, true); err != nil {
 		klog.Errorf("Failed to make sure ip set: %v exist, error: %v", set, err)

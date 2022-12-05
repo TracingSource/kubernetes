@@ -60,6 +60,8 @@ type ActivePodsFunc func() []*v1.Pod
 // Updated contains the most recent state of the Device.
 type monitorCallback func(resourceName string, devices []pluginapi.Device)
 
+// 实现了 pkg/kubelet/cm/devicemanager/types.go -> Manager 接口.
+//
 // ManagerImpl is the structure in charge of managing Device Plugins.
 type ManagerImpl struct {
 	socketname string
@@ -754,7 +756,9 @@ func (m *ManagerImpl) takeByTopology(resource string, available sets.String, aff
 // plugin resources for the input container, issues an Allocate rpc request
 // for each new device resource requirement, processes their AllocateResponses,
 // and updates the cached containerDevices on success.
-func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Container, devicesToReuse map[string]sets.String) error {
+func (m *ManagerImpl) allocateContainerResources(
+	pod *v1.Pod, container *v1.Container, devicesToReuse map[string]sets.String,
+) error {
 	podUID := string(pod.UID)
 	contName := container.Name
 	allocatedDevicesUpdated := false
@@ -765,6 +769,7 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 	for k, v := range container.Resources.Limits {
 		resource := string(k)
 		needed := int(v.Value())
+		// 比如 needs 1 cpu, needs 52428800 memory 等, 但这些不算是 device 类型的资源.
 		klog.V(3).Infof("needs %d %s", needed, resource)
 		if !m.isDevicePluginResource(resource) {
 			continue
@@ -775,7 +780,9 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 			m.updateAllocatedDevices(m.activePods())
 			allocatedDevicesUpdated = true
 		}
-		allocDevices, err := m.devicesToAllocate(podUID, contName, resource, needed, devicesToReuse[resource])
+		allocDevices, err := m.devicesToAllocate(
+			podUID, contName, resource, needed, devicesToReuse[resource],
+		)
 		if err != nil {
 			return err
 		}
@@ -809,7 +816,10 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 		devs := allocDevices.UnsortedList()
 		// TODO: refactor this part of code to just append a ContainerAllocationRequest
 		// in a passed in AllocateRequest pointer, and issues a single Allocate call per pod.
-		klog.V(3).Infof("Making allocation request for devices %v for device plugin %s", devs, resource)
+		klog.V(3).Infof(
+			"Making allocation request for devices %v for device plugin %s", 
+			devs, resource,
+		)
 		resp, err := eI.e.allocate(devs)
 		metrics.DevicePluginAllocationDuration.WithLabelValues(resource).Observe(metrics.SinceInSeconds(startRPCTime))
 		metrics.DeprecatedDevicePluginAllocationLatency.WithLabelValues(resource).Observe(metrics.SinceInMicroseconds(startRPCTime))
@@ -828,7 +838,9 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 
 		// Update internal cached podDevices state.
 		m.mutex.Lock()
-		m.podDevices.insert(podUID, contName, resource, allocDevices, resp.ContainerResponses[0])
+		m.podDevices.insert(
+			podUID, contName, resource, allocDevices, resp.ContainerResponses[0],
+		)
 		m.mutex.Unlock()
 	}
 
@@ -836,13 +848,20 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 	return m.writeCheckpoint()
 }
 
+// caller: 
+// 	1. pkg/kubelet/cm/container_manager_linux.go -> containerManagerImpl.GetResources()
+//
 // GetDeviceRunContainerOptions checks whether we have cached containerDevices
 // for the passed-in <pod, container> and returns its DeviceRunContainerOptions
 // for the found one. An empty struct is returned in case no cached state is found.
-func (m *ManagerImpl) GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Container) (*DeviceRunContainerOptions, error) {
+func (m *ManagerImpl) GetDeviceRunContainerOptions(
+	pod *v1.Pod, container *v1.Container,
+) (*DeviceRunContainerOptions, error) {
 	podUID := string(pod.UID)
 	contName := container.Name
 	needsReAllocate := false
+	// 注意: k 的值不只可以是 cpu, memory, 还可以是 storage 和 ephemeral-storage.
+	// 其中, 后两者就可能是 device 类型, 因为这两个是可能需要从宿主机上挂载的设备.
 	for k := range container.Resources.Limits {
 		resource := string(k)
 		if !m.isDevicePluginResource(resource) {
@@ -852,9 +871,9 @@ func (m *ManagerImpl) GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Co
 		if err != nil {
 			return nil, err
 		}
-		// This is a device plugin resource yet we don't have cached
-		// resource state. This is likely due to a race during node
-		// restart. We re-issue allocate request to cover this race.
+		// This is a device plugin resource yet we don't have cached resource state.
+		// This is likely due to a race during node restart. 
+		// We re-issue allocate request to cover this race.
 		if m.podDevices.containerDevices(podUID, contName, resource) == nil {
 			needsReAllocate = true
 		}

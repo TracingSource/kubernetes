@@ -76,6 +76,10 @@ func (statefulSetStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obj
 	pod.DropDisabledTemplateFields(&statefulSet.Spec.Template, nil)
 }
 
+// caller: 
+// 	1. staging/src/k8s.io/apiserver/pkg/registry/rest/update.go -> BeforeUpdate() 
+// 	客户发起更新请求, 合并字段后得到新对象, 实际写入etcd前被调用
+//
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (statefulSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newStatefulSet := obj.(*apps.StatefulSet)

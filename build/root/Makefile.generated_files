@@ -435,8 +435,10 @@ SAMPLEAPISERVER_OPENAPI_OUTPUT_PKG := staging/src/k8s.io/sample-apiserver/pkg/ge
 
 OPENAPI_TARGETS := KUBE APIEXTENSIONS CODEGEN SAMPLEAPISERVER
 
+## 这里 define 定义了一个"函数", 由下面 forearch 语句通过 eval 执行.
 # Find all the directories that request openapi generation.
 define OPENAPI_DIR_DEF
+## 如果定义了 DBG_MAKEFILE=1, 则打印调试信息
 ifeq ($$(DBG_MAKEFILE),1)
     $$(warning ***** finding all +k8s:openapi-gen tags for $(prefix))
 endif
@@ -505,8 +507,8 @@ $(foreach prefix, $(OPENAPI_TARGETS), $(eval $(OPENAPI_TARGETS_DEF)))
 .PHONY: gen_openapi
 gen_openapi: $(OPENAPI_GEN) $(KUBE_OPENAPI_OUTFILE) $(APIEXTENSIONS_OPENAPI_OUTFILE) $(CODEGEN_OPENAPI_OUTFILE) $(SAMPLEAPISERVER_OPENAPI_OUTFILE)
 
-# How to build the generator tool.  The deps for this are defined in
-# the $(GO_PKGDEPS_FILE), above.
+# How to build the generator tool. 
+# The deps for this are defined in the $(GO_PKGDEPS_FILE), above.
 #
 # A word on the need to touch: This rule might trigger if, for example, a
 # non-Go file was added or deleted from a directory on which this depends.

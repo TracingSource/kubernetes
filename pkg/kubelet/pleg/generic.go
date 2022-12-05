@@ -31,6 +31,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
+// GenericPLEG 实现了 pkg/kubelet/pleg/pleg.go -> PodLifecycleEventGenerator 接口
+//
 // GenericPLEG is an extremely simple generic PLEG that relies solely on
 // periodic listing to discover container changes. It should be used
 // as temporary replacement for container runtimes do not support a proper
@@ -83,6 +85,8 @@ const (
 	relistThreshold = 3 * time.Minute
 )
 
+// caller: 
+// 	1. getContainerState()
 func convertState(state kubecontainer.ContainerState) plegContainerState {
 	switch state {
 	case kubecontainer.ContainerStateCreated:
@@ -107,8 +111,10 @@ type podRecord struct {
 type podRecords map[types.UID]*podRecord
 
 // NewGenericPLEG instantiates a new GenericPLEG object and return it.
-func NewGenericPLEG(runtime kubecontainer.Runtime, channelCapacity int,
-	relistPeriod time.Duration, cache kubecontainer.Cache, clock clock.Clock) PodLifecycleEventGenerator {
+func NewGenericPLEG(
+	runtime kubecontainer.Runtime, channelCapacity int,
+	relistPeriod time.Duration, cache kubecontainer.Cache, clock clock.Clock,
+) PodLifecycleEventGenerator {
 	return &GenericPLEG{
 		relistPeriod: relistPeriod,
 		runtime:      runtime,
@@ -126,6 +132,9 @@ func (g *GenericPLEG) Watch() chan *PodLifecycleEvent {
 	return g.eventChannel
 }
 
+// caller: 
+// 	1. pkg/kubelet/kubelet.go -> Kubelet.Run() kubelet 启动后被调用
+//
 // Start spawns a goroutine to relist periodically.
 func (g *GenericPLEG) Start() {
 	go wait.Until(g.relist, g.relistPeriod, wait.NeverStop)
@@ -145,6 +154,8 @@ func (g *GenericPLEG) Healthy() (bool, error) {
 	return true, nil
 }
 
+// caller: 
+// 	1. computeEvents()
 func generateEvents(podID types.UID, cid string, oldState, newState plegContainerState) []*PodLifecycleEvent {
 	if newState == oldState {
 		return nil
@@ -183,6 +194,9 @@ func (g *GenericPLEG) updateRelistTime(timestamp time.Time) {
 	g.relistTime.Store(timestamp)
 }
 
+// caller: 
+// 	1. GenericPLEG.Start()
+//
 // relist queries the container runtime for list of pods/containers, compare
 // with the internal pods/containers, and generates events accordingly.
 func (g *GenericPLEG) relist() {
@@ -199,6 +213,7 @@ func (g *GenericPLEG) relist() {
 		metrics.DeprecatedPLEGRelistLatency.Observe(metrics.SinceInMicroseconds(timestamp))
 	}()
 
+	// 注意: 这里的 podList 并不是标准的 coreve.Pod{} 对象列表.
 	// Get all the pods.
 	podList, err := g.runtime.GetPods(true)
 	if err != nil {
@@ -207,7 +222,7 @@ func (g *GenericPLEG) relist() {
 	}
 
 	g.updateRelistTime(timestamp)
-
+	// 这里的 Pods() 是一个类型转换操作.
 	pods := kubecontainer.Pods(podList)
 	// update running pod and container count
 	updateRunningPodAndContainerMetrics(pods)
@@ -215,6 +230,7 @@ func (g *GenericPLEG) relist() {
 
 	// Compare the old and the current pods, and generate events.
 	eventsByPodID := map[types.UID][]*PodLifecycleEvent{}
+	// pid = pod uid
 	for pid := range g.podRecords {
 		oldPod := g.podRecords.getOld(pid)
 		pod := g.podRecords.getCurrent(pid)
@@ -300,6 +316,10 @@ func (g *GenericPLEG) relist() {
 	g.podsToReinspect = needsReinspection
 }
 
+// getContainersFromPods 从目标 pod 对象中, 取出 containers 列表(含 pause 容器).
+//
+// caller: 
+// 	1. GenericPLEG.relist()
 func getContainersFromPods(pods ...*kubecontainer.Pod) []*kubecontainer.Container {
 	cidSet := sets.NewString()
 	var containers []*kubecontainer.Container
@@ -330,7 +350,12 @@ func getContainersFromPods(pods ...*kubecontainer.Pod) []*kubecontainer.Containe
 	return containers
 }
 
-func computeEvents(oldPod, newPod *kubecontainer.Pod, cid *kubecontainer.ContainerID) []*PodLifecycleEvent {
+// caller:
+// 	1. GenericPLEG.relist()
+//
+func computeEvents(
+	oldPod, newPod *kubecontainer.Pod, cid *kubecontainer.ContainerID,
+) []*PodLifecycleEvent {
 	var pid types.UID
 	if oldPod != nil {
 		pid = oldPod.ID
@@ -407,6 +432,10 @@ func (g *GenericPLEG) updateCache(pod *kubecontainer.Pod, pid types.UID) error {
 	return err
 }
 
+// updateEvents 将传入的 event 对象 append 到 eventsByPodID 列表中(如果不为 nil 的话)
+//
+// caller: 
+// 	1. GenericPLEG.relist()
 func updateEvents(eventsByPodID map[types.UID][]*PodLifecycleEvent, e *PodLifecycleEvent) {
 	if e == nil {
 		return
@@ -414,6 +443,8 @@ func updateEvents(eventsByPodID map[types.UID][]*PodLifecycleEvent, e *PodLifecy
 	eventsByPodID[e.ID] = append(eventsByPodID[e.ID], e)
 }
 
+// caller: 
+// 	1. computeEvents()
 func getContainerState(pod *kubecontainer.Pod, cid *kubecontainer.ContainerID) plegContainerState {
 	// Default to the non-existent state.
 	state := plegContainerNonExistent
@@ -433,6 +464,8 @@ func getContainerState(pod *kubecontainer.Pod, cid *kubecontainer.ContainerID) p
 	return state
 }
 
+// caller: 
+// 	1. GenericPLEG.relist()
 func updateRunningPodAndContainerMetrics(pods []*kubecontainer.Pod) {
 	// Set the number of running pods in the parameter
 	metrics.RunningPodCount.Set(float64(len(pods)))
@@ -467,6 +500,13 @@ func (pr podRecords) getCurrent(id types.UID) *kubecontainer.Pod {
 	return r.current
 }
 
+// setCurrent 将传入的 pods 列表写入本地 map 的 currnet 字段.
+// podRecords map 的 value 中包含2个字段, 一个 old, 一个 current.
+//
+// @param pods: 当前主机上运行着的 Pod 列表.
+//
+// caller: 
+// 	1. GenericPLEG.relist() 
 func (pr podRecords) setCurrent(pods []*kubecontainer.Pod) {
 	for i := range pr {
 		pr[i].current = nil

@@ -57,6 +57,9 @@ type Config struct {
 	val interface{}
 }
 
+// caller: 
+// 	1. cmd/controller-manager/app/serve.go -> NewBaseHandler()
+//
 // InstallHandler adds an HTTP handler on the given mux for the "/configz"
 // endpoint which serves all registered ComponentConfigs in JSON format.
 func InstallHandler(m mux) {
@@ -67,8 +70,11 @@ type mux interface {
 	Handle(string, http.Handler)
 }
 
-// New creates a Config object with the given name. Each Config is registered
-// with this package's "/configz" handler.
+// caller: 
+// 	1. cmd/kubelet/app/server.go -> initConfigz()
+//
+// New creates a Config object with the given name.
+// Each Config is registered with this package's "/configz" handler.
 func New(name string) (*Config, error) {
 	configsGuard.Lock()
 	defer configsGuard.Unlock()

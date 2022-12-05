@@ -28,8 +28,10 @@ import (
 	"k8s.io/kubernetes/pkg/util/sysctl"
 )
 
-// Conntracker is an interface to the global sysctl. Descriptions of the various
-// sysctl fields can be found here:
+// kube-proxy的4个与conntracker相关的选项, 都是通过这个接口的对象来设置的.
+//
+// Conntracker is an interface to the global sysctl.
+// Descriptions of the various sysctl fields can be found here:
 //
 // https://www.kernel.org/doc/Documentation/networking/nf_conntrack-sysctl.txt
 type Conntracker interface {
@@ -51,10 +53,14 @@ func (rct realConntracker) SetMax(max int) error {
 	}
 	klog.Infof("Setting nf_conntrack_max to %d", max)
 
+	// hashsize 只能在初始 netns 中被修改, 函数末尾的写入操作应该是可以成功的, 
+	// 因为kube-proxy的pod使用的是hostNetwork, 但是kubeadm-nspawn工程是不行的.
+	//
 	// Linux does not support writing to /sys/module/nf_conntrack/parameters/hashsize
 	// when the writer process is not in the initial network namespace
 	// (https://github.com/torvalds/linux/blob/v4.10/net/netfilter/nf_conntrack_core.c#L1795-L1796).
-	// Usually that's fine. But in some configurations such as with github.com/kinvolk/kubeadm-nspawn,
+	// Usually that's fine.
+	// But in some configurations such as with github.com/kinvolk/kubeadm-nspawn,
 	// kube-proxy is in another netns.
 	// Therefore, check if writing in hashsize is necessary and skip the writing if not.
 	hashsize, err := readIntStringFile("/sys/module/nf_conntrack/parameters/hashsize")
@@ -65,13 +71,15 @@ func (rct realConntracker) SetMax(max int) error {
 		return nil
 	}
 
-	// sysfs is expected to be mounted as 'rw'. However, it may be
-	// unexpectedly mounted as 'ro' by docker because of a known docker
-	// issue (https://github.com/docker/docker/issues/24000). Setting
-	// conntrack will fail when sysfs is readonly. When that happens, we
-	// don't set conntrack hashsize and return a special error
-	// errReadOnlySysFS here. The caller should deal with
-	// errReadOnlySysFS differently.
+	// 我想, 由于SetMax()是在另外两个方法执行前执行, 只要这里验证过sysfs可写, 后两者就可以不用再次验证.
+	//
+	// sysfs is expected to be mounted as 'rw'. 
+	// However, it may be unexpectedly mounted as 'ro' by docker because of a known docker issue 
+	// (https://github.com/docker/docker/issues/24000). 
+	// Setting conntrack will fail when sysfs is readonly. 
+	// When that happens, we don't set conntrack hashsize 
+	// and return a special error errReadOnlySysFS here. 
+	// The caller should deal with errReadOnlySysFS differently.
 	writable, err := isSysFSWritable()
 	if err != nil {
 		return err
@@ -105,6 +113,8 @@ func (realConntracker) setIntSysCtl(name string, value int) error {
 	return nil
 }
 
+// isSysFSWritable /proc/mount文件的内容与`mount`命令的输出相同, 该函数就是检测当前已挂载的sys卷是否为rw.
+//
 // isSysFSWritable checks /proc/mounts to see whether sysfs is 'rw' or not.
 func isSysFSWritable() (bool, error) {
 	const permWritable = "rw"
@@ -140,6 +150,7 @@ func readIntStringFile(filename string) (int, error) {
 	return strconv.Atoi(strings.TrimSpace(string(b)))
 }
 
+// caller: SetMax()
 func writeIntStringFile(filename string, value int) error {
 	return ioutil.WriteFile(filename, []byte(strconv.Itoa(value)), 0640)
 }

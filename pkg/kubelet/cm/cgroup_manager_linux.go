@@ -172,6 +172,8 @@ type CgroupSubsystems struct {
 	MountPoints map[string]string
 }
 
+// cgroupManagerImpl 实现了 pkg/kubelet/cm/types.go -> CgroupManager 接口.
+//
 // cgroupManagerImpl implements the CgroupManager interface.
 // Its a stateless object which can be used to
 // update,create or delete any number of cgroups
@@ -242,6 +244,13 @@ func updateSystemdCgroupInfo(cgroupConfig *libcontainerconfigs.Cgroup, cgroupNam
 	cgroupConfig.Name = base
 }
 
+// Exists 判断目标 Pod 是否已经建立起所有的 cgroup 子系统目录.
+// 注意: 是所有!
+// 	@param name: Pod 名称.
+//
+// caller: 
+// 	1. pkg/kubelet/cm/pod_container_manager_linux.go -> podContainerManagerImpl.Exists()
+//
 // Exists checks if all subsystem cgroups already exist
 func (m *cgroupManagerImpl) Exists(name CgroupName) bool {
 	// Get map of all cgroup paths on the system for the particular cgroup
@@ -250,11 +259,15 @@ func (m *cgroupManagerImpl) Exists(name CgroupName) bool {
 	// the presence of alternative control groups not known to runc confuses
 	// the kubelet existence checks.
 	// ideally, we would have a mechanism in runc to support Exists() logic
-	// scoped to the set control groups it understands.  this is being discussed
+	// scoped to the set control groups it understands. 
+	// this is being discussed
 	// in https://github.com/opencontainers/runc/issues/1440
 	// once resolved, we can remove this code.
-	whitelistControllers := sets.NewString("cpu", "cpuacct", "cpuset", "memory", "systemd")
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) || utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportNodePidsLimit) {
+	whitelistControllers := sets.NewString(
+		"cpu", "cpuacct", "cpuset", "memory", "systemd",
+	)
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) || 
+		utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportNodePidsLimit) {
 		whitelistControllers.Insert("pids")
 	}
 	var missingPaths []string
@@ -405,6 +418,11 @@ func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcont
 	return resources
 }
 
+// Update ...
+//
+// caller: 
+// 	1. pkg/kubelet/cm/qos_container_manager_linux.go -> qosContainerManagerImpl.UpdateCgroups()
+//
 // Update updates the cgroup with the specified Cgroup Configuration
 func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 	start := time.Now()
@@ -431,12 +449,17 @@ func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 		libcontainerCgroupConfig.Path = cgroupConfig.Name.ToCgroupfs()
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) && cgroupConfig.ResourceParameters != nil && cgroupConfig.ResourceParameters.PidsLimit != nil {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) && 
+		cgroupConfig.ResourceParameters != nil && 
+		cgroupConfig.ResourceParameters.PidsLimit != nil {
 		libcontainerCgroupConfig.PidsLimit = *cgroupConfig.ResourceParameters.PidsLimit
 	}
 
 	if err := setSupportedSubsystems(libcontainerCgroupConfig); err != nil {
-		return fmt.Errorf("failed to set supported cgroup subsystems for cgroup %v: %v", cgroupConfig.Name, err)
+		return fmt.Errorf(
+			"failed to set supported cgroup subsystems for cgroup %v: %v", 
+			cgroupConfig.Name, err,
+		)
 	}
 	return nil
 }
@@ -462,7 +485,9 @@ func (m *cgroupManagerImpl) Create(cgroupConfig *CgroupConfig) error {
 		libcontainerCgroupConfig.Path = cgroupConfig.Name.ToCgroupfs()
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) && cgroupConfig.ResourceParameters != nil && cgroupConfig.ResourceParameters.PidsLimit != nil {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) && 
+		cgroupConfig.ResourceParameters != nil && 
+		cgroupConfig.ResourceParameters.PidsLimit != nil {
 		libcontainerCgroupConfig.PidsLimit = *cgroupConfig.ResourceParameters.PidsLimit
 	}
 

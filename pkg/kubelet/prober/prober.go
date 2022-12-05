@@ -60,8 +60,11 @@ type prober struct {
 	recorder   record.EventRecorder
 }
 
-// NewProber creates a Prober, it takes a command runner and
-// several container info managers.
+// caller: 
+// 	1. pkg/kubelet/prober/prober_manager.go -> NewManager()
+//
+// NewProber creates a Prober,
+// it takes a command runner and several container info managers.
 func newProber(
 	runner kubecontainer.ContainerCommandRunner,
 	refManager *kubecontainer.RefManager,

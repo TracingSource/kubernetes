@@ -76,6 +76,8 @@ func NewObjectCache(listObject listObjectFunc, watchObject watchObjectFunc, newO
 	}
 }
 
+// caller: 
+// 	1. objectCache.newReflector()
 func (c *objectCache) newStore() cache.Store {
 	// TODO: We may consider created a dedicated store keeping just a single
 	// item, instead of using a generic store implementation for this purpose.
@@ -85,6 +87,8 @@ func (c *objectCache) newStore() cache.Store {
 	return cache.NewStore(cache.MetaNamespaceKeyFunc)
 }
 
+// caller: 
+// 	1. objectCache.AddReference()
 func (c *objectCache) newReflector(namespace, name string) *objectCacheItem {
 	fieldSelector := fields.Set{"metadata.name": name}.AsSelector().String()
 	listFunc := func(options metav1.ListOptions) (runtime.Object, error) {
@@ -113,6 +117,8 @@ func (c *objectCache) newReflector(namespace, name string) *objectCacheItem {
 	}
 }
 
+// caller: 
+// 	1. pkg/kubelet/util/manager/cache_based_manager.go -> cacheBasedManager.RegisterPod()
 func (c *objectCache) AddReference(namespace, name string) {
 	key := objectKey{namespace: namespace, name: name}
 
@@ -182,13 +188,19 @@ func (c *objectCache) Get(namespace, name string) (runtime.Object, error) {
 	return nil, fmt.Errorf("unexpected object type: %v", obj)
 }
 
+// caller: 
+// 	1. pkg/kubelet/configmap/configmap_manager.go -> NewWatchingConfigMapManager()
+//
 // NewWatchBasedManager creates a manager that keeps a cache of all objects
 // necessary for registered pods.
 // It implements the following logic:
 // - whenever a pod is created or updated, we start individual watches for all
 //   referenced objects that aren't referenced from other registered pods
 // - every GetObject() returns a value from local cache propagated via watches
-func NewWatchBasedManager(listObject listObjectFunc, watchObject watchObjectFunc, newObject newObjectFunc, groupResource schema.GroupResource, getReferencedObjects func(*v1.Pod) sets.String) Manager {
+func NewWatchBasedManager(
+	listObject listObjectFunc, watchObject watchObjectFunc, newObject newObjectFunc, 
+	groupResource schema.GroupResource, getReferencedObjects func(*v1.Pod) sets.String,
+) Manager {
 	objectStore := NewObjectCache(listObject, watchObject, newObject, groupResource)
 	return NewCacheBasedManager(objectStore, getReferencedObjects)
 }

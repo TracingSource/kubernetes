@@ -33,6 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
+// Manager 由当前源文件的 configMapManager{} 结构体实现
+//
 // Manager interface provides methods for Kubelet to manage ConfigMap.
 type Manager interface {
 	// Get configmap by configmap namespace and name.

@@ -65,6 +65,10 @@ type ResourceStats struct {
 	MemoryStats *MemoryStats
 }
 
+// 由 pkg/kubelet/cm/cgroup_manager_linux.go -> cgroupManagerImpl{} 结构体实现.
+// 不过前者作为了 pkg/kubelet/cm/container_manager_linux.go -> containerManagerImpl{} 
+// 的一个成员, 所以其实后者也实现了这个接口.
+//
 // CgroupManager allows for cgroup management.
 // Supports Cgroup Creation ,Deletion and Updates.
 type CgroupManager interface {
@@ -105,7 +109,8 @@ type QOSContainersInfo struct {
 // The Pod workers interact with the PodContainerManager to create and destroy
 // containers for the pod.
 type PodContainerManager interface {
-	// GetPodContainerName returns the CgroupName identifier, and its literal cgroupfs form on the host.
+	// GetPodContainerName returns the CgroupName identifier,
+	// and its literal cgroupfs form on the host.
 	GetPodContainerName(*v1.Pod) (CgroupName, string)
 
 	// EnsureExists takes a pod as argument and makes sure that

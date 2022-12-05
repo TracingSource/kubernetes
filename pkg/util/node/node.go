@@ -37,10 +37,12 @@ import (
 )
 
 const (
-	// NodeUnreachablePodReason is the reason on a pod when its state cannot be confirmed as kubelet is unresponsive
+	// NodeUnreachablePodReason is the reason on a pod 
+	// when its state cannot be confirmed as kubelet is unresponsive
 	// on the node it is (was) running.
 	NodeUnreachablePodReason = "NodeLost"
-	// NodeUnreachablePodMessage is the message on a pod when its state cannot be confirmed as kubelet is unresponsive
+	// NodeUnreachablePodMessage is the message on a pod 
+	// when its state cannot be confirmed as kubelet is unresponsive
 	// on the node it is (was) running.
 	NodeUnreachablePodMessage = "Node %v which was running pod %v is unresponsive"
 )
@@ -107,6 +109,8 @@ func GetNodeHostIP(node *v1.Node) (net.IP, error) {
 	return nil, fmt.Errorf("host IP unknown; known addresses: %v", addresses)
 }
 
+// GetNodeIP 通过client获取名为hostname的node节点的IP.
+//
 // GetNodeIP returns the ip of node with the provided hostname
 // If required, wait for the node to be defined.
 func GetNodeIP(client clientset.Interface, hostname string) net.IP {

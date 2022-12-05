@@ -32,6 +32,8 @@ import (
 	"k8s.io/klog"
 )
 
+// caller: 
+// 	1. cmd/kubelet/app/server.go -> UnsecuredDependencies() 在 kubelet 启动过程中被调用.
 func NewOOMAdjuster() *OOMAdjuster {
 	oomAdjuster := &OOMAdjuster{
 		pidLister:        getPids,

@@ -76,15 +76,26 @@ type Config struct {
 
 	RequestHeaderConfig *authenticatorfactory.RequestHeaderConfig
 
-	// TODO, this is the only non-serializable part of the entire config.  Factor it out into a clientconfig
+	// ServiceAccountTokenGetter 这个Getter对象可以用来查询 secret, sa 和 pod 资源.
+	//
+	// assign: cmd/kube-apiserver/app/server.go -> BuildAuthenticator()
+	//
+	// TODO, this is the only non-serializable part of the entire config. 
+	// Factor it out into a clientconfig
 	ServiceAccountTokenGetter   serviceaccount.ServiceAccountTokenGetter
 	BootstrapTokenAuthenticator authenticator.Token
-	// ClientCAContentProvider are the options for verifying incoming connections using mTLS and directly assigning to users.
+	// ClientCAContentProvider are the options for verifying incoming connections using mTLS
+	// and directly assigning to users.
 	// Generally this is the CA bundle file used to authenticate client certificates
 	// If this value is nil, then mutual TLS is disabled.
 	ClientCAContentProvider dynamiccertificates.CAContentProvider
 }
 
+// New 根据 config 中的参数配置, 生成并返回了启用的认证方案列表(basic auth, bearer token 等).
+//
+// caller: 
+// 	1. cmd/kube-apiserver/app/server.go -> BuildAuthenticator()
+//
 // New returns an authenticator.Request or an error that supports the standard
 // Kubernetes authentication mechanisms.
 func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, error) {
@@ -188,11 +199,14 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 	}
 
 	if len(tokenAuthenticators) > 0 {
+		// 将 tokenAuthenticators 转换成 authenticator 并添加到 authenticators[] 列表中.
 		// Union the token authenticators
 		tokenAuth := tokenunion.New(tokenAuthenticators...)
 		// Optionally cache authentication results
 		if config.TokenSuccessCacheTTL > 0 || config.TokenFailureCacheTTL > 0 {
-			tokenAuth = tokencache.New(tokenAuth, true, config.TokenSuccessCacheTTL, config.TokenFailureCacheTTL)
+			tokenAuth = tokencache.New(
+				tokenAuth, true, config.TokenSuccessCacheTTL, config.TokenFailureCacheTTL,
+			)
 		}
 		authenticators = append(authenticators, bearertoken.New(tokenAuth), websocket.NewProtocolAuthenticator(tokenAuth))
 		securityDefinitions["BearerToken"] = &spec.SecurityScheme{
@@ -217,7 +231,8 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 	authenticator = group.NewAuthenticatedGroupAdder(authenticator)
 
 	if config.Anonymous {
-		// If the authenticator chain returns an error, return an error (don't consider a bad bearer token
+		// If the authenticator chain returns an error, 
+		// return an error (don't consider a bad bearer token
 		// or invalid username/password combination anonymous).
 		authenticator = union.NewFailOnError(authenticator, anonymous.NewAuthenticator())
 	}

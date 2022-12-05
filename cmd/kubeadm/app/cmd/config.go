@@ -192,7 +192,8 @@ func getDefaultedInitConfig() (*kubeadmapi.InitConfiguration, error) {
 		},
 	}
 	clusterCfg := &kubeadmapiv1beta2.ClusterConfiguration{
-		KubernetesVersion: constants.CurrentKubernetesVersion.String(), // avoid going to the Internet for the current Kubernetes version
+		// avoid going to the Internet for the current Kubernetes version
+		KubernetesVersion: constants.CurrentKubernetesVersion.String(), 
 	}
 	return configutil.DefaultedInitConfiguration(initCfg, clusterCfg)
 }
@@ -212,7 +213,9 @@ func getDefaultNodeConfigBytes() ([]byte, error) {
 			BootstrapToken: &kubeadmapiv1beta2.BootstrapTokenDiscovery{
 				Token:                    placeholderToken.Token.String(),
 				APIServerEndpoint:        "kube-apiserver:6443",
-				UnsafeSkipCAVerification: true, // TODO: UnsafeSkipCAVerification: true needs to be set for validation to pass, but shouldn't be recommended as the default
+				// TODO: UnsafeSkipCAVerification: true needs to be set for validation to pass,
+				// but shouldn't be recommended as the default
+				UnsafeSkipCAVerification: true, 
 			},
 		},
 		NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
@@ -448,23 +451,34 @@ func NewCmdConfigImagesPull() *cobra.Command {
 		Use:   "pull",
 		Short: "Pull images used by kubeadm",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			externalClusterCfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString)
+			externalClusterCfg.FeatureGates, err = features.NewFeatureGate(
+				&features.InitFeatureGates, featureGatesString,
+			)
 			if err != nil {
 				return err
 			}
-			internalcfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, externalInitCfg, externalClusterCfg)
+			internalcfg, err := configutil.LoadOrDefaultInitConfiguration(
+				cfgPath, externalInitCfg, externalClusterCfg,
+			)
 			if err != nil {
 				return err
 			}
-			containerRuntime, err := utilruntime.NewContainerRuntime(utilsexec.New(), internalcfg.NodeRegistration.CRISocket)
+			// 这里得到的 runtime 是 kubeadm 内置的一个简单的接口, 只能用来执行 docker pull 命令...
+			containerRuntime, err := utilruntime.NewContainerRuntime(
+				utilsexec.New(), internalcfg.NodeRegistration.CRISocket,
+			)
 			if err != nil {
 				return err
 			}
 			return PullControlPlaneImages(containerRuntime, &internalcfg.ClusterConfiguration)
 		},
 	}
-	AddImagesCommonConfigFlags(cmd.PersistentFlags(), externalClusterCfg, &cfgPath, &featureGatesString)
-	cmdutil.AddCRISocketFlag(cmd.PersistentFlags(), &externalInitCfg.NodeRegistration.CRISocket)
+	AddImagesCommonConfigFlags(
+		cmd.PersistentFlags(), externalClusterCfg, &cfgPath, &featureGatesString,
+	)
+	cmdutil.AddCRISocketFlag(
+		cmd.PersistentFlags(), &externalInitCfg.NodeRegistration.CRISocket,
+	)
 
 	return cmd
 }
@@ -484,7 +498,9 @@ func NewImagesPull(runtime utilruntime.ContainerRuntime, images []string) *Image
 }
 
 // PullControlPlaneImages pulls all images that the ImagesPull knows about
-func PullControlPlaneImages(runtime utilruntime.ContainerRuntime, cfg *kubeadmapi.ClusterConfiguration) error {
+func PullControlPlaneImages(
+	runtime utilruntime.ContainerRuntime, cfg *kubeadmapi.ClusterConfiguration,
+) error {
 	images := images.GetControlPlaneImages(cfg)
 	for _, image := range images {
 		if err := runtime.PullImage(image); err != nil {
@@ -563,8 +579,12 @@ func (i *ImagesList) Run(out io.Writer) error {
 	return nil
 }
 
-// AddImagesCommonConfigFlags adds the flags that configure kubeadm (and affect the images kubeadm will use)
-func AddImagesCommonConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta2.ClusterConfiguration, cfgPath *string, featureGatesString *string) {
+// AddImagesCommonConfigFlags adds the flags that configure kubeadm
+// (and affect the images kubeadm will use)
+func AddImagesCommonConfigFlags(
+	flagSet *flag.FlagSet, cfg *kubeadmapiv1beta2.ClusterConfiguration, 
+	cfgPath *string, featureGatesString *string,
+) {
 	options.AddKubernetesVersionFlag(flagSet, &cfg.KubernetesVersion)
 	options.AddFeatureGatesStringFlag(flagSet, featureGatesString)
 	options.AddImageMetaFlags(flagSet, &cfg.ImageRepository)

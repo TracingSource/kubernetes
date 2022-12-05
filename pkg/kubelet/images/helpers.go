@@ -25,10 +25,14 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
+// throttleImagePulling 为 imageService 添加流控机制, 限制镜像的并发拉取机制.
+//
 // throttleImagePulling wraps kubecontainer.ImageService to throttle image
 // pulling based on the given QPS and burst limits. If QPS is zero, defaults
 // to no throttling.
-func throttleImagePulling(imageService kubecontainer.ImageService, qps float32, burst int) kubecontainer.ImageService {
+func throttleImagePulling(
+	imageService kubecontainer.ImageService, qps float32, burst int,
+) kubecontainer.ImageService {
 	if qps == 0.0 {
 		return imageService
 	}
@@ -43,7 +47,10 @@ type throttledImageService struct {
 	limiter flowcontrol.RateLimiter
 }
 
-func (ts throttledImageService) PullImage(image kubecontainer.ImageSpec, secrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (ts throttledImageService) PullImage(
+	image kubecontainer.ImageSpec, secrets []v1.Secret, 
+	podSandboxConfig *runtimeapi.PodSandboxConfig,
+) (string, error) {
 	if ts.limiter.TryAccept() {
 		return ts.ImageService.PullImage(image, secrets, podSandboxConfig)
 	}

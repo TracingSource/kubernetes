@@ -61,6 +61,8 @@ type KubeletFlags struct {
 	// Crash immediately, rather than eating panics.
 	ReallyCrashForTesting bool
 
+	// RunOnce 对应kubelet的--runonce选项, 拉取apiserver的信息, 同步资源并检测static pod状态, 然后退出.
+	//
 	// TODO(mtaufen): It is increasingly looking like nobody actually uses the
 	//                Kubelet's runonce mode anymore, so it may be a candidate
 	//                for deprecation and removal.
@@ -68,6 +70,8 @@ type KubeletFlags struct {
 	// run those in addition to the pods specified by static pod files, and exit.
 	RunOnce bool
 
+	// EnableServer --enable-server选项, 默认为true
+	//
 	// enableServer enables the Kubelet's server
 	EnableServer bool
 
@@ -82,9 +86,14 @@ type KubeletFlags struct {
 	// can use to identify a specific node
 	ProviderID string
 
+	// 这个成员的值在 NewKubeletFlags() 中通过 NewContainerRuntimeOptions() 完成构造与初始化
+	// 其实就是关于 docker 的一些默认值.
+	//
 	// Container-runtime-specific options.
 	config.ContainerRuntimeOptions
 
+	// certDirectory 一般为 /var/lib/kubelet/pki
+	//
 	// certDirectory is the directory where the TLS certs are located (by
 	// default /var/run/kubernetes). If tlsCertFile and tlsPrivateKeyFile
 	// are provided, this flag will be ignored.
@@ -98,6 +107,8 @@ type KubeletFlags struct {
 	// +optional
 	CloudConfigFile string
 
+	// rootDirectory 默认为 /var/lib/kubelet 
+	//
 	// rootDirectory is the directory path to place kubelet files (volume
 	// mounts,etc).
 	RootDirectory string
@@ -130,9 +141,14 @@ type KubeletFlags struct {
 	RemoteRuntimeEndpoint string
 	// remoteImageEndpoint is the endpoint of remote image service
 	RemoteImageEndpoint string
-	// experimentalMounterPath is the path of mounter binary. Leave empty to use the default mount path
+
+	// ExperimentalMounterPath 默认为空, 一般传给 mounter 的也是一个空字符串.
+	//
+	// experimentalMounterPath is the path of mounter binary.
+	// Leave empty to use the default mount path
 	ExperimentalMounterPath string
-	// If enabled, the kubelet will integrate with the kernel memcg notification to determine if memory eviction thresholds are crossed rather than polling.
+	// If enabled, the kubelet will integrate with the kernel memcg notification
+	// to determine if memory eviction thresholds are crossed rather than polling.
 	// +optional
 	ExperimentalKernelMemcgNotification bool
 	// This flag, if set, enables a check prior to mount operations to verify that the required components
@@ -147,6 +163,8 @@ type KubeletFlags struct {
 	// volumePluginDir is the full path of the directory in which to search
 	// for additional third party volume plugins
 	VolumePluginDir string
+	// LockFilePath 默认为空
+	//
 	// lockFilePath is the path that kubelet will use to as a lock file.
 	// It uses this file as a lock to synchronize with other kubelet processes
 	// that may be running.
@@ -191,6 +209,11 @@ type KubeletFlags struct {
 	EnableCAdvisorJSONEndpoints bool
 }
 
+// NewKubeletConfiguration 创建并返回默认的 KubeletConfiguration 对象
+//
+// caller: 
+// 	1. cmd/kubelet/app/server.go -> NewKubeletCommand(), 及本文件中的 NewKubeletServer()
+//
 // NewKubeletFlags will create a new KubeletFlags with default values
 func NewKubeletFlags() *KubeletFlags {
 	remoteRuntimeEndpoint := ""
@@ -240,7 +263,11 @@ func ValidateKubeletFlags(f *KubeletFlags) error {
 		}
 	}
 	if len(unknownLabels) > 0 {
-		return fmt.Errorf("unknown 'kubernetes.io' or 'k8s.io' labels specified with --node-labels: %v\n--node-labels in the 'kubernetes.io' namespace must begin with an allowed prefix (%s) or be in the specifically allowed set (%s)", unknownLabels.List(), strings.Join(kubeletapis.KubeletLabelNamespaces(), ", "), strings.Join(kubeletapis.KubeletLabels(), ", "))
+		return fmt.Errorf(
+			"unknown 'kubernetes.io' or 'k8s.io' labels specified with --node-labels: %v\n--node-labels in the 'kubernetes.io' namespace must begin with an allowed prefix (%s) or be in the specifically allowed set (%s)", 
+			unknownLabels.List(), strings.Join(kubeletapis.KubeletLabelNamespaces(), ", "), 
+			strings.Join(kubeletapis.KubeletLabels(), ", "),
+		)
 	}
 
 	return nil
@@ -297,7 +324,9 @@ func applyLegacyDefaults(kc *kubeletconfig.KubeletConfiguration) {
 // KubeletServer encapsulates all of the parameters necessary for starting up
 // a kubelet. These can either be set via command line or directly.
 type KubeletServer struct {
+	// KubeletFlags 指的是命令行传入的参数列表对象
 	KubeletFlags
+	// KubeletConfiguration 指的是 config.yaml 文件中的配置对象
 	kubeletconfig.KubeletConfiguration
 }
 
@@ -313,9 +342,14 @@ func NewKubeletServer() (*KubeletServer, error) {
 	}, nil
 }
 
-// ValidateKubeletServer validates configuration of KubeletServer and returns an error if the input configuration is invalid.
+// caller: 
+// 	1. cmd/kubelet/app/server.go -> run()
+//
+// ValidateKubeletServer validates configuration of KubeletServer 
+// and returns an error if the input configuration is invalid.
 func ValidateKubeletServer(s *KubeletServer) error {
-	// please add any KubeletConfiguration validation to the kubeletconfigvalidation.ValidateKubeletConfiguration function
+	// please add any KubeletConfiguration validation to the 
+	// kubeletconfigvalidation.ValidateKubeletConfiguration function
 	if err := kubeletconfigvalidation.ValidateKubeletConfiguration(&s.KubeletConfiguration); err != nil {
 		return err
 	}

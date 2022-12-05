@@ -35,12 +35,16 @@ import (
 // containerGC is the manager of garbage collection.
 type containerGC struct {
 	client           internalapi.RuntimeService
+	// pkg/kubelet/kuberuntime/kuberuntime_container.go -> kubeGenericRuntimeManager{}
 	manager          *kubeGenericRuntimeManager
 	podStateProvider podStateProvider
 }
 
 // NewContainerGC creates a new containerGC.
-func newContainerGC(client internalapi.RuntimeService, podStateProvider podStateProvider, manager *kubeGenericRuntimeManager) *containerGC {
+func newContainerGC(
+	client internalapi.RuntimeService, podStateProvider podStateProvider, 
+	manager *kubeGenericRuntimeManager,
+) *containerGC {
 	return &containerGC{
 		client:           client,
 		manager:          manager,
@@ -111,7 +115,9 @@ func (a sandboxByCreated) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a sandboxByCreated) Less(i, j int) bool { return a[i].createTime.After(a[j].createTime) }
 
 // enforceMaxContainersPerEvictUnit enforces MaxPerPodContainer for each evictUnit.
-func (cgc *containerGC) enforceMaxContainersPerEvictUnit(evictUnits containersByEvictUnit, MaxContainers int) {
+func (cgc *containerGC) enforceMaxContainersPerEvictUnit(
+	evictUnits containersByEvictUnit, MaxContainers int,
+) {
 	for key := range evictUnits {
 		toRemove := len(evictUnits[key]) - MaxContainers
 
@@ -175,8 +181,11 @@ func (cgc *containerGC) removeSandbox(sandboxID string) {
 	}
 }
 
-// evictableContainers gets all containers that are evictable. Evictable containers are: not running
-// and created more than MinAge ago.
+// caller: 
+// 	1. containerGC.evictContainers()
+//
+// evictableContainers gets all containers that are evictable.
+// Evictable containers are: not running and created more than MinAge ago.
 func (cgc *containerGC) evictableContainers(minAge time.Duration) (containersByEvictUnit, error) {
 	containers, err := cgc.manager.getKubeletContainers(true)
 	if err != nil {
@@ -218,8 +227,14 @@ func (cgc *containerGC) evictableContainers(minAge time.Duration) (containersByE
 	return evictUnits, nil
 }
 
+// caller: 
+// 	1. containerGC.GarbageCollect()
+//
 // evict all containers that are evictable
-func (cgc *containerGC) evictContainers(gcPolicy kubecontainer.ContainerGCPolicy, allSourcesReady bool, evictTerminatedPods bool) error {
+func (cgc *containerGC) evictContainers(
+	gcPolicy kubecontainer.ContainerGCPolicy, 
+	allSourcesReady bool, evictTerminatedPods bool,
+) error {
 	// Separate containers by evict units.
 	evictUnits, err := cgc.evictableContainers(gcPolicy.MinAge)
 	if err != nil {
@@ -365,6 +380,9 @@ func (cgc *containerGC) evictPodLogsDirectories(allSourcesReady bool) error {
 	return nil
 }
 
+// caller: 
+// 	1. pkg/kubelet/kuberuntime/kuberuntime_manager.go -> kubeGenericRuntimeManager.GarbageCollect()
+//
 // GarbageCollect removes dead containers using the specified container gc policy.
 // Note that gc policy is not applied to sandboxes. Sandboxes are only removed when they are
 // not ready and containing no containers.
@@ -375,7 +393,10 @@ func (cgc *containerGC) evictPodLogsDirectories(allSourcesReady bool) error {
 // * removes oldest dead containers by enforcing gcPolicy.MaxContainers.
 // * gets evictable sandboxes which are not ready and contains no containers.
 // * removes evictable sandboxes.
-func (cgc *containerGC) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy, allSourcesReady bool, evictTerminatedPods bool) error {
+func (cgc *containerGC) GarbageCollect(
+	gcPolicy kubecontainer.ContainerGCPolicy, 
+	allSourcesReady bool, evictTerminatedPods bool,
+) error {
 	errors := []error{}
 	// Remove evictable containers
 	if err := cgc.evictContainers(gcPolicy, allSourcesReady, evictTerminatedPods); err != nil {

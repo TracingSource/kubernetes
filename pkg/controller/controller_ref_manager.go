@@ -50,6 +50,8 @@ func (m *BaseControllerRefManager) CanAdopt() error {
 	return m.canAdoptErr
 }
 
+// caller: m.ClaimPods()
+//
 // ClaimObject tries to take ownership of an object for this controller.
 //
 // It will reconcile the following:
@@ -65,13 +67,20 @@ func (m *BaseControllerRefManager) CanAdopt() error {
 // own the object.
 //
 // No reconciliation will be attempted if the controller is being deleted.
-func (m *BaseControllerRefManager) ClaimObject(obj metav1.Object, match func(metav1.Object) bool, adopt, release func(metav1.Object) error) (bool, error) {
+func (m *BaseControllerRefManager) ClaimObject(
+	obj metav1.Object, match func(metav1.Object) bool, 
+	adopt, release func(metav1.Object) error,
+) (bool, error) {
+	// 获取Pod中的归属信息
 	controllerRef := metav1.GetControllerOfNoCopy(obj)
 	if controllerRef != nil {
+		// 如果存在归属信息，则判断是否属于这个RS
+		// 通过UID判断，如果UID不相等则说明属于另外的资源
 		if controllerRef.UID != m.Controller.GetUID() {
 			// Owned by someone else. Ignore.
 			return false, nil
 		}
+		// UID相同则进行一步判断Label是否相等，相等则认为是这个RS的Pod
 		if match(obj) {
 			// We already own it and the selector matches.
 			// Return true (successfully claimed) before checking deletion timestamp.
@@ -79,6 +88,9 @@ func (m *BaseControllerRefManager) ClaimObject(obj metav1.Object, match func(met
 			// because doing so requires taking no actions.
 			return true, nil
 		}
+
+		// 如果不相等，则说明是归属异常的Pod
+		// 先判断是否处于删除状态，如果不处于删除状态则释放Pod
 		// Owned by us but selector doesn't match.
 		// Try to release, unless we're being deleted.
 		if m.Controller.GetDeletionTimestamp() != nil {
@@ -97,6 +109,9 @@ func (m *BaseControllerRefManager) ClaimObject(obj metav1.Object, match func(met
 		return false, nil
 	}
 
+	// 如果Pod没有确定归属信息，则Pod属于孤儿Pod
+	// 如果RS没有删除，Pod一直存在
+	// 尝试设置Pod属于这个RS
 	// It's an orphan.
 	if m.Controller.GetDeletionTimestamp() != nil || !match(obj) {
 		// Ignore if we're being deleted or selector doesn't match.
@@ -155,25 +170,32 @@ func NewPodControllerRefManager(
 	}
 }
 
+// Claim 索取, 认领(不同于常规的"宣称, 声称"的含义)
+//
 // ClaimPods tries to take ownership of a list of Pods.
 //
-// It will reconcile the following:
+// It will reconcile(调和, 协商使一致) the following:
 //   * Adopt orphans if the selector matches.
 //   * Release owned objects if the selector no longer matches.
 //
-// Optional: If one or more filters are specified, a Pod will only be claimed if
-// all filters return true.
+// Optional: 
+// If one or more filters are specified,
+// a Pod will only be claimed if all filters return true.
 //
 // A non-nil error is returned if some form of reconciliation was attempted and
-// failed. Usually, controllers should try again later in case reconciliation
+// failed. 
+// Usually, controllers should try again later in case reconciliation
 // is still needed.
 //
 // If the error is nil, either the reconciliation succeeded, or no
 // reconciliation was necessary. The list of Pods that you now own is returned.
-func (m *PodControllerRefManager) ClaimPods(pods []*v1.Pod, filters ...func(*v1.Pod) bool) ([]*v1.Pod, error) {
+func (m *PodControllerRefManager) ClaimPods(
+	pods []*v1.Pod, filters ...func(*v1.Pod) bool,
+) ([]*v1.Pod, error) {
 	var claimed []*v1.Pod
 	var errlist []error
-
+	// 下面定义的 match, adopt, release 函数都将在 m.ClaimObject() 中被调用.
+	// 定义标签匹配函数
 	match := func(obj metav1.Object) bool {
 		pod := obj.(*v1.Pod)
 		// Check selector first so filters only run on potentially matching Pods.
@@ -187,13 +209,15 @@ func (m *PodControllerRefManager) ClaimPods(pods []*v1.Pod, filters ...func(*v1.
 		}
 		return true
 	}
+	// 定义捕获函数
 	adopt := func(obj metav1.Object) error {
 		return m.AdoptPod(obj.(*v1.Pod))
 	}
+	// 定义释放函数
 	release := func(obj metav1.Object) error {
 		return m.ReleasePod(obj.(*v1.Pod))
 	}
-
+	// 对每个Pod轮训，判断是否属于这个RS
 	for _, pod := range pods {
 		ok, err := m.ClaimObject(pod, match, adopt, release)
 		if err != nil {
@@ -207,11 +231,13 @@ func (m *PodControllerRefManager) ClaimPods(pods []*v1.Pod, filters ...func(*v1.
 	return claimed, utilerrors.NewAggregate(errlist)
 }
 
-// AdoptPod sends a patch to take control of the pod. It returns the error if
-// the patching fails.
+// AdoptPod sends a patch to take control of the pod.
+// It returns the error if the patching fails.
 func (m *PodControllerRefManager) AdoptPod(pod *v1.Pod) error {
 	if err := m.CanAdopt(); err != nil {
-		return fmt.Errorf("can't adopt Pod %v/%v (%v): %v", pod.Namespace, pod.Name, pod.UID, err)
+		return fmt.Errorf(
+			"can't adopt Pod %v/%v (%v): %v", pod.Namespace, pod.Name, pod.UID, err,
+		)
 	}
 	// Note that ValidateOwnerReferences() will reject this patch if another
 	// OwnerReference exists with controller=true.
@@ -226,8 +252,11 @@ func (m *PodControllerRefManager) AdoptPod(pod *v1.Pod) error {
 // ReleasePod sends a patch to free the pod from the control of the controller.
 // It returns the error if the patching fails. 404 and 422 errors are ignored.
 func (m *PodControllerRefManager) ReleasePod(pod *v1.Pod) error {
-	klog.V(2).Infof("patching pod %s_%s to remove its controllerRef to %s/%s:%s",
-		pod.Namespace, pod.Name, m.controllerKind.GroupVersion(), m.controllerKind.Kind, m.Controller.GetName())
+	klog.V(2).Infof(
+		"patching pod %s_%s to remove its controllerRef to %s/%s:%s",
+		pod.Namespace, pod.Name, m.controllerKind.GroupVersion(), 
+		m.controllerKind.Kind, m.Controller.GetName(),
+	)
 	patchBytes, err := deleteOwnerRefStrategicMergePatch(pod.UID, m.Controller.GetUID())
 	if err != nil {
 		return err
@@ -254,10 +283,12 @@ func (m *PodControllerRefManager) ReleasePod(pod *v1.Pod) error {
 }
 
 // ReplicaSetControllerRefManager is used to manage controllerRef of ReplicaSets.
-// Three methods are defined on this object 1: Classify 2: AdoptReplicaSet and
+// Three methods are defined on this object 
+// 1: Classify 
+// 2: AdoptReplicaSet and
 // 3: ReleaseReplicaSet which are used to classify the ReplicaSets into appropriate
-// categories and accordingly adopt or release them. See comments on these functions
-// for more details.
+// categories and accordingly adopt or release them.
+// See comments on these functions for more details.
 type ReplicaSetControllerRefManager struct {
 	BaseControllerRefManager
 	controllerKind schema.GroupVersionKind

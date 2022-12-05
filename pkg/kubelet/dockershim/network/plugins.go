@@ -128,8 +128,17 @@ type PortMappingGetter interface {
 	GetPodPortMappings(containerID string) ([]*hostport.PortMapping, error)
 }
 
-// InitNetworkPlugin inits the plugin that matches networkPluginName. Plugins must have unique names.
-func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host Host, hairpinMode kubeletconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) (NetworkPlugin, error) {
+// InitNetworkPlugin 从 plugins 数组中找到配置文件中指定的插件, 
+// 调用其 Init() 方法后返回
+// (其实就是加载一下 br-netfilter 内核模块, 调用 sysctl 允许 iptables 操作).
+//
+// InitNetworkPlugin inits the plugin that matches networkPluginName. 
+// Plugins must have unique names.
+func InitNetworkPlugin(
+	plugins []NetworkPlugin, networkPluginName string, host Host, 
+	hairpinMode kubeletconfig.HairpinMode, nonMasqueradeCIDR string, mtu int,
+) (NetworkPlugin, error) {
+	// 一般来说, 这个应该是空的吧...
 	if networkPluginName == "" {
 		// default to the no_op plugin
 		plug := &NoopNetworkPlugin{}
@@ -146,12 +155,17 @@ func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host H
 	for _, plugin := range plugins {
 		name := plugin.Name()
 		if errs := validation.IsQualifiedName(name); len(errs) != 0 {
-			allErrs = append(allErrs, fmt.Errorf("network plugin has invalid name: %q: %s", name, strings.Join(errs, ";")))
+			allErrs = append(allErrs, fmt.Errorf(
+				"network plugin has invalid name: %q: %s", 
+				name, strings.Join(errs, ";"),
+			))
 			continue
 		}
 
 		if _, found := pluginMap[name]; found {
-			allErrs = append(allErrs, fmt.Errorf("network plugin %q was registered more than once", name))
+			allErrs = append(allErrs, fmt.Errorf(
+				"network plugin %q was registered more than once", name,
+			))
 			continue
 		}
 		pluginMap[name] = plugin

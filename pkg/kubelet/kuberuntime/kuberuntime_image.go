@@ -28,7 +28,10 @@ import (
 
 // PullImage pulls an image from the network to local storage using the supplied
 // secrets if necessary.
-func (m *kubeGenericRuntimeManager) PullImage(image kubecontainer.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (m *kubeGenericRuntimeManager) PullImage(
+	image kubecontainer.ImageSpec, pullSecrets []v1.Secret, 
+	podSandboxConfig *runtimeapi.PodSandboxConfig,
+) (string, error) {
 	img := image.Image
 	repoToPull, _, _, err := parsers.ParseImageName(img)
 	if err != nil {
@@ -77,8 +80,11 @@ func (m *kubeGenericRuntimeManager) PullImage(image kubecontainer.ImageSpec, pul
 	return "", utilerrors.NewAggregate(pullErrs)
 }
 
-// GetImageRef gets the ID of the image which has already been in
-// the local storage. It returns ("", nil) if the image isn't in the local storage.
+// caller: 
+// 	1. pkg/kubelet/images/image_gc_manager.go -> realImageGCManager.detectImages()
+//
+// GetImageRef gets the ID of the image which has already been in the local storage.
+// It returns ("", nil) if the image isn't in the local storage.
 func (m *kubeGenericRuntimeManager) GetImageRef(image kubecontainer.ImageSpec) (string, error) {
 	status, err := m.imageService.ImageStatus(&runtimeapi.ImageSpec{Image: image.Image})
 	if err != nil {

@@ -41,6 +41,13 @@ import (
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
+// ControllerClientBuilder 由 SAControllerClientBuilder{} 结构体实现
+//
+// ControllerClientBuilder 用于创建restclient与clientset对象.
+// 我想最重要的应该是作为全局用户权限的限制, 使各组件的权限被独立分隔.
+// 在controller manager代码中, 很多函数都是通过builder即时创建client, 再进行操作的...
+// 暂时还不明白这么做的原因.
+//
 // ControllerClientBuilder allows you to get clients and configs for controllers
 // Please note a copy also exists in staging/src/k8s.io/cloud-provider/cloud.go
 // TODO: Extract this into a separate controller utilities repo (issues/68947)
@@ -51,17 +58,25 @@ type ControllerClientBuilder interface {
 	ClientOrDie(name string) clientset.Interface
 }
 
+// SimpleControllerClientBuilder 实现了 ControllerClientBuilder 接口.
+//
 // SimpleControllerClientBuilder returns a fixed client with different user agents
 type SimpleControllerClientBuilder struct {
 	// ClientConfig is a skeleton config to clone and use as the basis for each controller client
 	ClientConfig *restclient.Config
 }
 
+// Config ...
+// caller: 
+// 	1. ConfigOrDie(), Client(), ClientOrDie()
+//
 func (b SimpleControllerClientBuilder) Config(name string) (*restclient.Config, error) {
 	clientConfig := *b.ClientConfig
 	return restclient.AddUserAgent(&clientConfig, name), nil
 }
 
+// caller: 
+// 	1. cmd/kube-controller-manager/app/controllermanager.go -> CreateControllerContext()
 func (b SimpleControllerClientBuilder) ConfigOrDie(name string) *restclient.Config {
 	clientConfig, err := b.Config(name)
 	if err != nil {
@@ -86,18 +101,27 @@ func (b SimpleControllerClientBuilder) ClientOrDie(name string) clientset.Interf
 	return client
 }
 
+// SAControllerClientBuilder 一般用于在 kcm 启动各种资源的 controller 时, 
+// 创建 kube client(通过 ClientOrDie() 方法)
+//
+// 在 cmd/kube-controller-manager/app/controllermanager.go -> run() 中初始化(无构造函数)
+//
 // SAControllerClientBuilder is a ControllerClientBuilder that returns clients identifying as
 // service accounts
 type SAControllerClientBuilder struct {
 	// ClientConfig is a skeleton config to clone and use as the basis for each controller client
 	ClientConfig *restclient.Config
 
-	// CoreClient is used to provision service accounts if needed and watch for their associated tokens
-	// to construct a controller client
+	// CoreClient 某个 clientset 的 CoreV1() 分组
+	//
+	// CoreClient is used to provision service accounts if needed 
+	// and watch for their associated tokens to construct a controller client
 	CoreClient v1core.CoreV1Interface
 
-	// AuthenticationClient is used to check API tokens to make sure they are valid before
-	// building a controller client from them
+	// AuthenticationClient 某个 clientset 的 AuthenticationV1() 分组
+	//
+	// AuthenticationClient is used to check API tokens to make sure they are valid
+	// before building a controller client from them
 	AuthenticationClient v1authentication.AuthenticationV1Interface
 
 	// Namespace is the namespace used to host the service accounts that will back the
@@ -105,8 +129,14 @@ type SAControllerClientBuilder struct {
 	Namespace string
 }
 
-// config returns a complete clientConfig for constructing clients.  This is separate in anticipation of composition
-// which means that not all clientsets are known here
+// Config ...
+//
+// caller: 
+// 	1. SAControllerClientBuilder.Client()
+//
+// config returns a complete clientConfig for constructing clients. 
+// This is separate in anticipation of composition which means
+// that not all clientsets are known here
 func (b SAControllerClientBuilder) Config(name string) (*restclient.Config, error) {
 	sa, err := getOrCreateServiceAccount(b.CoreClient, b.Namespace, name)
 	if err != nil {
@@ -177,7 +207,14 @@ func (b SAControllerClientBuilder) Config(name string) (*restclient.Config, erro
 	return clientConfig, nil
 }
 
-func (b SAControllerClientBuilder) getAuthenticatedConfig(sa *v1.ServiceAccount, token string) (*restclient.Config, bool, error) {
+// getAuthenticatedConfig ...
+//
+// caller:
+// 	1. SAControllerClientBuilder.Config() 只有这一处
+//
+func (b SAControllerClientBuilder) getAuthenticatedConfig(
+	sa *v1.ServiceAccount, token string,
+) (*restclient.Config, bool, error) {
 	username := apiserverserviceaccount.MakeUsername(sa.Namespace, sa.Name)
 
 	clientConfig := restclient.AnonymousClientConfig(b.ClientConfig)
@@ -185,22 +222,33 @@ func (b SAControllerClientBuilder) getAuthenticatedConfig(sa *v1.ServiceAccount,
 	restclient.AddUserAgent(clientConfig, username)
 
 	// Try token review first
-	tokenReview := &v1authenticationapi.TokenReview{Spec: v1authenticationapi.TokenReviewSpec{Token: token}}
-	if tokenResult, err := b.AuthenticationClient.TokenReviews().Create(tokenReview); err == nil {
+	tokenReview := &v1authenticationapi.TokenReview{
+		Spec: v1authenticationapi.TokenReviewSpec{Token: token},
+	}
+	tokenResult, err := b.AuthenticationClient.TokenReviews().Create(tokenReview)
+	if err == nil {
 		if !tokenResult.Status.Authenticated {
-			klog.Warningf("Token for %s/%s did not authenticate correctly", sa.Namespace, sa.Name)
+			klog.Warningf(
+				"Token for %s/%s did not authenticate correctly", 
+				sa.Namespace, sa.Name,
+			)
 			return nil, false, nil
 		}
 		if tokenResult.Status.User.Username != username {
-			klog.Warningf("Token for %s/%s authenticated as unexpected username: %s", sa.Namespace, sa.Name, tokenResult.Status.User.Username)
+			klog.Warningf(
+				"Token for %s/%s authenticated as unexpected username: %s", 
+				sa.Namespace, sa.Name, tokenResult.Status.User.Username,
+			)
 			return nil, false, nil
 		}
 		klog.V(4).Infof("Verified credential for %s/%s", sa.Namespace, sa.Name)
 		return clientConfig, true, nil
 	}
 
-	// If we couldn't run the token review, the API might be disabled or we might not have permission.
-	// Try to make a request to /apis with the token. If we get a 401 we should consider the token invalid.
+	// If we couldn't run the token review, the API might be disabled
+	// or we might not have permission.
+	// Try to make a request to /apis with the token.
+	// If we get a 401 we should consider the token invalid.
 	clientConfigCopy := *clientConfig
 	clientConfigCopy.NegotiatedSerializer = legacyscheme.Codecs
 	client, err := restclient.UnversionedRESTClientFor(&clientConfigCopy)
@@ -209,7 +257,10 @@ func (b SAControllerClientBuilder) getAuthenticatedConfig(sa *v1.ServiceAccount,
 	}
 	err = client.Get().AbsPath("/apis").Do().Error()
 	if apierrors.IsUnauthorized(err) {
-		klog.Warningf("Token for %s/%s did not authenticate correctly: %v", sa.Namespace, sa.Name, err)
+		klog.Warningf(
+			"Token for %s/%s did not authenticate correctly: %v", 
+			sa.Namespace, sa.Name, err,
+		)
 		return nil, false, nil
 	}
 
@@ -232,6 +283,11 @@ func (b SAControllerClientBuilder) Client(name string) (clientset.Interface, err
 	return clientset.NewForConfig(clientConfig)
 }
 
+// ClientOrDie ...
+//
+// caller:
+// 	1. cmd/kube-controller-manager/app/core.go -> startServiceController()
+// 	在 kcm 启动各种资源的 controller 时, 创建 kube client
 func (b SAControllerClientBuilder) ClientOrDie(name string) clientset.Interface {
 	client, err := b.Client(name)
 	if err != nil {

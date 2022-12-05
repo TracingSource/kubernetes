@@ -175,7 +175,22 @@ func (d *roleBindingDescriber) String() string {
 	)
 }
 
-func (r *DefaultRuleResolver) VisitRulesFor(user user.Info, namespace string, visitor func(source fmt.Stringer, rule *rbacv1.PolicyRule, err error) bool) {
+// VisitRulesFor 遍历 clusterRoleBindings 列表, 从其中绑定的 subjects 列表(user/group), 
+// 查找该 user 绑定了哪个 role/clusterrole.
+//
+// 然后遍历该 clusterRoleBinding.roleRef (role/clusterrole) 中的规则列表,
+// 与 user 参数中请求的资源与操作进行对比, 判断 user 参数中的请求是否拥有相应的权限.
+//
+// 注意: 更新是否符合的操作(allowed字段)在 visitor() 参数中定义.
+//
+// 	@param namespace: 客户端请求目标资源时, uri路径中包含的 namespace 参数信息(没有则为"")
+// 	@param visitor: plugin/pkg/auth/authorizer/rbac/rbac.go -> authorizingVisitor.visit()
+//
+// caller: plugin/pkg/auth/authorizer/rbac/rbac.go -> RBACAuthorizer.Authorize()
+func (r *DefaultRuleResolver) VisitRulesFor(
+	user user.Info, namespace string, 
+	visitor func(source fmt.Stringer, rule *rbacv1.PolicyRule, err error) bool,
+) {
 	if clusterRoleBindings, err := r.clusterRoleBindingLister.ListClusterRoleBindings(); err != nil {
 		if !visitor(nil, nil, err) {
 			return
@@ -183,6 +198,7 @@ func (r *DefaultRuleResolver) VisitRulesFor(user user.Info, namespace string, vi
 	} else {
 		sourceDescriber := &clusterRoleBindingDescriber{}
 		for _, clusterRoleBinding := range clusterRoleBindings {
+			// subjectIndex 当前 user 在 clusterRoleBinding.Subjects 中的索引值.
 			subjectIndex, applies := appliesTo(user, clusterRoleBinding.Subjects, "")
 			if !applies {
 				continue
@@ -203,7 +219,8 @@ func (r *DefaultRuleResolver) VisitRulesFor(user user.Info, namespace string, vi
 			}
 		}
 	}
-
+	// 如果没通过 cluster 级别的权限认证, 则判断 namespace 是否有值, 
+	// 如果有的话, 则可能是目标用户只在某个 ns 下才有权限
 	if len(namespace) > 0 {
 		if roleBindings, err := r.roleBindingLister.ListRoleBindings(namespace); err != nil {
 			if !visitor(nil, nil, err) {
@@ -235,8 +252,16 @@ func (r *DefaultRuleResolver) VisitRulesFor(user user.Info, namespace string, vi
 	}
 }
 
+// GetRoleReferenceRules 从目标 rolebinding/clusterrolebinding 中, 
+// 获取绑定的 role/clusterrole 的权限声明规则(是一个列表), 包括目标资源类型, 操作类型等.
+//
+// caller:
+// 	1. DefaultRuleResolver.VisitRulesFor()
+//
 // GetRoleReferenceRules attempts to resolve the RoleBinding or ClusterRoleBinding.
-func (r *DefaultRuleResolver) GetRoleReferenceRules(roleRef rbacv1.RoleRef, bindingNamespace string) ([]rbacv1.PolicyRule, error) {
+func (r *DefaultRuleResolver) GetRoleReferenceRules(
+	roleRef rbacv1.RoleRef, bindingNamespace string,
+) ([]rbacv1.PolicyRule, error) {
 	switch roleRef.Kind {
 	case "Role":
 		role, err := r.roleGetter.GetRole(bindingNamespace, roleRef.Name)
@@ -257,6 +282,9 @@ func (r *DefaultRuleResolver) GetRoleReferenceRules(roleRef rbacv1.RoleRef, bind
 	}
 }
 
+// caller: 
+// 	1. DefaultRuleResolver.VisitRulesFor()
+//
 // appliesTo returns whether any of the bindingSubjects applies to the specified subject,
 // and if true, the index of the first subject that applies
 func appliesTo(user user.Info, bindingSubjects []rbacv1.Subject, namespace string) (int, bool) {
@@ -294,7 +322,11 @@ func appliesToUser(user user.Info, subject rbacv1.Subject, namespace string) boo
 }
 
 // NewTestRuleResolver returns a rule resolver from lists of role objects.
-func NewTestRuleResolver(roles []*rbacv1.Role, roleBindings []*rbacv1.RoleBinding, clusterRoles []*rbacv1.ClusterRole, clusterRoleBindings []*rbacv1.ClusterRoleBinding) (AuthorizationRuleResolver, *StaticRoles) {
+func NewTestRuleResolver(
+	roles []*rbacv1.Role, roleBindings []*rbacv1.RoleBinding, 
+	clusterRoles []*rbacv1.ClusterRole, 
+	clusterRoleBindings []*rbacv1.ClusterRoleBinding,
+) (AuthorizationRuleResolver, *StaticRoles) {
 	r := StaticRoles{
 		roles:               roles,
 		roleBindings:        roleBindings,

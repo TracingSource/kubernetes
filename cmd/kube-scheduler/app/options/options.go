@@ -130,6 +130,8 @@ func splitHostIntPort(s string) (string, int, error) {
 
 func newDefaultComponentConfig() (*kubeschedulerconfig.KubeSchedulerConfiguration, error) {
 	cfgv1alpha1 := kubeschedulerconfigv1alpha1.KubeSchedulerConfiguration{}
+	// 这里的 Default() 应该是取的 pkg/scheduler/apis/config/v1alpha1/defaults.go
+	// 文件中的 SetDefaults_KubeSchedulerConfiguration() 中的设置值
 	kubeschedulerscheme.Scheme.Default(&cfgv1alpha1)
 	cfg := kubeschedulerconfig.KubeSchedulerConfiguration{}
 	if err := kubeschedulerscheme.Scheme.Convert(&cfgv1alpha1, &cfg, nil); err != nil {
@@ -222,7 +224,10 @@ func (o *Options) Validate() []error {
 // Config return a scheduler config object
 func (o *Options) Config() (*schedulerappconfig.Config, error) {
 	if o.SecureServing != nil {
-		if err := o.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
+		err = o.SecureServing.MaybeDefaultWithSelfSignedCerts(
+			"localhost", nil, []net.IP{net.ParseIP("127.0.0.1")},
+		)
+		if err != nil {
 			return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
 		}
 	}
@@ -233,18 +238,25 @@ func (o *Options) Config() (*schedulerappconfig.Config, error) {
 	}
 
 	// Prepare kube clients.
-	client, leaderElectionClient, eventClient, err := createClients(c.ComponentConfig.ClientConnection, o.Master, c.ComponentConfig.LeaderElection.RenewDeadline.Duration)
+	client, leaderElectionClient, eventClient, err := createClients(
+		c.ComponentConfig.ClientConnection, o.Master, 
+		c.ComponentConfig.LeaderElection.RenewDeadline.Duration,
+	)
 	if err != nil {
 		return nil, err
 	}
 
 	coreBroadcaster := record.NewBroadcaster()
-	coreRecorder := coreBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: c.ComponentConfig.SchedulerName})
+	coreRecorder := coreBroadcaster.NewRecorder(
+		scheme.Scheme, corev1.EventSource{Component: c.ComponentConfig.SchedulerName},
+	)
 
 	// Set up leader election if enabled.
 	var leaderElectionConfig *leaderelection.LeaderElectionConfig
 	if c.ComponentConfig.LeaderElection.LeaderElect {
-		leaderElectionConfig, err = makeLeaderElectionConfig(c.ComponentConfig.LeaderElection, leaderElectionClient, coreRecorder)
+		leaderElectionConfig, err = makeLeaderElectionConfig(
+			c.ComponentConfig.LeaderElection, leaderElectionClient, coreRecorder,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -263,7 +275,10 @@ func (o *Options) Config() (*schedulerappconfig.Config, error) {
 
 // makeLeaderElectionConfig builds a leader election configuration. It will
 // create a new resource lock associated with the configuration.
-func makeLeaderElectionConfig(config kubeschedulerconfig.KubeSchedulerLeaderElectionConfiguration, client clientset.Interface, recorder record.EventRecorder) (*leaderelection.LeaderElectionConfig, error) {
+func makeLeaderElectionConfig(
+	config kubeschedulerconfig.KubeSchedulerLeaderElectionConfiguration, 
+	client clientset.Interface, recorder record.EventRecorder,
+) (*leaderelection.LeaderElectionConfig, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return nil, fmt.Errorf("unable to get hostname: %v", err)

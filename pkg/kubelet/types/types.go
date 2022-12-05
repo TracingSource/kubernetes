@@ -93,8 +93,12 @@ type Reservation struct {
 	Kubernetes v1.ResourceList
 }
 
+// ResolvedPodUID 实际上和 MirrorPodUID 是同一种类型
+//
 // A pod UID which has been translated/resolved to the representation known to kubelets.
 type ResolvedPodUID types.UID
 
+// MirrorPodUID 实际上和 ResolvedPodUID 是同一种类型
+// 
 // A pod UID for a mirror pod.
 type MirrorPodUID types.UID

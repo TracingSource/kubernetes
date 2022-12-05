@@ -976,7 +976,7 @@ func schema_pkg_apis_meta_v1_ListMeta(ref common.ReferenceCallback) common.OpenA
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.",
+				Description: "ListMeta 实现了 pkg/apis/meta/v1/meta.go -> ListInterface 接口.\n\nListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"selfLink": {

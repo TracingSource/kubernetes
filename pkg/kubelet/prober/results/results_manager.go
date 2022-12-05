@@ -95,6 +95,9 @@ type manager struct {
 
 var _ Manager = &manager{}
 
+// caller:
+// 	1. pkg/kubelet/prober/prober_manager.go -> NewManager() 在 kubelet 启动过程中被调用.
+//
 // NewManager creates and returns an empty results manager.
 func NewManager() Manager {
 	return &manager{
@@ -116,7 +119,8 @@ func (m *manager) Set(id kubecontainer.ContainerID, result Result, pod *v1.Pod) 
 	}
 }
 
-// Internal helper for locked portion of set. Returns whether an update should be sent.
+// Internal helper for locked portion of set.
+// Returns whether an update should be sent.
 func (m *manager) setInternal(id kubecontainer.ContainerID, result Result) bool {
 	m.Lock()
 	defer m.Unlock()

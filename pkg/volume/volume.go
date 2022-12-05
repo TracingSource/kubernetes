@@ -123,11 +123,14 @@ type Mounter interface {
 	// using the experimental-check-mount-binaries binary flag
 	CanMount() error
 
+	// SetUp ...
+	// hostPath 插件的 Setup() 就是把要挂载的文件/目录事先创建好.
+	//
 	// SetUp prepares and mounts/unpacks the volume to a
 	// self-determined directory path. The mount point and its
 	// content should be owned by 'fsGroup' so that it can be
 	// accessed by the pod. This may be called more than once, so
-	// implementations must be idempotent.
+	// implementations must be idempotent(幂等的).
 	SetUp(mounterArgs MounterArgs) error
 	// SetUpAt prepares and mounts/unpacks the volume to the
 	// specified directory path, which may or may not exist yet.

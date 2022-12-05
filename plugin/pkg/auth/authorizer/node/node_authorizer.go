@@ -79,7 +79,11 @@ var (
 	csiNodeResource   = storageapi.Resource("csinodes")
 )
 
-func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
+// caller: 
+// 	1. staging/src/k8s.io/apiserver/pkg/authorization/union/union.go -> unionAuthzHandler.Authorize()
+func (r *NodeAuthorizer) Authorize(
+	ctx context.Context, attrs authorizer.Attributes,
+) (authorizer.Decision, string, error) {
 	nodeName, isNode := r.identifier.NodeIdentity(attrs.GetUser())
 	if !isNode {
 		// reject requests from non-nodes

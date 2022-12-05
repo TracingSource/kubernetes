@@ -59,9 +59,16 @@ type crdRegistrationController struct {
 	queue workqueue.RateLimitingInterface
 }
 
-// NewCRDRegistrationController returns a controller which will register CRD GroupVersions with the auto APIService registration
-// controller so they automatically stay in sync.
-func NewCRDRegistrationController(crdinformer crdinformers.CustomResourceDefinitionInformer, apiServiceRegistration AutoAPIServiceRegistration) *crdRegistrationController {
+// caller: 
+// 	1. cmd/kube-apiserver/app/aggregator.go -> createAggregatorServer() 在聚合 APIServer 启动过程中被调用.
+//
+// NewCRDRegistrationController returns a controller which will register
+// CRD GroupVersions with the auto APIService registration controller 
+// so they automatically stay in sync.
+func NewCRDRegistrationController(
+	crdinformer crdinformers.CustomResourceDefinitionInformer, 
+	apiServiceRegistration AutoAPIServiceRegistration,
+) *crdRegistrationController {
 	c := &crdRegistrationController{
 		crdLister:              crdinformer.Lister(),
 		crdSynced:              crdinformer.Informer().HasSynced,

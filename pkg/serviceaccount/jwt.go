@@ -53,7 +53,13 @@ type TokenGenerator interface {
 	GenerateToken(claims *jwt.Claims, privateClaims interface{}) (string, error)
 }
 
-// JWTTokenGenerator returns a TokenGenerator that generates signed JWT tokens, using the given privateKey.
+// caller: 
+// 	1. cmd/kube-controller-manager/app/controllermanager_sa_token_controller_starter.go -> 
+// 	serviceAccountTokenControllerStarter.startServiceAccountTokenController() 
+// 	kcm 在启动时, 选主完成后由主进程调用.
+//
+// JWTTokenGenerator returns a TokenGenerator that generates signed JWT tokens,
+// using the given privateKey.
 // privateKey is a PEM-encoded byte array of a private RSA key.
 func JWTTokenGenerator(iss string, privateKey interface{}) (TokenGenerator, error) {
 	var signer jose.Signer
@@ -249,7 +255,12 @@ type Validator interface {
 	NewPrivateClaims() interface{}
 }
 
-func (j *jwtTokenAuthenticator) AuthenticateToken(ctx context.Context, tokenData string) (*authenticator.Response, bool, error) {
+// caller: 
+// 	1. staging/src/k8s.io/apiserver/pkg/authentication/token/union/union.go -> 
+// 	unionAuthTokenHandler.AuthenticateToken()
+func (j *jwtTokenAuthenticator) AuthenticateToken(
+	ctx context.Context, tokenData string,
+) (*authenticator.Response, bool, error) {
 	if !j.hasCorrectIssuer(tokenData) {
 		return nil, false, nil
 	}

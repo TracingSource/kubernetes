@@ -70,6 +70,7 @@ type UpdatePodOptions struct {
 	KillPodOptions *KillPodOptions
 }
 
+// 由当前源文件的 podWorkers{} 结构体实现.
 // PodWorkers is an abstract interface for testability.
 type PodWorkers interface {
 	UpdatePod(options *UpdatePodOptions)
@@ -140,8 +141,18 @@ type podWorkers struct {
 	podCache kubecontainer.Cache
 }
 
-func newPodWorkers(syncPodFn syncPodFnType, recorder record.EventRecorder, workQueue queue.WorkQueue,
-	resyncInterval, backOffPeriod time.Duration, podCache kubecontainer.Cache) *podWorkers {
+// newPodWorkers ...
+//
+// 	@param syncPodFn: 其实为 Kubelet.syncPod() 方法.
+//
+// 	@return podWorkers: 返回值被赋值给了 Kubelet.podWorkers 成员.
+//
+// caller: 
+// 	1. pkg/kubelet/kubelet.go -> NewMainKubelet()
+func newPodWorkers(
+	syncPodFn syncPodFnType, recorder record.EventRecorder, workQueue queue.WorkQueue,
+	resyncInterval, backOffPeriod time.Duration, podCache kubecontainer.Cache,
+) *podWorkers {
 	return &podWorkers{
 		podUpdates:                map[types.UID]chan UpdatePodOptions{},
 		isWorking:                 map[types.UID]bool{},
@@ -155,11 +166,16 @@ func newPodWorkers(syncPodFn syncPodFnType, recorder record.EventRecorder, workQ
 	}
 }
 
+// caller: 
+// 	1. podWorkers.UpdatePod() 只有这一处
 func (p *podWorkers) managePodLoop(podUpdates <-chan UpdatePodOptions) {
 	var lastSyncTime time.Time
 	for update := range podUpdates {
 		err := func() error {
 			podUID := update.Pod.UID
+			// 这是一个阻塞方法, 只能等待 podCache 中存在此 Pod 的信息后才能返回.
+			// status 表示目标 Pod 当前的状态.
+			//
 			// This is a blocking call that would return only if the cache
 			// has an entry for the pod that is newer than minRuntimeCache
 			// Time. This ensures the worker doesn't start syncing until
@@ -169,9 +185,13 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan UpdatePodOptions) {
 			if err != nil {
 				// This is the legacy event thrown by manage pod loop
 				// all other events are now dispatched from syncPodFn
-				p.recorder.Eventf(update.Pod, v1.EventTypeWarning, events.FailedSync, "error determining status: %v", err)
+				p.recorder.Eventf(
+					update.Pod, v1.EventTypeWarning, events.FailedSync, 
+					"error determining status: %v", err,
+				)
 				return err
 			}
+			// 这里的 syncPodFn 是 Kubelet.syncPod()
 			err = p.syncPodFn(syncPodOptions{
 				mirrorPod:      update.MirrorPod,
 				pod:            update.Pod,
@@ -188,12 +208,18 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan UpdatePodOptions) {
 		}
 		if err != nil {
 			// IMPORTANT: we do not log errors here, the syncPodFn is responsible for logging errors
-			klog.Errorf("Error syncing pod %s (%q), skipping: %v", update.Pod.UID, format.Pod(update.Pod), err)
+			klog.Errorf(
+				"Error syncing pod %s (%q), skipping: %v", update.Pod.UID, 
+				format.Pod(update.Pod), err,
+			)
 		}
 		p.wrapUp(update.Pod.UID, err)
 	}
 }
 
+// caller: 
+// 	1. pkg/kubelet/kubelet.go -> Kubelet.dispatchWork()
+//
 // Apply the new setting to the specified pod.
 // If the options provide an OnCompleteFunc, the function is invoked if the update is accepted.
 // Update requests are ignored if a kill pod request is pending.
@@ -205,6 +231,9 @@ func (p *podWorkers) UpdatePod(options *UpdatePodOptions) {
 
 	p.podLock.Lock()
 	defer p.podLock.Unlock()
+	// 只有在创建一个新Pod, 或是 kubelet 刚启动的时候, 才会进到这个 case 里.
+	// 一般这个时候, options.Pod{} 是一个正常对象, 而 options.MirrorPod{} 则是 nil.
+	// 且 options.UpdateType == SyncPodCreate
 	if podUpdates, exists = p.podUpdates[uid]; !exists {
 		// We need to have a buffer here, because checkForUpdates() method that
 		// puts an update into channel is called from the same goroutine where
@@ -213,6 +242,12 @@ func (p *podWorkers) UpdatePod(options *UpdatePodOptions) {
 		podUpdates = make(chan UpdatePodOptions, 1)
 		p.podUpdates[uid] = podUpdates
 
+		// 这是一个新建的Pod, 或是 kubelet 启动时刚发现的 Pod.
+		// 不管是哪种情况, kubelet 都需要自己同步一遍 Pod 状态.
+		//
+		// managePodLoop() 是一个不会自动退出的函数, 
+		// 这里相当于为每一个 Pod 单独运行一个协程, 处理属于自己的 podUpdates 通道中的事件.
+		//
 		// Creating a new pod worker either means this is a new pod, or that the
 		// kubelet just restarted. In either case the kubelet is willing to believe
 		// the status of the pod for the first pod worker sync. See corresponding
@@ -226,7 +261,8 @@ func (p *podWorkers) UpdatePod(options *UpdatePodOptions) {
 		p.isWorking[pod.UID] = true
 		podUpdates <- *options
 	} else {
-		// if a request to kill a pod is pending, we do not let anything overwrite that request.
+		// if a request to kill a pod is pending,
+		// we do not let anything overwrite that request.
 		update, found := p.lastUndeliveredWorkUpdate[pod.UID]
 		if !found || update.UpdateType != kubetypes.SyncPodKill {
 			p.lastUndeliveredWorkUpdate[pod.UID] = *options
@@ -332,7 +368,10 @@ func killPodNow(podWorkers PodWorkers, recorder record.EventRecorder) eviction.K
 		case r := <-ch:
 			return r.err
 		case <-time.After(timeoutDuration):
-			recorder.Eventf(pod, v1.EventTypeWarning, events.ExceededGracePeriod, "Container runtime did not kill the pod within specified grace period.")
+			recorder.Eventf(
+				pod, v1.EventTypeWarning, events.ExceededGracePeriod, 
+				"Container runtime did not kill the pod within specified grace period.",
+			)
 			return fmt.Errorf("timeout waiting to kill pod")
 		}
 	}

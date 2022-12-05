@@ -41,8 +41,8 @@ import (
 // node and the pods that the manager believes have successfully mounted the
 // volume.
 // Note: This is distinct from the ActualStateOfWorld implemented by the
-// attach/detach controller. They both keep track of different objects. This
-// contains kubelet volume manager specific state.
+// attach/detach controller. They both keep track of different objects.
+// This contains kubelet volume manager specific state.
 type ActualStateOfWorld interface {
 	// ActualStateOfWorld must implement the methods required to allow
 	// operationexecutor to interact with it.
@@ -93,6 +93,9 @@ type ActualStateOfWorld interface {
 	// is not empty, an error is returned.
 	DeleteVolume(volumeName v1.UniqueVolumeName) error
 
+	// PodExistsInVolume "actual state of world"这个对象中保存着已经挂载的 pod-volume-node 列表,
+	// 本函数可以按 pod-volume 两个条件查询是否存在于此列表中.
+	//
 	// PodExistsInVolume returns true if the given pod exists in the list of
 	// mountedPods for the given volume in the cache, indicating that the volume
 	// is attached to this node and the pod has successfully mounted it.
@@ -127,9 +130,9 @@ type ActualStateOfWorld interface {
 	// actual state of the world.
 	GetMountedVolumes() []MountedVolume
 
-	// GetMountedVolumesForPod generates and returns a list of volumes that are
-	// successfully attached and mounted for the specified pod based on the
-	// current actual state of the world.
+	// GetMountedVolumesForPod generates and returns a list of volumes
+	// that are successfully attached and mounted for the specified pod
+	// based on the current actual state of the world.
 	GetMountedVolumesForPod(podName volumetypes.UniquePodName) []MountedVolume
 
 	// GetGloballyMountedVolumes generates and returns a list of all attached
@@ -196,6 +199,7 @@ func IsRemountRequiredError(err error) bool {
 	return ok
 }
 
+// 实现了 pkg/volume/util/operationexecutor/operation_executor.go -> ActualStateOfWorldMounterUpdater 接口.
 type actualStateOfWorld struct {
 	// nodeName is the name of this node. This value is passed to Attach/Detach
 	nodeName types.NodeName
@@ -318,6 +322,10 @@ func (asw *actualStateOfWorld) MarkVolumeAsDetached(
 	asw.DeleteVolume(volumeName)
 }
 
+// caller: 
+// 	1. pkg/volume/util/operationexecutor/operation_generator.go -> operationGenerator.GenerateMountVolumeFunc()
+// 在 volume 实际挂载成功时被调用.
+// 不过实际上的调用其实是在 pkg/volume/util/types/types.go -> GeneratedOperations.Run()
 func (asw *actualStateOfWorld) MarkVolumeAsMounted(
 	podName volumetypes.UniquePodName,
 	podUID types.UID,
@@ -328,14 +336,10 @@ func (asw *actualStateOfWorld) MarkVolumeAsMounted(
 	volumeGidValue string,
 	volumeSpec *volume.Spec) error {
 	return asw.AddPodToVolume(
-		podName,
-		podUID,
-		volumeName,
-		mounter,
-		blockVolumeMapper,
-		outerVolumeSpecName,
-		volumeGidValue,
-		volumeSpec)
+		podName, podUID, volumeName, mounter,
+		blockVolumeMapper, outerVolumeSpecName,
+		volumeGidValue, volumeSpec,
+	)
 }
 
 func (asw *actualStateOfWorld) AddVolumeToReportAsAttached(volumeName v1.UniqueVolumeName, nodeName types.NodeName) {

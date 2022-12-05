@@ -33,11 +33,17 @@ type UniquePVCName types.UID
 type GeneratedOperations struct {
 	// Name of operation - could be used for resetting shared exponential backoff
 	OperationName     string
+	// caller: 在 GeneratedOperations{} 对象中, 通过其 Run() 方法调用.
 	OperationFunc     func() (eventErr error, detailedErr error)
 	EventRecorderFunc func(*error)
 	CompleteFunc      func(*error)
 }
 
+// Run ...
+// caller: 
+// 	1. pkg/volume/util/nestedpendingoperations/nestedpendingoperations.go -> nestedPendingOperations.Run()
+//  在其中的 go 协程中被调用.
+//
 // Run executes the operations and its supporting functions
 func (o *GeneratedOperations) Run() (eventErr, detailedErr error) {
 	if o.CompleteFunc != nil {

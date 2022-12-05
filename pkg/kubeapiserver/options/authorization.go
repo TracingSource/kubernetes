@@ -113,7 +113,14 @@ func (s *BuiltInAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 		"The duration to cache 'unauthorized' responses from the webhook authorizer.")
 }
 
-func (s *BuiltInAuthorizationOptions) ToAuthorizationConfig(versionedInformerFactory versionedinformers.SharedInformerFactory) authorizer.Config {
+// ToAuthorizationConfig 构造 authorizer.Config{} 对象并返回(很简单的流程)
+//
+// caller: 
+// 	1. cmd/kube-apiserver/app/server.go -> BuildAuthorizer()
+//
+func (s *BuiltInAuthorizationOptions) ToAuthorizationConfig(
+	versionedInformerFactory versionedinformers.SharedInformerFactory,
+) authorizer.Config {
 	return authorizer.Config{
 		AuthorizationModes:          s.Modes,
 		PolicyFile:                  s.PolicyFile,

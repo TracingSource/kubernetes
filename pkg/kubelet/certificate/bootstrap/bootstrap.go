@@ -49,13 +49,26 @@ import (
 
 const tmpPrivateKeyFile = "kubelet-client.key.tmp"
 
-// LoadClientConfig tries to load the appropriate client config for retrieving certs and for use by users.
-// If bootstrapPath is empty, only kubeconfigPath is checked. If bootstrap path is set and the contents
-// of kubeconfigPath are valid, both certConfig and userConfig will point to that file. Otherwise the
-// kubeconfigPath on disk is populated based on bootstrapPath but pointing to the location of the client cert
-// in certDir. This preserves the historical behavior of bootstrapping where on subsequent restarts the
+// LoadClientConfig ...
+//
+// 	@param kubeconfigPath: 	"/etc/kubernetes/kubelet.conf"
+// 	@param bootstrapPath: 	"/etc/kubernetes/bootstrap-kubelet.conf"
+// 	@param certDir: 		"/var/lib/kubelet/pki"
+//
+// caller: cmd/kubelet/app/server.go -> buildKubeletClientConfig()
+//
+// LoadClientConfig tries to load the appropriate client config
+// for retrieving certs and for use by users.
+// If bootstrapPath is empty, only kubeconfigPath is checked.
+// If bootstrap path is set and the contents of kubeconfigPath are valid, 
+// both certConfig and userConfig will point to that file.
+// Otherwise the kubeconfigPath on disk is populated based on bootstrapPath
+// but pointing to the location of the client cert in certDir.
+// This preserves the historical behavior of bootstrapping where on subsequent restarts the
 // most recent client cert is used to request new client certs instead of the initial token.
-func LoadClientConfig(kubeconfigPath, bootstrapPath, certDir string) (certConfig, userConfig *restclient.Config, err error) {
+func LoadClientConfig(
+	kubeconfigPath, bootstrapPath, certDir string,
+) (certConfig, userConfig *restclient.Config, err error) {
 	if len(bootstrapPath) == 0 {
 		clientConfig, err := loadRESTClientConfig(kubeconfigPath)
 		if err != nil {

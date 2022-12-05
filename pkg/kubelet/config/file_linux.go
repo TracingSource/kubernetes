@@ -47,6 +47,8 @@ func (e *retryableError) Error() string {
 	return e.message
 }
 
+// caller: 
+// 	1. pkg/kubelet/config/file.go -> sourceFile.run()
 func (s *sourceFile) startWatch() {
 	backOff := flowcontrol.NewBackOff(retryPeriod, maxRetryPeriod)
 	backOffID := "watch"
@@ -65,6 +67,8 @@ func (s *sourceFile) startWatch() {
 	}, retryPeriod)
 }
 
+// caller: 
+// 	1. sourceFile.startWatch()
 func (s *sourceFile) doWatch() error {
 	_, err := os.Stat(s.path)
 	if err != nil {

@@ -32,6 +32,10 @@ const maxMsgSize = 1024 * 1024 * 16
 
 // DockerServer is the grpc server of dockershim.
 type DockerServer struct {
+	// 一般为 /var/run/dockershim.sock 
+	// 每当创建一个 docker 容器都会同时创建一个 containerd-shim 进程,
+	// 且ta们都指向这个 dockershim.sock 文件.
+	//
 	// endpoint is the endpoint to serve on.
 	endpoint string
 	// service is the docker service which implements runtime and image services.
@@ -40,6 +44,13 @@ type DockerServer struct {
 	server *grpc.Server
 }
 
+// remoteRuntimeEndpoint: /var/run/dockershim.sock, 与 docker.sock 同目录.
+// 每个 docker 容器在启动时都会创建一个新的 containerd-shim 进程, 
+// 并指定 dockershim.sock 路径
+//
+// caller: 
+// 	1. pkg/kubelet/kubelet.go -> NewMainKubelet()
+//
 // NewDockerServer creates the dockershim grpc server.
 func NewDockerServer(endpoint string, s dockershim.CRIService) *DockerServer {
 	return &DockerServer{

@@ -195,6 +195,10 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	return labels.Set(pod.ObjectMeta.Labels), PodToSelectableFields(pod), nil
 }
 
+// caller: 
+// 	1. staging/src/k8s.io/apiserver/pkg/registry/generic/registry/store.go -> Store.List()
+//  2. staging/src/k8s.io/apiserver/pkg/registry/generic/registry/store.go -> Store.Watch()
+//
 // MatchPod returns a generic matcher for a given label and field selector.
 func MatchPod(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
 	return storage.SelectionPredicate{

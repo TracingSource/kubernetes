@@ -253,6 +253,11 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	return fss
 }
 
+// ApplyTo 根据 options 选项, 补全 config 对象
+//
+// caller:
+// 	1. KubeControllerManagerOptions.Config()
+//
 // ApplyTo fills up controller manager config with options.
 func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config) error {
 	if err := s.Generic.ApplyTo(&c.ComponentConfig.Generic); err != nil {
@@ -334,9 +339,11 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config) e
 		return err
 	}
 	if s.SecureServing.BindPort != 0 || s.SecureServing.Listener != nil {
+		// 根据 s.Authentication option 选项, 初始化 c.Authentication 字段
 		if err := s.Authentication.ApplyTo(&c.Authentication, c.SecureServing, nil); err != nil {
 			return err
 		}
+		// 根据 s.Authorization option 选项, 初始化 c.Authorization 字段
 		if err := s.Authorization.ApplyTo(&c.Authorization); err != nil {
 			return err
 		}
@@ -350,8 +357,16 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config) e
 	return nil
 }
 
+// Validate receiver中包含各种controller的option对象, 这个函数基本上就是遍历这些对象, 
+// 依次调用ta们的Validate()方法, 传入的两个参数只用于receiver的Generic成员对象的Validate()方法.
+//
+// caller: 
+// 	1. KubeControllerManagerOptions.Config()
+//
 // Validate is used to validate the options and config before launching the controller manager
-func (s *KubeControllerManagerOptions) Validate(allControllers []string, disabledByDefaultControllers []string) error {
+func (s *KubeControllerManagerOptions) Validate(
+	allControllers []string, disabledByDefaultControllers []string,
+) error {
 	var errs []error
 
 	errs = append(errs, s.Generic.Validate(allControllers, disabledByDefaultControllers)...)
@@ -388,13 +403,27 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 	return utilerrors.NewAggregate(errs)
 }
 
+// Config 将options对象转换为Config对象. 其实options对象直接包含了config对象, 转换时做一些构造和验证工作.
+//
+// @param allControllers: 当前kcm可用的所有controller名称(如endpoint, namespace). 
+// 	可在NewControllerInitializers()函数中查看
+//
+// caller:
+// 	1. cmd/kube-controller-manager/app/controllermanager.go -> NewControllerManagerCommand()
+//
 // Config return a controller manager config objective
-func (s KubeControllerManagerOptions) Config(allControllers []string, disabledByDefaultControllers []string) (*kubecontrollerconfig.Config, error) {
-	if err := s.Validate(allControllers, disabledByDefaultControllers); err != nil {
+func (s KubeControllerManagerOptions) Config(
+	allControllers []string, disabledByDefaultControllers []string,
+) (*kubecontrollerconfig.Config, error) {
+	var err error
+	err = s.Validate(allControllers, disabledByDefaultControllers)
+	if err != nil {
 		return nil, err
 	}
-
-	if err := s.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
+	err = s.SecureServing.MaybeDefaultWithSelfSignedCerts(
+		"localhost", nil, []net.IP{net.ParseIP("127.0.0.1")},
+	)
+	if err != nil {
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
@@ -408,15 +437,20 @@ func (s KubeControllerManagerOptions) Config(allControllers []string, disabledBy
 	kubeconfig.QPS = s.Generic.ClientConnection.QPS
 	kubeconfig.Burst = int(s.Generic.ClientConnection.Burst)
 
-	client, err := clientset.NewForConfig(restclient.AddUserAgent(kubeconfig, KubeControllerManagerUserAgent))
+	// 初始化 kube client
+	client, err := clientset.NewForConfig(
+		restclient.AddUserAgent(kubeconfig, KubeControllerManagerUserAgent),
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	// shallow copy, do not modify the kubeconfig.Timeout.
+	// shallow copy(浅拷贝), do not modify the kubeconfig.Timeout.
 	config := *kubeconfig
 	config.Timeout = s.Generic.LeaderElection.RenewDeadline.Duration
-	leaderElectionClient := clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "leader-election"))
+	leaderElectionClient := clientset.NewForConfigOrDie(
+		restclient.AddUserAgent(&config, "leader-election"),
+	)
 
 	eventRecorder := createRecorder(client, KubeControllerManagerUserAgent)
 
@@ -433,9 +467,15 @@ func (s KubeControllerManagerOptions) Config(allControllers []string, disabledBy
 	return c, nil
 }
 
-func createRecorder(kubeClient clientset.Interface, userAgent string) record.EventRecorder {
+func createRecorder(
+	kubeClient clientset.Interface, userAgent string,
+) record.EventRecorder {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(klog.Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
-	return eventBroadcaster.NewRecorder(clientgokubescheme.Scheme, v1.EventSource{Component: userAgent})
+	eventBroadcaster.StartRecordingToSink(
+		&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")},
+	)
+	return eventBroadcaster.NewRecorder(
+		clientgokubescheme.Scheme, v1.EventSource{Component: userAgent},
+	)
 }

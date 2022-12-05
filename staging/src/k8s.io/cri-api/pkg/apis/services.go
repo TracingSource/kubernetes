@@ -28,6 +28,8 @@ type RuntimeVersioner interface {
 	Version(apiVersion string) (*runtimeapi.VersionResponse, error)
 }
 
+// 由 pkg/kubelet/remote/remote_runtime.go -> RemoteRuntimeService{} 结构体实现
+//
 // ContainerManager contains methods to manipulate containers managed by a
 // container runtime. The methods are thread-safe.
 type ContainerManager interface {
@@ -88,6 +90,10 @@ type ContainerStatsManager interface {
 	ListContainerStats(filter *runtimeapi.ContainerStatsFilter) ([]*runtimeapi.ContainerStats, error)
 }
 
+// RuntimeService 由以下结构体实现 
+// 	1. pkg/kubelet/kuberuntime/instrumented_services.go -> instrumentedRuntimeService{} 其实是对2的简单封装
+// 	2. pkg/kubelet/remote/remote_runtime.go -> RemoteRuntimeService{}
+//
 // RuntimeService interface should be implemented by a container runtime.
 // The methods should be thread-safe.
 type RuntimeService interface {

@@ -1,0 +1,311 @@
+Oct  2 16:19:08 k8s-master-01 systemd: Started kubelet: The Kubernetes Node Agent.
+Oct  2 16:19:08 k8s-master-01 kubelet: Flag --cgroup-driver has been deprecated, This parameter should be set via the config file specified by the Kubelet's --config flag. See https://kubernetes.io/docs/tasks/administer-cluster/kubelet-config-file/ for more information.
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772362    3514 flags.go:33] FLAG: --add-dir-header="false"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772402    3514 flags.go:33] FLAG: --address="0.0.0.0"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772408    3514 flags.go:33] FLAG: --allowed-unsafe-sysctls="[]"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772415    3514 flags.go:33] FLAG: --alsologtostderr="false"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772419    3514 flags.go:33] FLAG: --anonymous-auth="true"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772423    3514 flags.go:33] FLAG: --application-metrics-count-limit="100"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772427    3514 flags.go:33] FLAG: --authentication-token-webhook="false"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772431    3514 flags.go:33] FLAG: --authentication-token-webhook-cache-ttl="2m0s"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772435    3514 flags.go:33] FLAG: --authorization-mode="AlwaysAllow"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772439    3514 flags.go:33] FLAG: --authorization-webhook-cache-authorized-ttl="5m0s"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772442    3514 flags.go:33] FLAG: --authorization-webhook-cache-unauthorized-ttl="30s"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772445    3514 flags.go:33] FLAG: --azure-container-registry-config=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772449    3514 flags.go:33] FLAG: --boot-id-file="/proc/sys/kernel/random/boot_id"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772452    3514 flags.go:33] FLAG: --bootstrap-checkpoint-path=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772455    3514 flags.go:33] FLAG: --bootstrap-kubeconfig="/etc/kubernetes/bootstrap-kubelet.conf"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772459    3514 flags.go:33] FLAG: --cert-dir="/var/lib/kubelet/pki"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772462    3514 flags.go:33] FLAG: --cgroup-driver="systemd"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772465    3514 flags.go:33] FLAG: --cgroup-root=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772468    3514 flags.go:33] FLAG: --cgroups-per-qos="true"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772471    3514 flags.go:33] FLAG: --chaos-chance="0"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772476    3514 flags.go:33] FLAG: --client-ca-file=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772479    3514 flags.go:33] FLAG: --cloud-config=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772482    3514 flags.go:33] FLAG: --cloud-provider=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772485    3514 flags.go:33] FLAG: --cluster-dns="[]"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772489    3514 flags.go:33] FLAG: --cluster-domain=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772491    3514 flags.go:33] FLAG: --cni-bin-dir="/opt/cni/bin"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772495    3514 flags.go:33] FLAG: --cni-cache-dir="/var/lib/cni/cache"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772498    3514 flags.go:33] FLAG: --cni-conf-dir="/etc/cni/net.d"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772501    3514 flags.go:33] FLAG: --config="/var/lib/kubelet/config.yaml"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772504    3514 flags.go:33] FLAG: --container-hints="/etc/cadvisor/container_hints.json"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772508    3514 flags.go:33] FLAG: --container-log-max-files="5"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772512    3514 flags.go:33] FLAG: --container-log-max-size="10Mi"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772515    3514 flags.go:33] FLAG: --container-runtime="docker"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772518    3514 flags.go:33] FLAG: --container-runtime-endpoint="unix:///var/run/dockershim.sock"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772521    3514 flags.go:33] FLAG: --containerd="/run/containerd/containerd.sock"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772525    3514 flags.go:33] FLAG: --contention-profiling="false"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772528    3514 flags.go:33] FLAG: --cpu-cfs-quota="true"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772531    3514 flags.go:33] FLAG: --cpu-cfs-quota-period="100ms"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772534    3514 flags.go:33] FLAG: --cpu-manager-policy="none"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772537    3514 flags.go:33] FLAG: --cpu-manager-reconcile-period="10s"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772540    3514 flags.go:33] FLAG: --docker="unix:///var/run/docker.sock"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772544    3514 flags.go:33] FLAG: --docker-endpoint="unix:///var/run/docker.sock"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772547    3514 flags.go:33] FLAG: --docker-env-metadata-whitelist=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772550    3514 flags.go:33] FLAG: --docker-only="false"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772553    3514 flags.go:33] FLAG: --docker-root="/var/lib/docker"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772567    3514 flags.go:33] FLAG: --docker-tls="false"
+Oct  2 16:19:08 k8s-master-01 systemd: Started Kubernetes systemd probe.
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772572    3514 flags.go:33] FLAG: --docker-tls-ca="ca.pem"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772575    3514 flags.go:33] FLAG: --docker-tls-cert="cert.pem"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772578    3514 flags.go:33] FLAG: --docker-tls-key="key.pem"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772582    3514 flags.go:33] FLAG: --dynamic-config-dir=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772589    3514 flags.go:33] FLAG: --enable-cadvisor-json-endpoints="true"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772592    3514 flags.go:33] FLAG: --enable-controller-attach-detach="true"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772595    3514 flags.go:33] FLAG: --enable-debugging-handlers="true"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772598    3514 flags.go:33] FLAG: --enable-load-reader="false"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772601    3514 flags.go:33] FLAG: --enable-server="true"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772604    3514 flags.go:33] FLAG: --enforce-node-allocatable="[pods]"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772611    3514 flags.go:33] FLAG: --event-burst="10"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772614    3514 flags.go:33] FLAG: --event-qps="5"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772617    3514 flags.go:33] FLAG: --event-storage-age-limit="default=0"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772621    3514 flags.go:33] FLAG: --event-storage-event-limit="default=0"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772624    3514 flags.go:33] FLAG: --eviction-hard="imagefs.available<15%,memory.available<100Mi,nodefs.available<10%,nodefs.inodesFree<5%"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772634    3514 flags.go:33] FLAG: --eviction-max-pod-grace-period="0"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772638    3514 flags.go:33] FLAG: --eviction-minimum-reclaim=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772644    3514 flags.go:33] FLAG: --eviction-pressure-transition-period="5m0s"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772650    3514 flags.go:33] FLAG: --eviction-soft=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772653    3514 flags.go:33] FLAG: --eviction-soft-grace-period=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772656    3514 flags.go:33] FLAG: --exit-on-lock-contention="false"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772659    3514 flags.go:33] FLAG: --experimental-allocatable-ignore-eviction="false"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772662    3514 flags.go:33] FLAG: --experimental-bootstrap-kubeconfig="/etc/kubernetes/bootstrap-kubelet.conf"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772667    3514 flags.go:33] FLAG: --experimental-check-node-capabilities-before-mount="false"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772670    3514 flags.go:33] FLAG: --experimental-dockershim="false"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772673    3514 flags.go:33] FLAG: --experimental-dockershim-root-directory="/var/lib/dockershim"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772676    3514 flags.go:33] FLAG: --experimental-kernel-memcg-notification="false"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772679    3514 flags.go:33] FLAG: --experimental-mounter-path=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772682    3514 flags.go:33] FLAG: --fail-swap-on="true"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772685    3514 flags.go:33] FLAG: --feature-gates=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772689    3514 flags.go:33] FLAG: --file-check-frequency="20s"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772694    3514 flags.go:33] FLAG: --global-housekeeping-interval="1m0s"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772697    3514 flags.go:33] FLAG: --hairpin-mode="promiscuous-bridge"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772701    3514 flags.go:33] FLAG: --healthz-bind-address="127.0.0.1"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772704    3514 flags.go:33] FLAG: --healthz-port="10248"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772707    3514 flags.go:33] FLAG: --help="false"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772710    3514 flags.go:33] FLAG: --hostname-override=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772713    3514 flags.go:33] FLAG: --housekeeping-interval="10s"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772716    3514 flags.go:33] FLAG: --http-check-frequency="20s"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772719    3514 flags.go:33] FLAG: --image-gc-high-threshold="85"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772722    3514 flags.go:33] FLAG: --image-gc-low-threshold="80"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772725    3514 flags.go:33] FLAG: --image-pull-progress-deadline="1m0s"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772728    3514 flags.go:33] FLAG: --image-service-endpoint=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772731    3514 flags.go:33] FLAG: --iptables-drop-bit="15"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772734    3514 flags.go:33] FLAG: --iptables-masquerade-bit="14"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772737    3514 flags.go:33] FLAG: --keep-terminated-pod-volumes="false"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772740    3514 flags.go:33] FLAG: --kube-api-burst="10"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772743    3514 flags.go:33] FLAG: --kube-api-content-type="application/vnd.kubernetes.protobuf"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772746    3514 flags.go:33] FLAG: --kube-api-qps="5"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772749    3514 flags.go:33] FLAG: --kube-reserved=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772752    3514 flags.go:33] FLAG: --kube-reserved-cgroup=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772755    3514 flags.go:33] FLAG: --kubeconfig="/etc/kubernetes/kubelet.conf"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772759    3514 flags.go:33] FLAG: --kubelet-cgroups=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772761    3514 flags.go:33] FLAG: --lock-file=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772764    3514 flags.go:33] FLAG: --log-backtrace-at=":0"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772768    3514 flags.go:33] FLAG: --log-cadvisor-usage="false"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772771    3514 flags.go:33] FLAG: --log-dir=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772774    3514 flags.go:33] FLAG: --log-file=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772777    3514 flags.go:33] FLAG: --log-file-max-size="1800"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772780    3514 flags.go:33] FLAG: --log-flush-frequency="5s"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772783    3514 flags.go:33] FLAG: --logtostderr="true"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772786    3514 flags.go:33] FLAG: --machine-id-file="/etc/machine-id,/var/lib/dbus/machine-id"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772790    3514 flags.go:33] FLAG: --make-iptables-util-chains="true"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772793    3514 flags.go:33] FLAG: --manifest-url=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772796    3514 flags.go:33] FLAG: --manifest-url-header=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772805    3514 flags.go:33] FLAG: --master-service-namespace="default"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772808    3514 flags.go:33] FLAG: --max-open-files="1000000"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772813    3514 flags.go:33] FLAG: --max-pods="110"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772816    3514 flags.go:33] FLAG: --maximum-dead-containers="-1"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772819    3514 flags.go:33] FLAG: --maximum-dead-containers-per-container="1"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772823    3514 flags.go:33] FLAG: --minimum-container-ttl-duration="0s"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772826    3514 flags.go:33] FLAG: --minimum-image-ttl-duration="2m0s"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772830    3514 flags.go:33] FLAG: --network-plugin="cni"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772832    3514 flags.go:33] FLAG: --network-plugin-mtu="0"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772835    3514 flags.go:33] FLAG: --node-ip=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772838    3514 flags.go:33] FLAG: --node-labels=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772843    3514 flags.go:33] FLAG: --node-status-max-images="50"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772846    3514 flags.go:33] FLAG: --node-status-update-frequency="10s"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772849    3514 flags.go:33] FLAG: --non-masquerade-cidr="10.0.0.0/8"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772852    3514 flags.go:33] FLAG: --oom-score-adj="-999"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772855    3514 flags.go:33] FLAG: --pod-cidr=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772858    3514 flags.go:33] FLAG: --pod-infra-container-image="registry.cn-hangzhou.aliyuncs.com/google_containers/pause:3.1"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772863    3514 flags.go:33] FLAG: --pod-manifest-path=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772866    3514 flags.go:33] FLAG: --pod-max-pids="-1"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772869    3514 flags.go:33] FLAG: --pods-per-core="0"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772872    3514 flags.go:33] FLAG: --port="10250"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772875    3514 flags.go:33] FLAG: --protect-kernel-defaults="false"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772878    3514 flags.go:33] FLAG: --provider-id=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772881    3514 flags.go:33] FLAG: --qos-reserved=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772884    3514 flags.go:33] FLAG: --read-only-port="10255"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772887    3514 flags.go:33] FLAG: --really-crash-for-testing="false"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772890    3514 flags.go:33] FLAG: --redirect-container-streaming="false"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772893    3514 flags.go:33] FLAG: --register-node="true"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772896    3514 flags.go:33] FLAG: --register-schedulable="true"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772899    3514 flags.go:33] FLAG: --register-with-taints=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772903    3514 flags.go:33] FLAG: --registry-burst="10"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772906    3514 flags.go:33] FLAG: --registry-qps="5"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772909    3514 flags.go:33] FLAG: --reserved-cpus=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772912    3514 flags.go:33] FLAG: --resolv-conf="/etc/resolv.conf"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772915    3514 flags.go:33] FLAG: --root-dir="/var/lib/kubelet"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772918    3514 flags.go:33] FLAG: --rotate-certificates="false"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772921    3514 flags.go:33] FLAG: --rotate-server-certificates="false"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772924    3514 flags.go:33] FLAG: --runonce="false"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772927    3514 flags.go:33] FLAG: --runtime-cgroups=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772930    3514 flags.go:33] FLAG: --runtime-request-timeout="2m0s"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772934    3514 flags.go:33] FLAG: --seccomp-profile-root="/var/lib/kubelet/seccomp"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772937    3514 flags.go:33] FLAG: --serialize-image-pulls="true"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772941    3514 flags.go:33] FLAG: --skip-headers="false"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772944    3514 flags.go:33] FLAG: --skip-log-headers="false"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772949    3514 flags.go:33] FLAG: --stderrthreshold="2"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772952    3514 flags.go:33] FLAG: --storage-driver-buffer-duration="1m0s"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772955    3514 flags.go:33] FLAG: --storage-driver-db="cadvisor"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772958    3514 flags.go:33] FLAG: --storage-driver-host="localhost:8086"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772961    3514 flags.go:33] FLAG: --storage-driver-password="root"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772964    3514 flags.go:33] FLAG: --storage-driver-secure="false"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772967    3514 flags.go:33] FLAG: --storage-driver-table="stats"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772970    3514 flags.go:33] FLAG: --storage-driver-user="root"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772973    3514 flags.go:33] FLAG: --streaming-connection-idle-timeout="4h0m0s"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772976    3514 flags.go:33] FLAG: --sync-frequency="1m0s"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772979    3514 flags.go:33] FLAG: --system-cgroups=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772982    3514 flags.go:33] FLAG: --system-reserved=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772985    3514 flags.go:33] FLAG: --system-reserved-cgroup=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772987    3514 flags.go:33] FLAG: --tls-cert-file=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772990    3514 flags.go:33] FLAG: --tls-cipher-suites="[]"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772994    3514 flags.go:33] FLAG: --tls-min-version=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.772997    3514 flags.go:33] FLAG: --tls-private-key-file=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.773000    3514 flags.go:33] FLAG: --topology-manager-policy="none"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.773002    3514 flags.go:33] FLAG: --v="5"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.773005    3514 flags.go:33] FLAG: --version="false"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.773012    3514 flags.go:33] FLAG: --vmodule=""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.773016    3514 flags.go:33] FLAG: --volume-plugin-dir="/usr/libexec/kubernetes/kubelet-plugins/volume/exec/"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.773019    3514 flags.go:33] FLAG: --volume-stats-agg-period="1m0s"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.773050    3514 feature_gate.go:243] feature gates: &{map[]}
+Oct  2 16:19:08 k8s-master-01 kubelet: Flag --cgroup-driver has been deprecated, This parameter should be set via the config file specified by the Kubelet's --config flag. See https://kubernetes.io/docs/tasks/administer-cluster/kubelet-config-file/ for more information.
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.774933    3514 feature_gate.go:243] feature gates: &{map[]}
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.774979    3514 feature_gate.go:243] feature gates: &{map[]}
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.791378    3514 mount_linux.go:168] Detected OS with systemd
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.791499    3514 server.go:271] KubeletConfiguration: config.KubeletConfiguration{TypeMeta:v1.TypeMeta{Kind:"", APIVersion:""}, StaticPodPath:"/etc/kubernetes/manifests", SyncFrequency:v1.Duration{Duration:60000000000}, FileCheckFrequency:v1.Duration{Duration:20000000000}, HTTPCheckFrequency:v1.Duration{Duration:20000000000}, StaticPodURL:"", StaticPodURLHeader:map[string][]string(nil), Address:"0.0.0.0", Port:10250, ReadOnlyPort:0, TLSCertFile:"/var/lib/kubelet/pki/kubelet.crt", TLSPrivateKeyFile:"/var/lib/kubelet/pki/kubelet.key", TLSCipherSuites:[]string(nil), TLSMinVersion:"", RotateCertificates:true, ServerTLSBootstrap:false, Authentication:config.KubeletAuthentication{X509:config.KubeletX509Authentication{ClientCAFile:"/etc/kubernetes/pki/ca.crt"}, Webhook:config.KubeletWebhookAuthentication{Enabled:true, CacheTTL:v1.Duration{Duration:120000000000}}, Anonymous:config.KubeletAnonymousAuthentication{Enabled:false}}, Authorization:config.KubeletAuthorization{Mode:"Webhook", Webhook:config.KubeletWebhookAuthorization{CacheAuthorizedTTL:v1.Duration{Duration:300000000000}, CacheUnauthorizedTTL:v1.Duration{Duration:30000000000}}}, RegistryPullQPS:5, RegistryBurst:10, EventRecordQPS:5, EventBurst:10, EnableDebuggingHandlers:true, EnableContentionProfiling:false, HealthzPort:10248, HealthzBindAddress:"127.0.0.1", OOMScoreAdj:-999, ClusterDomain:"cluster.local", ClusterDNS:[]string{"10.96.0.10"}, StreamingConnectionIdleTimeout:v1.Duration{Duration:14400000000000}, NodeStatusUpdateFrequency:v1.Duration{Duration:10000000000}, NodeStatusReportFrequency:v1.Duration{Duration:300000000000}, NodeLeaseDurationSeconds:40, ImageMinimumGCAge:v1.Duration{Duration:120000000000}, ImageGCHighThresholdPercent:85, ImageGCLowThresholdPercent:80, VolumeStatsAggPeriod:v1.Duration{Duration:60000000000}, KubeletCgroups:"", SystemCgroups:"", CgroupRoot:"", CgroupsPerQOS:true, CgroupDriver:"systemd", CPUManagerPolicy:"none", CPUManagerReconcilePeriod:v1.Duration{Duration:10000000000}, TopologyManagerPolicy:"none", QOSReserved:map[string]string(nil), RuntimeRequestTimeout:v1.Duration{Duration:120000000000}, HairpinMode:"promiscuous-bridge", MaxPods:110, PodCIDR:"", PodPidsLimit:-1, ResolverConfig:"/etc/resolv.conf", CPUCFSQuota:true, CPUCFSQuotaPeriod:v1.Duration{Duration:100000000}, MaxOpenFiles:1000000, ContentType:"application/vnd.kubernetes.protobuf", KubeAPIQPS:5, KubeAPIBurst:10, SerializeImagePulls:true, EvictionHard:map[string]string{"imagefs.available":"15%", "memory.available":"100Mi", "nodefs.available":"10%", "nodefs.inodesFree":"5%"}, EvictionSoft:map[string]string(nil), EvictionSoftGracePeriod:map[string]string(nil), EvictionPressureTransitionPeriod:v1.Duration{Duration:300000000000}, EvictionMaxPodGracePeriod:0, EvictionMinimumReclaim:map[string]string(nil), PodsPerCore:0, EnableControllerAttachDetach:true, ProtectKernelDefaults:false, MakeIPTablesUtilChains:true, IPTablesMasqueradeBit:14, IPTablesDropBit:15, FeatureGates:map[string]bool(nil), FailSwapOn:true, ContainerLogMaxSize:"10Mi", ContainerLogMaxFiles:5, ConfigMapAndSecretChangeDetectionStrategy:"Watch", AllowedUnsafeSysctls:[]string(nil), SystemReserved:map[string]string(nil), KubeReserved:map[string]string(nil), SystemReservedCgroup:"", KubeReservedCgroup:"", EnforceNodeAllocatable:[]string{"pods"}, ReservedSystemCPUs:""}
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.791649    3514 server.go:416] Version: v1.17.2
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.791689    3514 feature_gate.go:243] feature gates: &{map[]}
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.791733    3514 feature_gate.go:243] feature gates: &{map[]}
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.791852    3514 plugins.go:100] No cloud provider specified.
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.791874    3514 server.go:532] No cloud provider specified: "" from the config file: ""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.791886    3514 server.go:821] Client rotation is on, will bootstrap in background
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.795451    3514 bootstrap.go:84] Current kubeconfig file contents are still valid, no bootstrap necessary
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.795641    3514 certificate_store.go:129] Loading cert/key pair from "/var/lib/kubelet/pki/kubelet-client-current.pem".
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.796012    3514 server.go:848] Starting client certificate rotation.
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.796033    3514 certificate_manager.go:275] Certificate rotation is enabled.
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.796550    3514 certificate_manager.go:531] Certificate expiration is 2022-10-02 08:08:14 +0000 UTC, rotation deadline is 2022-08-11 20:38:02.061806266 +0000 UTC
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.796593    3514 certificate_manager.go:281] Waiting 7524h18m53.265217544s for next certificate rotation
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.801952    3514 manager.go:146] cAdvisor running in container: "/sys/fs/cgroup/cpu,cpuacct/system.slice/kubelet.service"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.802183    3514 plugin.go:40] CRI-O not connected: Get http://%2Fvar%2Frun%2Fcrio%2Fcrio.sock/info: dial unix /var/run/crio/crio.sock: connect: no such file or directory
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.862350    3514 fs.go:125] Filesystem UUIDs: map[1713f9a1-6463-47d6-a9d7-e466a75ce09e:/dev/dm-0 3dedd0df-7f60-4cfc-bef0-2925c96d178e:/dev/sda1 e14af2ca-f6ff-4a5f-a6bd-fdf71fb2de2b:/dev/dm-1]
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.862399    3514 fs.go:126] Filesystem partitions: map[/dev/mapper/centos-root:{mountpoint:/ major:253 minor:0 fsType:xfs blockSize:0} /dev/sda1:{mountpoint:/boot major:8 minor:1 fsType:xfs blockSize:0} /dev/shm:{mountpoint:/dev/shm major:0 minor:19 fsType:tmpfs blockSize:0} /run:{mountpoint:/run major:0 minor:20 fsType:tmpfs blockSize:0} /run/user/0:{mountpoint:/run/user/0 major:0 minor:42 fsType:tmpfs blockSize:0} /sys/fs/cgroup:{mountpoint:/sys/fs/cgroup major:0 minor:21 fsType:tmpfs blockSize:0} overlay_0-39:{mountpoint:/var/lib/docker/overlay2/e3ee4b324c6bbb624646530911a3e2800ef49978782660da22f45557c1fc6c2c/merged major:0 minor:39 fsType:overlay blockSize:0}]
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.866075    3514 manager.go:193] Machine: {NumCores:4 CpuFrequency:2194689 MemoryCapacity:8181817344 HugePages:[{PageSize:1048576 NumPages:0} {PageSize:2048 NumPages:0}] MachineID:627e17e8fbe44a50b238cdf71fc42a87 SystemUUID:CE444D56-87E2-57B5-6DA3-3DE19F9AA4CE BootID:7dd594e9-165e-4a01-968b-46d683a5ebbd Filesystems:[{Device:/dev/sda1 DeviceMajor:8 DeviceMinor:1 Capacity:1063256064 Type:vfs Inodes:524288 HasInodes:true} {Device:overlay_0-39 DeviceMajor:0 DeviceMinor:39 Capacity:50442797056 Type:vfs Inodes:24635392 HasInodes:true} {Device:/run/user/0 DeviceMajor:0 DeviceMinor:42 Capacity:818184192 Type:vfs Inodes:998757 HasInodes:true} {Device:/dev/shm DeviceMajor:0 DeviceMinor:19 Capacity:4090908672 Type:vfs Inodes:998757 HasInodes:true} {Device:/run DeviceMajor:0 DeviceMinor:20 Capacity:4090908672 Type:vfs Inodes:998757 HasInodes:true} {Device:/sys/fs/cgroup DeviceMajor:0 DeviceMinor:21 Capacity:4090908672 Type:vfs Inodes:998757 HasInodes:true} {Device:/dev/mapper/centos-root DeviceMajor:253 DeviceMinor:0 Capacity:50442797056 Type:vfs Inodes:24635392 HasInodes:true}] DiskMap:map[253:0:{Name:dm-0 Major:253 Minor:0 Size:50453282816 Scheduler:none} 253:1:{Name:dm-1 Major:253 Minor:1 Size:2147483648 Scheduler:none} 8:0:{Name:sda Major:8 Minor:0 Size:53687091200 Scheduler:deadline}] NetworkDevices:[{Name:br-9a322dab8b74 MacAddress:02:42:b4:50:4a:bc Speed:0 Mtu:1500} {Name:ens33 MacAddress:00:0c:29:9a:a4:ce Speed:1000 Mtu:1500}] Topology:[{Id:0 Memory:8181809152 HugePages:[{PageSize:1048576 NumPages:0} {PageSize:2048 NumPages:0}] Cores:[{Id:0 Threads:[0] Caches:[{Size:32768 Type:Data Level:1} {Size:32768 Type:Instruction Level:1} {Size:262144 Type:Unified Level:2}]}] Caches:[{Size:6291456 Type:Unified Level:3} {Size:134217728 Type:Unified Level:4}]} {Id:2 Memory:0 HugePages:[] Cores:[{Id:0 Threads:[1] Caches:[{Size:32768 Type:Data Level:1} {Size:32768 Type:Instruction Level:1} {Size:262144 Type:Unified Level:2}]}] Caches:[{Size:6291456 Type:Unified Level:3} {Size:134217728 Type:Unified Level:4}]} {Id:4 Memory:0 HugePages:[] Cores:[{Id:0 Threads:[2] Caches:[{Size:32768 Type:Data Level:1} {Size:32768 Type:Instruction Level:1} {Size:262144 Type:Unified Level:2}]}] Caches:[{Size:6291456 Type:Unified Level:3} {Size:134217728 Type:Unified Level:4}]} {Id:6 Memory:0 HugePages:[] Cores:[{Id:0 Threads:[3] Caches:[{Size:32768 Type:Data Level:1} {Size:32768 Type:Instruction Level:1} {Size:262144 Type:Unified Level:2}]}] Caches:[{Size:6291456 Type:Unified Level:3} {Size:134217728 Type:Unified Level:4}]}] CloudProvider:Unknown InstanceType:Unknown InstanceID:None}
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.884485    3514 manager.go:199] Version: {KernelVersion:3.10.0-1160.24.1.el7.x86_64 ContainerOsVersion:CentOS Linux 7 (Core) DockerVersion:19.03.5 DockerAPIVersion:1.40 CadvisorVersion: CadvisorRevision:}
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.884659    3514 server.go:470] Sending events to api server.
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.884694    3514 server.go:641] --cgroups-per-qos enabled, but --cgroup-root was not specified.  defaulting to /
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.885223    3514 container_manager_linux.go:265] container manager verified user specified cgroup-root exists: []
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.885234    3514 container_manager_linux.go:270] Creating Container Manager object based on Node Config: {RuntimeCgroupsName: SystemCgroupsName: KubeletCgroupsName: ContainerRuntime:docker CgroupsPerQOS:true CgroupRoot:/ CgroupDriver:systemd KubeletRootDir:/var/lib/kubelet ProtectKernelDefaults:false NodeAllocatableConfig:{KubeReservedCgroupName: SystemReservedCgroupName: ReservedSystemCPUs: EnforceNodeAllocatable:map[pods:{}] KubeReserved:map[] SystemReserved:map[] HardEvictionThresholds:[{Signal:memory.available Operator:LessThan Value:{Quantity:100Mi Percentage:0} GracePeriod:0s MinReclaim:<nil>} {Signal:nodefs.available Operator:LessThan Value:{Quantity:<nil> Percentage:0.1} GracePeriod:0s MinReclaim:<nil>} {Signal:nodefs.inodesFree Operator:LessThan Value:{Quantity:<nil> Percentage:0.05} GracePeriod:0s MinReclaim:<nil>} {Signal:imagefs.available Operator:LessThan Value:{Quantity:<nil> Percentage:0.15} GracePeriod:0s MinReclaim:<nil>}]} QOSReserved:map[] ExperimentalCPUManagerPolicy:none ExperimentalCPUManagerReconcilePeriod:10s ExperimentalPodPidsLimit:-1 EnforceCPULimits:true CPUCFSQuotaPeriod:100ms ExperimentalTopologyManagerPolicy:none}
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.885320    3514 fake_topology_manager.go:29] [fake topologymanager] NewFakeManager
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.885326    3514 container_manager_linux.go:305] Creating device plugin manager: true
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.885339    3514 manager.go:126] Creating Device Plugin manager at /var/lib/kubelet/device-plugins/kubelet.sock
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.885358    3514 fake_topology_manager.go:39] [fake topologymanager] AddHintProvider HintProvider:  &{kubelet.sock /var/lib/kubelet/device-plugins/ map[] {0 0} <nil> {{} [0 0 0]} 0x1b1bbe0 0x6e97c50 0x1b1c4b0 map[] map[] map[] map[] map[] 0xc000959b30 [0] 0x6e97c50}
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.885398    3514 state_mem.go:36] [cpumanager] initializing new in-memory state store
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.886736    3514 state_mem.go:84] [cpumanager] updated default cpuset: ""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.886764    3514 state_mem.go:92] [cpumanager] updated cpuset assignments: "map[]"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.886784    3514 state_checkpoint.go:101] [cpumanager] state checkpoint: restored state from checkpoint
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.886790    3514 state_checkpoint.go:102] [cpumanager] state checkpoint: defaultCPUSet:
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.886801    3514 fake_topology_manager.go:39] [fake topologymanager] AddHintProvider HintProvider:  &{{0 0} 0x6e97c50 10000000000 0xc0009db020 <nil> <nil> <nil> <nil> map[memory:{{104857600 0} {<nil>}  BinarySI}] 0x6e97c50}
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.886839    3514 oom_linux.go:65] attempting to set "/proc/self/oom_score_adj" to "-999"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.886876    3514 server.go:1055] Using root directory: /var/lib/kubelet
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.886900    3514 kubelet.go:286] Adding pod path: /etc/kubernetes/manifests
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.886954    3514 file.go:68] Watching path "/etc/kubernetes/manifests"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.886970    3514 kubelet.go:311] Watching apiserver
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.887359    3514 reflector.go:150] Starting reflector *v1.Pod (0s) from k8s.io/kubernetes/pkg/kubelet/config/apiserver.go:46
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.887380    3514 reflector.go:185] Listing and watching *v1.Pod from k8s.io/kubernetes/pkg/kubelet/config/apiserver.go:46
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.889732    3514 file.go:201] Reading config file "/etc/kubernetes/manifests/etcd.yaml"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.891733    3514 client.go:75] Connecting to docker on unix:///var/run/docker.sock
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.891754    3514 client.go:104] Start docker client with request timeout=2m0s
+Oct  2 16:19:08 k8s-master-01 kubelet: E1002 16:19:08.892288    3514 reflector.go:153] k8s.io/kubernetes/pkg/kubelet/config/apiserver.go:46: Failed to list *v1.Pod: Get https://k8s-server-lb:8443/api/v1/pods?fieldSelector=spec.nodeName%3Dk8s-master-01&limit=500&resourceVersion=0: EOF
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.892320    3514 reflector.go:150] Starting reflector *v1.Service (0s) from k8s.io/kubernetes/pkg/kubelet/kubelet.go:449
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.892328    3514 reflector.go:185] Listing and watching *v1.Service from k8s.io/kubernetes/pkg/kubelet/kubelet.go:449
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.893951    3514 request.go:848] Got a Retry-After 1s response for attempt 1 to https://k8s-server-lb:8443/api/v1/services?limit=500&resourceVersion=0
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.894100    3514 reflector.go:150] Starting reflector *v1.Node (0s) from k8s.io/kubernetes/pkg/kubelet/kubelet.go:458
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.894113    3514 reflector.go:185] Listing and watching *v1.Node from k8s.io/kubernetes/pkg/kubelet/kubelet.go:458
+Oct  2 16:19:08 k8s-master-01 kubelet: E1002 16:19:08.895348    3514 reflector.go:153] k8s.io/kubernetes/pkg/kubelet/kubelet.go:458: Failed to list *v1.Node: Get https://k8s-server-lb:8443/api/v1/nodes?fieldSelector=metadata.name%3Dk8s-master-01&limit=500&resourceVersion=0: EOF
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.901877    3514 common.go:66] Generated UID "93695211ddb48f47b58a74ddb3b651a8" pod "etcd" from /etc/kubernetes/manifests/etcd.yaml
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.901896    3514 common.go:70] Generated Name "etcd-k8s-master-01" for UID "93695211ddb48f47b58a74ddb3b651a8" from URL /etc/kubernetes/manifests/etcd.yaml
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.901902    3514 common.go:75] Using namespace "kube-system" for pod "etcd-k8s-master-01" from /etc/kubernetes/manifests/etcd.yaml
+Oct  2 16:19:08 k8s-master-01 kubelet: W1002 16:19:08.901961    3514 docker_service.go:563] Hairpin mode set to "promiscuous-bridge" but kubenet is not enabled, falling back to "hairpin-veth"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.901981    3514 docker_service.go:240] Hairpin mode set to "hairpin-veth"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.902064    3514 file.go:201] Reading config file "/etc/kubernetes/manifests/kube-apiserver.yaml"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.903004    3514 common.go:66] Generated UID "b2405549123232c7525529b5bf823c46" pod "kube-apiserver" from /etc/kubernetes/manifests/kube-apiserver.yaml
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.903016    3514 common.go:70] Generated Name "kube-apiserver-k8s-master-01" for UID "b2405549123232c7525529b5bf823c46" from URL /etc/kubernetes/manifests/kube-apiserver.yaml
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.903021    3514 common.go:75] Using namespace "kube-system" for pod "kube-apiserver-k8s-master-01" from /etc/kubernetes/manifests/kube-apiserver.yaml
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.903097    3514 file.go:201] Reading config file "/etc/kubernetes/manifests/kube-controller-manager.yaml"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.904451    3514 common.go:66] Generated UID "f3da8a96c779b6f440be4acd3a637e47" pod "kube-controller-manager" from /etc/kubernetes/manifests/kube-controller-manager.yaml
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.904469    3514 common.go:70] Generated Name "kube-controller-manager-k8s-master-01" for UID "f3da8a96c779b6f440be4acd3a637e47" from URL /etc/kubernetes/manifests/kube-controller-manager.yaml
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.904474    3514 common.go:75] Using namespace "kube-system" for pod "kube-controller-manager-k8s-master-01" from /etc/kubernetes/manifests/kube-controller-manager.yaml
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.904550    3514 file.go:201] Reading config file "/etc/kubernetes/manifests/kube-scheduler.yaml"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.905607    3514 common.go:66] Generated UID "92e6721871b55a1e38e273dab9a560bc" pod "kube-scheduler" from /etc/kubernetes/manifests/kube-scheduler.yaml
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.905626    3514 common.go:70] Generated Name "kube-scheduler-k8s-master-01" for UID "92e6721871b55a1e38e273dab9a560bc" from URL /etc/kubernetes/manifests/kube-scheduler.yaml
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.905635    3514 common.go:75] Using namespace "kube-system" for pod "kube-scheduler-k8s-master-01" from /etc/kubernetes/manifests/kube-scheduler.yaml
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.905740    3514 config.go:303] Setting pods for source file
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.905756    3514 config.go:412] Receiving a new pod "kube-apiserver-k8s-master-01_kube-system(b2405549123232c7525529b5bf823c46)"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.905769    3514 config.go:412] Receiving a new pod "kube-controller-manager-k8s-master-01_kube-system(f3da8a96c779b6f440be4acd3a637e47)"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.905775    3514 config.go:412] Receiving a new pod "kube-scheduler-k8s-master-01_kube-system(92e6721871b55a1e38e273dab9a560bc)"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.905781    3514 config.go:412] Receiving a new pod "etcd-k8s-master-01_kube-system(93695211ddb48f47b58a74ddb3b651a8)"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.919402    3514 cni.go:206] Using CNI configuration file /etc/cni/net.d/10-flannel.conflist
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.930680    3514 cni.go:206] Using CNI configuration file /etc/cni/net.d/10-flannel.conflist
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.930704    3514 plugins.go:166] Loaded network plugin "cni"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.930741    3514 docker_service.go:255] Docker cri networking managed by cni
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.936400    3514 cni.go:206] Using CNI configuration file /etc/cni/net.d/10-flannel.conflist
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.945454    3514 docker_service.go:260] Docker Info: &{ID:RZRX:BCUD:DPGF:M35G:RIU2:TSN7:2T2B:PC5R:D3BC:BO6C:C2C2:CYBT Containers:26 ContainersRunning:1 ContainersPaused:0 ContainersStopped:25 Images:99 Driver:overlay2 DriverStatus:[[Backing Filesystem xfs] [Supports d_type true] [Native Overlay Diff true]] SystemStatus:[] Plugins:{Volume:[local] Network:[bridge host ipvlan macvlan null overlay] Authorization:[] Log:[awslogs fluentd gcplogs gelf journald json-file local logentries splunk syslog]} MemoryLimit:true SwapLimit:true KernelMemory:true KernelMemoryTCP:true CPUCfsPeriod:true CPUCfsQuota:true CPUShares:true CPUSet:true PidsLimit:true IPv4Forwarding:true BridgeNfIptables:true BridgeNfIP6tables:true Debug:false NFd:28 OomKillDisable:true NGoroutines:40 SystemTime:2021-10-02T16:19:08.931917678+08:00 LoggingDriver:json-file CgroupDriver:systemd NEventsListener:0 KernelVersion:3.10.0-1160.24.1.el7.x86_64 OperatingSystem:CentOS Linux 7 (Core) OSType:linux Architecture:x86_64 IndexServerAddress:https://index.docker.io/v1/ RegistryConfig:0xc0006aca10 NCPU:4 MemTotal:8181817344 GenericResources:[] DockerRootDir:/var/lib/docker HTTPProxy: HTTPSProxy: NoProxy: Name:k8s-master-01 Labels:[] ExperimentalBuild:false ServerVersion:19.03.5 ClusterStore: ClusterAdvertise: Runtimes:map[runc:{Path:runc Args:[]}] DefaultRuntime:runc Swarm:{NodeID: NodeAddr: LocalNodeState:inactive ControlAvailable:false Error: RemoteManagers:[] Nodes:0 Managers:0 Cluster:<nil> Warnings:[]} LiveRestoreEnabled:false Isolation: InitBinary:docker-init ContainerdCommit:{ID:b34a5c8af56e510852c35414db4c1f4fa6172339 Expected:b34a5c8af56e510852c35414db4c1f4fa6172339} RuncCommit:{ID:22c72eb3976b73573b28fe9d14e3f2e113871345-dirty Expected:22c72eb3976b73573b28fe9d14e3f2e113871345-dirty} InitCommit:{ID:fec3683 Expected:fec3683} SecurityOptions:[name=seccomp,profile=default] ProductLicense: Warnings:[]}
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.945510    3514 docker_service.go:273] Setting cgroupDriver to systemd
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.945651    3514 kubelet.go:639] RemoteRuntimeEndpoint: "unix:///var/run/dockershim.sock", RemoteImageEndpoint: "unix:///var/run/dockershim.sock"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.945690    3514 kubelet.go:642] Starting the GRPC server for the docker CRI shim.
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.945741    3514 docker_server.go:59] Start dockershim grpc server
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.962452    3514 container_manager_linux.go:801] attempting to apply oom_score_adj of -999 to pid 1576
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.962485    3514 oom_linux.go:65] attempting to set "/proc/1576/oom_score_adj" to "-999"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.968708    3514 remote_runtime.go:51] Connecting to runtime service unix:///var/run/dockershim.sock
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.968785    3514 remote_runtime.go:59] parsed scheme: ""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.968796    3514 remote_runtime.go:59] scheme "" not registered, fallback to default scheme
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.968823    3514 passthrough.go:48] ccResolverWrapper: sending update to cc: {[{/var/run/dockershim.sock 0  <nil>}] <nil>}
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.968835    3514 clientconn.go:577] ClientConn switching balancer to "pick_first"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.968863    3514 remote_image.go:41] Connecting to image service unix:///var/run/dockershim.sock
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.968874    3514 remote_image.go:50] parsed scheme: ""
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.968878    3514 remote_image.go:50] scheme "" not registered, fallback to default scheme
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.968885    3514 passthrough.go:48] ccResolverWrapper: sending update to cc: {[{/var/run/dockershim.sock 0  <nil>}] <nil>}
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.968890    3514 clientconn.go:577] ClientConn switching balancer to "pick_first"
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.968934    3514 plugins.go:64] Registering credential provider: .dockercfg
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.969310    3514 balancer_conn_wrappers.go:127] pickfirstBalancer: HandleSubConnStateChange: 0xc000245a30, CONNECTING
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.969452    3514 balancer_conn_wrappers.go:127] pickfirstBalancer: HandleSubConnStateChange: 0xc000245bc0, CONNECTING
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.969837    3514 balancer_conn_wrappers.go:127] pickfirstBalancer: HandleSubConnStateChange: 0xc000245a30, READY
+Oct  2 16:19:08 k8s-master-01 kubelet: I1002 16:19:08.969849    3514 balancer_conn_wrappers.go:127] pickfirstBalancer: HandleSubConnStateChange: 0xc000245bc0, READY
+Oct  2 16:19:09 k8s-master-01 kubelet: I1002 16:19:09.895076    3514 reflector.go:185] Listing and watching *v1.Pod from k8s.io/kubernetes/pkg/kubelet/config/apiserver.go:46
+Oct  2 16:19:09 k8s-master-01 kubelet: I1002 16:19:09.895965    3514 reflector.go:185] Listing and watching *v1.Node from k8s.io/kubernetes/pkg/kubelet/kubelet.go:458
+Oct  2 16:19:09 k8s-master-01 kubelet: E1002 16:19:09.896455    3514 reflector.go:153] k8s.io/kubernetes/pkg/kubelet/kubelet.go:449: Failed to list *v1.Service: Get https://k8s-server-lb:8443/api/v1/services?limit=500&resourceVersion=0: EOF
+Oct  2 16:19:09 k8s-master-01 kubelet: E1002 16:19:09.896545    3514 reflector.go:153] k8s.io/kubernetes/pkg/kubelet/config/apiserver.go:46: Failed to list *v1.Pod: Get https://k8s-server-lb:8443/api/v1/pods?fieldSelector=spec.nodeName%3Dk8s-master-01&limit=500&resourceVersion=0: EOF
+Oct  2 16:19:09 k8s-master-01 kubelet: I1002 16:19:09.896785    3514 request.go:848] Got a Retry-After 1s response for attempt 1 to https://k8s-server-lb:8443/api/v1/nodes?fieldSelector=metadata.name%3Dk8s-master-01&limit=500&resourceVersion=0
+Oct  2 16:19:10 k8s-master-01 kubelet: I1002 16:19:10.898190    3514 reflector.go:185] Listing and watching *v1.Service from k8s.io/kubernetes/pkg/kubelet/kubelet.go:449
+Oct  2 16:19:10 k8s-master-01 kubelet: I1002 16:19:10.898274    3514 reflector.go:185] Listing and watching *v1.Pod from k8s.io/kubernetes/pkg/kubelet/config/apiserver.go:46
+Oct  2 16:19:10 k8s-master-01 kubelet: I1002 16:19:10.899757    3514 request.go:848] Got a Retry-After 1s response for attempt 2 to https://k8s-server-lb:8443/api/v1/nodes?fieldSelector=metadata.name%3Dk8s-master-01&limit=500&resourceVersion=0
+Oct  2 16:19:10 k8s-master-01 kubelet: I1002 16:19:10.899821    3514 request.go:848] Got a Retry-After 1s response for attempt 1 to https://k8s-server-lb:8443/api/v1/pods?fieldSelector=spec.nodeName%3Dk8s-master-01&limit=500&resourceVersion=0
+Oct  2 16:19:10 k8s-master-01 kubelet: I1002 16:19:10.899879    3514 request.go:848] Got a Retry-After 1s response for attempt 1 to https://k8s-server-lb:8443/api/v1/services?limit=500&resourceVersion=0
+Oct  2 16:19:11 k8s-master-01 kubelet: I1002 16:19:11.902501    3514 request.go:848] Got a Retry-After 1s response for attempt 2 to https://k8s-server-lb:8443/api/v1/services?limit=500&resourceVersion=0
+Oct  2 16:19:11 k8s-master-01 kubelet: E1002 16:19:11.902537    3514 reflector.go:153] k8s.io/kubernetes/pkg/kubelet/config/apiserver.go:46: Failed to list *v1.Pod: Get https://k8s-server-lb:8443/api/v1/pods?fieldSelector=spec.nodeName%3Dk8s-master-01&limit=500&resourceVersion=0: EOF
+Oct  2 16:19:11 k8s-master-01 kubelet: I1002 16:19:11.902613    3514 request.go:848] Got a Retry-After 1s response for attempt 3 to https://k8s-server-lb:8443/api/v1/nodes?fieldSelector=metadata.name%3Dk8s-master-01&limit=500&resourceVersion=0
+Oct  2 16:19:12 k8s-master-01 kubelet: I1002 16:19:12.903268    3514 reflector.go:185] Listing and watching *v1.Pod from k8s.io/kubernetes/pkg/kubelet/config/apiserver.go:46
+Oct  2 16:19:12 k8s-master-01 kubelet: E1002 16:19:12.904245    3514 reflector.go:153] k8s.io/kubernetes/pkg/kubelet/config/apiserver.go:46: Failed to list *v1.Pod: Get https://k8s-server-lb:8443/api/v1/pods?fieldSelector=spec.nodeName%3Dk8s-master-01&limit=500&resourceVersion=0: EOF
+Oct  2 16:19:12 k8s-master-01 kubelet: I1002 16:19:12.904333    3514 request.go:848] Got a Retry-After 1s response for attempt 4 to https://k8s-server-lb:8443/api/v1/nodes?fieldSelector=metadata.name%3Dk8s-master-01&limit=500&resourceVersion=0
+Oct  2 16:19:12 k8s-master-01 kubelet: E1002 16:19:12.904386    3514 reflector.go:153] k8s.io/kubernetes/pkg/kubelet/kubelet.go:449: Failed to list *v1.Service: Get https://k8s-server-lb:8443/api/v1/services?limit=500&resourceVersion=0: EOF
+
+Oct  2 16:19:13 k8s-master-01 kubelet: I1002 16:19:13.907542    3514 reflector.go:185] Listing and watching *v1.Pod from k8s.io/kubernetes/pkg/kubelet/config/apiserver.go:46
+Oct  2 16:19:13 k8s-master-01 kubelet: E1002 16:19:13.908051    3514 reflector.go:153] k8s.io/kubernetes/pkg/kubelet/kubelet.go:458: Failed to list *v1.Node: Get https://k8s-server-lb:8443/api/v1/nodes?fieldSelector=metadata.name%3Dk8s-master-01&limit=500&resourceVersion=0: EOF
+Oct  2 16:19:13 k8s-master-01 kubelet: I1002 16:19:13.908077    3514 reflector.go:185] Listing and watching *v1.Service from k8s.io/kubernetes/pkg/kubelet/kubelet.go:449
+Oct  2 16:19:13 k8s-master-01 kubelet: I1002 16:19:13.908302    3514 request.go:848] Got a Retry-After 1s response for attempt 1 to https://k8s-server-lb:8443/api/v1/pods?fieldSelector=spec.nodeName%3Dk8s-master-01&limit=500&resourceVersion=0
+Oct  2 16:19:13 k8s-master-01 kubelet: I1002 16:19:13.908917    3514 request.go:848] Got a Retry-After 1s response for attempt 1 to https://k8s-server-lb:8443/api/v1/services?limit=500&resourceVersion=0
+Oct  2 16:19:13 k8s-master-01 kubelet: I1002 16:19:13.947245    3514 cni.go:206] Using CNI configuration file /etc/cni/net.d/10-flannel.conflist
+
+

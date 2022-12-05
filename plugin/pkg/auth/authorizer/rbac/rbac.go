@@ -60,6 +60,9 @@ type authorizingVisitor struct {
 	errors  []error
 }
 
+// caller: 
+// 	1. pkg/registry/rbac/validation/rule.go -> DefaultRuleResolver.VisitRulesFor()
+//
 func (v *authorizingVisitor) visit(source fmt.Stringer, rule *rbacv1.PolicyRule, err error) bool {
 	if rule != nil && RuleAllows(v.requestAttributes, rule) {
 		v.allowed = true
@@ -72,10 +75,17 @@ func (v *authorizingVisitor) visit(source fmt.Stringer, rule *rbacv1.PolicyRule,
 	return true
 }
 
-func (r *RBACAuthorizer) Authorize(ctx context.Context, requestAttributes authorizer.Attributes) (authorizer.Decision, string, error) {
+// caller: 
+// 	1. staging/src/k8s.io/apiserver/pkg/authorization/union/union.go -> unionAuthzHandler.Authorize()
+//
+func (r *RBACAuthorizer) Authorize(
+	ctx context.Context, requestAttributes authorizer.Attributes,
+) (authorizer.Decision, string, error) {
 	ruleCheckingVisitor := &authorizingVisitor{requestAttributes: requestAttributes}
 
-	r.authorizationRuleResolver.VisitRulesFor(requestAttributes.GetUser(), requestAttributes.GetNamespace(), ruleCheckingVisitor.visit)
+	r.authorizationRuleResolver.VisitRulesFor(
+		requestAttributes.GetUser(), requestAttributes.GetNamespace(), ruleCheckingVisitor.visit,
+	)
 	if ruleCheckingVisitor.allowed {
 		return authorizer.DecisionAllow, ruleCheckingVisitor.reason, nil
 	}
@@ -175,6 +185,8 @@ func RulesAllow(requestAttributes authorizer.Attributes, rules ...rbacv1.PolicyR
 	return false
 }
 
+// caller: 
+// 	1. RBACAuthorizer.Authorize()
 func RuleAllows(requestAttributes authorizer.Attributes, rule *rbacv1.PolicyRule) bool {
 	if requestAttributes.IsResourceRequest() {
 		combinedResource := requestAttributes.GetResource()

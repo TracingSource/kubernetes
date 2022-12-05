@@ -414,6 +414,13 @@ func NewSafeFormatAndMountFromHost(pluginName string, host volume.VolumeHost) *m
 	return &mount.SafeFormatAndMount{Interface: mounter, Exec: exec}
 }
 
+// GetVolumeMode 获取目标 volume 的 mode 形式, 一般有两种: file system 和 block.
+// 但是这个函数貌似只判断关联的 pv 对象的 mode, 
+// 对于 configmap, secret, 和 hostPath 等的挂载, 则直接返回 file system.
+//
+// caller:
+// 	1. CheckVolumeModeFilesystem()
+//
 // GetVolumeMode retrieves VolumeMode from pv.
 // If the volume doesn't have PersistentVolume, it's an inline volume,
 // should return volumeMode as filesystem to keep existing behavior.
@@ -432,6 +439,14 @@ func GetPersistentVolumeClaimQualifiedName(claim *v1.PersistentVolumeClaim) stri
 	return utilstrings.JoinQualifiedName(claim.GetNamespace(), claim.GetName())
 }
 
+// CheckVolumeModeFilesystem 判断目标 volume 的挂载模式(mode)是否为 file system.
+// 其实挂载模式只有 file system 和 block 两种模式, 
+// 而被调用函数 GetVolumeMode() 只判断 pv 的 volume mode, 
+// 其余的 configmap, secret 和 hostPath 等, 则直接被判断为 file system.
+//
+// caller: 
+// 	1. pkg/volume/util/operationexecutor/operation_executor.go -> operationExecutor.MountVolume()
+// 
 // CheckVolumeModeFilesystem checks VolumeMode.
 // If the mode is Filesystem, return true otherwise return false.
 func CheckVolumeModeFilesystem(volumeSpec *volume.Spec) (bool, error) {

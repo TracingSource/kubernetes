@@ -33,6 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
+// Manager 由当前源文件的 secretManager{} 结构体实现.
+//
 // Manager manages Kubernets secrets. This includes retrieving
 // secrets or registering/unregistering them via Pods.
 type Manager interface {
@@ -90,6 +92,8 @@ func (s *secretManager) GetSecret(namespace, name string) (*v1.Secret, error) {
 	return nil, fmt.Errorf("unexpected object type: %v", object)
 }
 
+// caller: 
+// 	1. pkg/kubelet/pod/pod_manager.go -> basicManager.updatePodsInternal()
 func (s *secretManager) RegisterPod(pod *v1.Pod) {
 	s.manager.RegisterPod(pod)
 }

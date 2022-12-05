@@ -95,6 +95,8 @@ func (kl *Kubelet) GetPodDir(podUID types.UID) string {
 	return kl.getPodDir(podUID)
 }
 
+// getPodDir 返回 /var/lib/kubelet/pods/PodUID 路径
+//
 // getPodDir returns the full path to the per-pod directory for the pod with
 // the given UID.
 func (kl *Kubelet) getPodDir(podUID types.UID) string {

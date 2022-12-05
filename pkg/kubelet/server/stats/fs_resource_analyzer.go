@@ -44,6 +44,9 @@ type fsResourceAnalyzer struct {
 
 var _ fsResourceAnalyzerInterface = &fsResourceAnalyzer{}
 
+// caller: 
+// 	1. pkg/kubelet/server/stats/resource_analyzer.go -> NewResourceAnalyzer()
+//
 // newFsResourceAnalyzer returns a new fsResourceAnalyzer implementation
 func newFsResourceAnalyzer(statsProvider Provider, calcVolumePeriod time.Duration) *fsResourceAnalyzer {
 	r := &fsResourceAnalyzer{
@@ -54,6 +57,9 @@ func newFsResourceAnalyzer(statsProvider Provider, calcVolumePeriod time.Duratio
 	return r
 }
 
+// caller: 
+// 	1. pkg/kubelet/server/stats/resource_analyzer.go -> resourceAnalyzer.Start()
+//
 // Start eager background caching of volume stats.
 func (s *fsResourceAnalyzer) Start() {
 	s.startOnce.Do(func() {

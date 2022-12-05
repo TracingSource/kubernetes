@@ -82,7 +82,8 @@ func newWorker(
 	container v1.Container) *worker {
 
 	w := &worker{
-		stopCh:       make(chan struct{}, 1), // Buffer so stop() can be non-blocking.
+		// Buffer so stop() can be non-blocking.
+		stopCh:       make(chan struct{}, 1), 
 		pod:          pod,
 		container:    container,
 		probeType:    probeType,
@@ -239,10 +240,13 @@ func (w *worker) doProbe() (keepGoing bool) {
 		}
 	}
 
-	// TODO: in order for exec probes to correctly handle downward API env, we must be able to reconstruct
-	// the full container environment here, OR we must make a call to the CRI in order to get those environment
+	// TODO: in order for exec probes to correctly handle downward API env,
+	// we must be able to reconstruct the full container environment here, 
+	// OR we must make a call to the CRI in order to get those environment
 	// values from the running container.
-	result, err := w.probeManager.prober.probe(w.probeType, w.pod, status, w.container, w.containerID)
+	result, err := w.probeManager.prober.probe(
+		w.probeType, w.pod, status, w.container, w.containerID,
+	)
 	if err != nil {
 		// Prober error, throw away the result.
 		return true

@@ -95,10 +95,13 @@ type Scheduler struct {
 	// Framework runs scheduler plugins at configured extension points.
 	Framework framework.Framework
 
+	// NextPod 实际为 pkg/scheduler/internal/queue/scheduling_queue.go 文件中的 MakeNextPodFunc() 函数.
+	// 从 Pod 队列中取一个 Pod 对象出来, 逻辑很简单.
+	//
 	// NextPod should be a function that blocks until the next pod
-	// is available. We don't use a channel for this, because scheduling
-	// a pod may take some amount of time and we don't want pods to get
-	// stale while they sit in a channel.
+	// is available. We don't use a channel for this,
+	// because scheduling a pod may take some amount of time 
+	// and we don't want pods to get stale while they sit in a channel.
 	NextPod func() *framework.PodInfo
 
 	// Error is called if there is an error. It is passed the pod in
@@ -398,7 +401,11 @@ func initPolicyFromFile(policyFile string, policy *schedulerapi.Policy) error {
 }
 
 // initPolicyFromConfigMap initialize policy from configMap
-func initPolicyFromConfigMap(client clientset.Interface, policyRef *schedulerapi.SchedulerPolicyConfigMapSource, policy *schedulerapi.Policy) error {
+func initPolicyFromConfigMap(
+	client clientset.Interface, 
+	policyRef *schedulerapi.SchedulerPolicyConfigMapSource, 
+	policy *schedulerapi.Policy,
+) error {
 	// Use a policy serialized in a config map value.
 	policyConfigMap, err := client.CoreV1().ConfigMaps(policyRef.Namespace).Get(policyRef.Name, metav1.GetOptions{})
 	if err != nil {
@@ -415,12 +422,13 @@ func initPolicyFromConfigMap(client clientset.Interface, policyRef *schedulerapi
 	return nil
 }
 
-// Run begins watching and scheduling. It waits for cache to be synced, then starts scheduling and blocked until the context is done.
+// Run begins watching and scheduling. It waits for cache to be synced,
+// then starts scheduling and blocked until the context is done.
 func (sched *Scheduler) Run(ctx context.Context) {
 	if !cache.WaitForCacheSync(ctx.Done(), sched.scheduledPodsHasSynced) {
 		return
 	}
-
+	// Until() 可以说是一个循环了, 当 scheduleOne() 结束的时候就会立刻启动(间隔0秒)下一个 scheduleOne()
 	wait.UntilWithContext(ctx, sched.scheduleOne, 0)
 }
 
@@ -441,10 +449,14 @@ func (sched *Scheduler) recordSchedulingFailure(podInfo *framework.PodInfo, err 
 	}
 }
 
-// preempt tries to create room for a pod that has failed to schedule, by preempting lower priority pods if possible.
+// preempt tries to create room for a pod that has failed to schedule,
+// by preempting lower priority pods if possible.
 // If it succeeds, it adds the name of the node where preemption has happened to the pod spec.
 // It returns the node name and an error if any.
-func (sched *Scheduler) preempt(ctx context.Context, state *framework.CycleState, fwk framework.Framework, preemptor *v1.Pod, scheduleErr error) (string, error) {
+func (sched *Scheduler) preempt(
+	ctx context.Context, state *framework.CycleState, fwk framework.Framework, 
+	preemptor *v1.Pod, scheduleErr error,
+) (string, error) {
 	preemptor, err := sched.podPreemptor.getUpdatedPod(preemptor)
 	if err != nil {
 		klog.Errorf("Error getting the updated preemptor pod object: %v", err)
@@ -467,7 +479,10 @@ func (sched *Scheduler) preempt(ctx context.Context, state *framework.CycleState
 		// Make a call to update nominated node name of the pod on the API server.
 		err = sched.podPreemptor.setNominatedNodeName(preemptor, nodeName)
 		if err != nil {
-			klog.Errorf("Error in preemption process. Cannot set 'NominatedPod' on pod %v/%v: %v", preemptor.Namespace, preemptor.Name, err)
+			klog.Errorf(
+				"Error in preemption process. Cannot set 'NominatedPod' on pod %v/%v: %v", 
+				preemptor.Namespace, preemptor.Name, err,
+			)
 			sched.SchedulingQueue.DeleteNominatedPodIfExists(preemptor)
 			return "", err
 		}
@@ -481,7 +496,11 @@ func (sched *Scheduler) preempt(ctx context.Context, state *framework.CycleState
 			if waitingPod := fwk.GetWaitingPod(victim.UID); waitingPod != nil {
 				waitingPod.Reject("preempted")
 			}
-			sched.Recorder.Eventf(victim, preemptor, v1.EventTypeNormal, "Preempted", "Preempting", "Preempted by %v/%v on node %v", preemptor.Namespace, preemptor.Name, nodeName)
+			sched.Recorder.Eventf(
+				victim, preemptor, v1.EventTypeNormal, "Preempted", "Preempting", 
+				"Preempted by %v/%v on node %v", 
+				preemptor.Namespace, preemptor.Name, nodeName,
+			)
 
 		}
 		metrics.PreemptionVictims.Observe(float64(len(victims)))
@@ -584,181 +603,6 @@ func (sched *Scheduler) bind(ctx context.Context, assumed *v1.Pod, targetNode st
 	metrics.DeprecatedSchedulingLatency.WithLabelValues(metrics.Binding).Observe(metrics.SinceInSeconds(bindingStart))
 	sched.Recorder.Eventf(assumed, nil, v1.EventTypeNormal, "Scheduled", "Binding", "Successfully assigned %v/%v to %v", assumed.Namespace, assumed.Name, targetNode)
 	return nil
-}
-
-// scheduleOne does the entire scheduling workflow for a single pod.  It is serialized on the scheduling algorithm's host fitting.
-func (sched *Scheduler) scheduleOne(ctx context.Context) {
-	fwk := sched.Framework
-
-	podInfo := sched.NextPod()
-	// pod could be nil when schedulerQueue is closed
-	if podInfo == nil || podInfo.Pod == nil {
-		return
-	}
-	pod := podInfo.Pod
-	if pod.DeletionTimestamp != nil {
-		sched.Recorder.Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", "skip schedule deleting pod: %v/%v", pod.Namespace, pod.Name)
-		klog.V(3).Infof("Skip schedule deleting pod: %v/%v", pod.Namespace, pod.Name)
-		return
-	}
-
-	klog.V(3).Infof("Attempting to schedule pod: %v/%v", pod.Namespace, pod.Name)
-
-	// Synchronously attempt to find a fit for the pod.
-	start := time.Now()
-	state := framework.NewCycleState()
-	state.SetRecordFrameworkMetrics(rand.Intn(100) < frameworkMetricsSamplePercent)
-	schedulingCycleCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	scheduleResult, err := sched.Algorithm.Schedule(schedulingCycleCtx, state, pod)
-	if err != nil {
-		sched.recordSchedulingFailure(podInfo.DeepCopy(), err, v1.PodReasonUnschedulable, err.Error())
-		// Schedule() may have failed because the pod would not fit on any host, so we try to
-		// preempt, with the expectation that the next time the pod is tried for scheduling it
-		// will fit due to the preemption. It is also possible that a different pod will schedule
-		// into the resources that were preempted, but this is harmless.
-		if fitError, ok := err.(*core.FitError); ok {
-			if sched.DisablePreemption {
-				klog.V(3).Infof("Pod priority feature is not enabled or preemption is disabled by scheduler configuration." +
-					" No preemption is performed.")
-			} else {
-				preemptionStartTime := time.Now()
-				sched.preempt(schedulingCycleCtx, state, fwk, pod, fitError)
-				metrics.PreemptionAttempts.Inc()
-				metrics.SchedulingAlgorithmPreemptionEvaluationDuration.Observe(metrics.SinceInSeconds(preemptionStartTime))
-				metrics.DeprecatedSchedulingAlgorithmPreemptionEvaluationDuration.Observe(metrics.SinceInMicroseconds(preemptionStartTime))
-				metrics.SchedulingLatency.WithLabelValues(metrics.PreemptionEvaluation).Observe(metrics.SinceInSeconds(preemptionStartTime))
-				metrics.DeprecatedSchedulingLatency.WithLabelValues(metrics.PreemptionEvaluation).Observe(metrics.SinceInSeconds(preemptionStartTime))
-			}
-			// Pod did not fit anywhere, so it is counted as a failure. If preemption
-			// succeeds, the pod should get counted as a success the next time we try to
-			// schedule it. (hopefully)
-			metrics.PodScheduleFailures.Inc()
-		} else {
-			klog.Errorf("error selecting node for pod: %v", err)
-			metrics.PodScheduleErrors.Inc()
-		}
-		return
-	}
-	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInSeconds(start))
-	metrics.DeprecatedSchedulingAlgorithmLatency.Observe(metrics.SinceInMicroseconds(start))
-	// Tell the cache to assume that a pod now is running on a given node, even though it hasn't been bound yet.
-	// This allows us to keep scheduling without waiting on binding to occur.
-	assumedPodInfo := podInfo.DeepCopy()
-	assumedPod := assumedPodInfo.Pod
-
-	// Assume volumes first before assuming the pod.
-	//
-	// If all volumes are completely bound, then allBound is true and binding will be skipped.
-	//
-	// Otherwise, binding of volumes is started after the pod is assumed, but before pod binding.
-	//
-	// This function modifies 'assumedPod' if volume binding is required.
-	allBound, err := sched.VolumeBinder.Binder.AssumePodVolumes(assumedPod, scheduleResult.SuggestedHost)
-	if err != nil {
-		sched.recordSchedulingFailure(assumedPodInfo, err, SchedulerError,
-			fmt.Sprintf("AssumePodVolumes failed: %v", err))
-		metrics.PodScheduleErrors.Inc()
-		return
-	}
-
-	// Run "reserve" plugins.
-	if sts := fwk.RunReservePlugins(schedulingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost); !sts.IsSuccess() {
-		sched.recordSchedulingFailure(assumedPodInfo, sts.AsError(), SchedulerError, sts.Message())
-		metrics.PodScheduleErrors.Inc()
-		return
-	}
-
-	// assume modifies `assumedPod` by setting NodeName=scheduleResult.SuggestedHost
-	err = sched.assume(assumedPod, scheduleResult.SuggestedHost)
-	if err != nil {
-		// This is most probably result of a BUG in retrying logic.
-		// We report an error here so that pod scheduling can be retried.
-		// This relies on the fact that Error will check if the pod has been bound
-		// to a node and if so will not add it back to the unscheduled pods queue
-		// (otherwise this would cause an infinite loop).
-		sched.recordSchedulingFailure(assumedPodInfo, err, SchedulerError, fmt.Sprintf("AssumePod failed: %v", err))
-		metrics.PodScheduleErrors.Inc()
-		// trigger un-reserve plugins to clean up state associated with the reserved Pod
-		fwk.RunUnreservePlugins(schedulingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
-		return
-	}
-	// bind the pod to its host asynchronously (we can do this b/c of the assumption step above).
-	go func() {
-		bindingCycleCtx, cancel := context.WithCancel(ctx)
-		defer cancel()
-		metrics.SchedulerGoroutines.WithLabelValues("binding").Inc()
-		defer metrics.SchedulerGoroutines.WithLabelValues("binding").Dec()
-
-		// Run "permit" plugins.
-		permitStatus := fwk.RunPermitPlugins(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
-		if !permitStatus.IsSuccess() {
-			var reason string
-			if permitStatus.IsUnschedulable() {
-				metrics.PodScheduleFailures.Inc()
-				reason = v1.PodReasonUnschedulable
-			} else {
-				metrics.PodScheduleErrors.Inc()
-				reason = SchedulerError
-			}
-			if forgetErr := sched.Cache().ForgetPod(assumedPod); forgetErr != nil {
-				klog.Errorf("scheduler cache ForgetPod failed: %v", forgetErr)
-			}
-			// trigger un-reserve plugins to clean up state associated with the reserved Pod
-			fwk.RunUnreservePlugins(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
-			sched.recordSchedulingFailure(assumedPodInfo, permitStatus.AsError(), reason, permitStatus.Message())
-			return
-		}
-
-		// Bind volumes first before Pod
-		if !allBound {
-			err := sched.bindVolumes(assumedPod)
-			if err != nil {
-				sched.recordSchedulingFailure(assumedPodInfo, err, "VolumeBindingFailed", err.Error())
-				metrics.PodScheduleErrors.Inc()
-				// trigger un-reserve plugins to clean up state associated with the reserved Pod
-				fwk.RunUnreservePlugins(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
-				return
-			}
-		}
-
-		// Run "prebind" plugins.
-		preBindStatus := fwk.RunPreBindPlugins(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
-		if !preBindStatus.IsSuccess() {
-			var reason string
-			metrics.PodScheduleErrors.Inc()
-			reason = SchedulerError
-			if forgetErr := sched.Cache().ForgetPod(assumedPod); forgetErr != nil {
-				klog.Errorf("scheduler cache ForgetPod failed: %v", forgetErr)
-			}
-			// trigger un-reserve plugins to clean up state associated with the reserved Pod
-			fwk.RunUnreservePlugins(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
-			sched.recordSchedulingFailure(assumedPodInfo, preBindStatus.AsError(), reason, preBindStatus.Message())
-			return
-		}
-
-		err := sched.bind(bindingCycleCtx, assumedPod, scheduleResult.SuggestedHost, state)
-		metrics.E2eSchedulingLatency.Observe(metrics.SinceInSeconds(start))
-		metrics.DeprecatedE2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
-		if err != nil {
-			metrics.PodScheduleErrors.Inc()
-			// trigger un-reserve plugins to clean up state associated with the reserved Pod
-			fwk.RunUnreservePlugins(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
-			sched.recordSchedulingFailure(assumedPodInfo, err, SchedulerError, fmt.Sprintf("Binding rejected: %v", err))
-		} else {
-			// Calculating nodeResourceString can be heavy. Avoid it if klog verbosity is below 2.
-			if klog.V(2) {
-				klog.Infof("pod %v/%v is bound successfully on node %q, %d nodes evaluated, %d nodes were found feasible.", assumedPod.Namespace, assumedPod.Name, scheduleResult.SuggestedHost, scheduleResult.EvaluatedNodes, scheduleResult.FeasibleNodes)
-			}
-
-			metrics.PodScheduleSuccesses.Inc()
-			metrics.PodSchedulingAttempts.Observe(float64(podInfo.Attempts))
-			metrics.PodSchedulingDuration.Observe(metrics.SinceInSeconds(podInfo.InitialAttemptTimestamp))
-
-			// Run "postbind" plugins.
-			fwk.RunPostBindPlugins(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
-		}
-	}()
 }
 
 type podConditionUpdaterImpl struct {

@@ -126,6 +126,10 @@ type OperationExecutor interface {
 	// It then updates the actual state of the world to reflect that.
 	UnmountDevice(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, hostutil hostutil.HostUtils) error
 
+	// VerifyControllerAttachedVolume 判断目标 volume 是否已经出现在了目标 node 主机上.
+	// 如果是, 则更新 actual state of the world 中该 volume 的状态,
+	// 如果存在 error, 则重试.
+	//
 	// VerifyControllerAttachedVolume checks if the specified volume is present
 	// in the specified nodes AttachedVolumes Status field. It uses kubeClient
 	// to fetch the node object.
@@ -160,6 +164,8 @@ func NewOperationExecutor(
 	}
 }
 
+// 由 pkg/kubelet/volumemanager/cache/actual_state_of_world.go -> actualStateOfWorld{} 实现
+//
 // ActualStateOfWorldMounterUpdater defines a set of operations updating the actual
 // state of the world cache after successful mount/unmount.
 type ActualStateOfWorldMounterUpdater interface {

@@ -35,6 +35,7 @@ import (
 
 // Config contains the data on how to authorize a request to the Kube API Server
 type Config struct {
+	// AuthorizationModes --authorization-mode 参数, 其值一般为 [Node,RBAC]
 	AuthorizationModes []string
 
 	// Options for ModeABAC

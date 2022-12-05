@@ -102,6 +102,9 @@ func (m *kubeGenericRuntimeManager) toKubeContainer(c *runtimeapi.Container) (*k
 	}, nil
 }
 
+// caller: 
+// 	1. pkg/kubelet/kuberuntime/kuberuntime_manager.go -> kubeGenericRuntimeManager.GetPods()
+//
 // sandboxToKubeContainer converts runtimeapi.PodSandbox to kubecontainer.Container.
 // This is only needed because we need to return sandboxes as if they were
 // kubecontainer.Containers to avoid substantial changes to PLEG.
@@ -117,8 +120,8 @@ func (m *kubeGenericRuntimeManager) sandboxToKubeContainer(s *runtimeapi.PodSand
 	}, nil
 }
 
-// getImageUser gets uid or user name that will run the command(s) from image. The function
-// guarantees that only one of them is set.
+// getImageUser gets uid or user name that will run the command(s) from image.
+// The function guarantees that only one of them is set.
 func (m *kubeGenericRuntimeManager) getImageUser(image string) (*int64, string, error) {
 	imageStatus, err := m.imageService.ImageStatus(&runtimeapi.ImageSpec{Image: image})
 	if err != nil {

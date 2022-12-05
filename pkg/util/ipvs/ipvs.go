@@ -23,17 +23,21 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 )
 
-// Interface is an injectable interface for running ipvs commands.  Implementations must be goroutine-safe.
+// Interface is an injectable interface for running ipvs commands. 
+// Implementations must be goroutine-safe.
 type Interface interface {
 	// Flush clears all virtual servers in system. return occurred error immediately.
 	Flush() error
 	// AddVirtualServer creates the specified virtual server.
 	AddVirtualServer(*VirtualServer) error
-	// UpdateVirtualServer updates an already existing virtual server.  If the virtual server does not exist, return error.
+	// UpdateVirtualServer updates an already existing virtual server. 
+	// If the virtual server does not exist, return error.
 	UpdateVirtualServer(*VirtualServer) error
-	// DeleteVirtualServer deletes the specified virtual server.  If the virtual server does not exist, return error.
+	// DeleteVirtualServer deletes the specified virtual server. 
+	// If the virtual server does not exist, return error.
 	DeleteVirtualServer(*VirtualServer) error
-	// Given a partial virtual server, GetVirtualServer will return the specified virtual server information in the system.
+	// Given a partial virtual server, GetVirtualServer will return
+	// the specified virtual server information in the system.
 	GetVirtualServer(*VirtualServer) (*VirtualServer, error)
 	// GetVirtualServers lists all virtual servers in the system.
 	GetVirtualServers() ([]*VirtualServer, error)
@@ -120,13 +124,21 @@ func (rs *RealServer) Equal(other *RealServer) bool {
 		rs.Port == other.Port
 }
 
+// GetRequiredIPVSModules 返回不同版本内核启动ipvs功能需要加载的模块列表
+//
 // GetRequiredIPVSModules returns the required ipvs modules for the given linux kernel version.
 func GetRequiredIPVSModules(kernelVersion *version.Version) []string {
 	// "nf_conntrack_ipv4" has been removed since v4.19
 	// see https://github.com/torvalds/linux/commit/a0ae2562c6c4b2721d9fddba63b7286c13517d9f
 	if kernelVersion.LessThan(version.MustParseGeneric("4.19")) {
-		return []string{KernelModuleIPVS, KernelModuleIPVSRR, KernelModuleIPVSWRR, KernelModuleIPVSSH, KernelModuleNfConntrackIPV4}
+		return []string{
+			KernelModuleIPVS, KernelModuleIPVSRR, KernelModuleIPVSWRR,
+			KernelModuleIPVSSH, KernelModuleNfConntrackIPV4,
+		}
 	}
-	return []string{KernelModuleIPVS, KernelModuleIPVSRR, KernelModuleIPVSWRR, KernelModuleIPVSSH, KernelModuleNfConntrack}
+	return []string{
+		KernelModuleIPVS, KernelModuleIPVSRR, KernelModuleIPVSWRR, 
+		KernelModuleIPVSSH, KernelModuleNfConntrack,
+	}
 
 }

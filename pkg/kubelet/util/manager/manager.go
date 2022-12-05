@@ -21,6 +21,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+// Manager 由 pkg/kubelet/util/manager/cache_based_manager.go -> cacheBasedManager{} 结构体实现
+//
 // Manager is the interface for registering and unregistering
 // objects referenced by pods in the underlying cache and
 // extracting those from that cache if needed.
@@ -43,6 +45,8 @@ type Manager interface {
 	UnregisterPod(pod *v1.Pod)
 }
 
+// Store 由 pkg/kubelet/util/manager/watch_based_manager.go -> objectCache{} 结构体实现.
+//
 // Store is the interface for a object cache that
 // can be used by cacheBasedManager.
 type Store interface {

@@ -46,6 +46,9 @@ type subpath struct {
 	mounter mount.Interface
 }
 
+// caller: 
+// 	1. cmd/kubelet/app/server.go -> UnsecuredDependencies() 在 kubelet 启动过程中被调用.
+//
 // New returns a subpath.Interface for the current system
 func New(mounter mount.Interface) Interface {
 	return &subpath{

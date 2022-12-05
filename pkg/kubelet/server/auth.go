@@ -37,8 +37,17 @@ type KubeletAuth struct {
 	authorizer.Authorizer
 }
 
-// NewKubeletAuth returns a kubelet.AuthInterface composed of the given authenticator, attribute getter, and authorizer
-func NewKubeletAuth(authenticator authenticator.Request, authorizerAttributeGetter authorizer.RequestAttributesGetter, authorizer authorizer.Authorizer) AuthInterface {
+// NewKubeletAuth 直接返回一个 KubeletAuth{} 结构体对象
+// caller:
+// 	1. cmd/kubelet/app/auth.go -> BuildAuth() 在 kubelet 启动过程中被调用.
+//
+// NewKubeletAuth returns a kubelet.AuthInterface composed of 
+// the given authenticator, attribute getter, and authorizer
+func NewKubeletAuth(
+	authenticator authenticator.Request, 
+	authorizerAttributeGetter authorizer.RequestAttributesGetter, 
+	authorizer authorizer.Authorizer,
+) AuthInterface {
 	return &KubeletAuth{authenticator, authorizerAttributeGetter, authorizer}
 }
 

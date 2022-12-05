@@ -193,6 +193,9 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (
 	return lc, nil
 }
 
+// caller: 
+// 	1. pkg/kubelet/kuberuntime/kuberuntime_manager.go -> kubeGenericRuntimeManager.GetPods()
+//
 // getKubeletSandboxes lists all (or just the running) sandboxes managed by kubelet.
 func (m *kubeGenericRuntimeManager) getKubeletSandboxes(all bool) ([]*runtimeapi.PodSandbox, error) {
 	var filter *runtimeapi.PodSandboxFilter
@@ -215,7 +218,9 @@ func (m *kubeGenericRuntimeManager) getKubeletSandboxes(all bool) ([]*runtimeapi
 }
 
 // determinePodSandboxIP determines the IP addresses of the given pod sandbox.
-func (m *kubeGenericRuntimeManager) determinePodSandboxIPs(podNamespace, podName string, podSandbox *runtimeapi.PodSandboxStatus) []string {
+func (m *kubeGenericRuntimeManager) determinePodSandboxIPs(
+	podNamespace, podName string, podSandbox *runtimeapi.PodSandboxStatus,
+) []string {
 	podIPs := make([]string, 0)
 	if podSandbox.Network == nil {
 		klog.Warningf("Pod Sandbox status doesn't have network information, cannot report IPs")

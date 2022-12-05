@@ -105,6 +105,10 @@ func HugePageLimits(resourceList v1.ResourceList) map[int64]int64 {
 	return hugePageLimits
 }
 
+// caller: 
+// 	1. pkg/kubelet/cm/pod_container_manager_linux.go -> podContainerManagerImpl.EnsureExists()
+// 只有这一处调用.
+//
 // ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
 func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64) *ResourceConfig {
 	// sum requests and limits.
@@ -237,19 +241,45 @@ func GetPodCgroupNameSuffix(podUID types.UID) string {
 	return podCgroupNamePrefix + string(podUID)
 }
 
+// 	@param cgroupRoot: ""
+// 	@param cgroupDriver: systemd
+//
+// caller: 
+// 	1. cmd/kubelet/app/server.go -> run()
+//
 // NodeAllocatableRoot returns the literal cgroup path for the node allocatable cgroup
 func NodeAllocatableRoot(cgroupRoot, cgroupDriver string) string {
 	root := ParseCgroupfsToCgroupName(cgroupRoot)
+	// defaultNodeAllocatableCgroupName 值为 kubepods
+	// 所以 nodeAllocatableRoot
 	nodeAllocatableRoot := NewCgroupName(root, defaultNodeAllocatableCgroupName)
+	// 如果配置了 kubelet 的 cgroup 驱动为 systemd 就返回 systemd 的路径格式, 不然返回 cgroupfs 的格式.
 	if libcontainerCgroupManagerType(cgroupDriver) == libcontainerSystemd {
 		return nodeAllocatableRoot.ToSystemd()
 	}
 	return nodeAllocatableRoot.ToCgroupfs()
 }
 
+// GetKubeletContainer 其实就是判断了一下 kubeletCgroups 为空的情况,
+// 为空的时候访问/proc/$pid/cgroup文件取得真实的cgroup名称($pid为当前kubelet进程的pid).
+//
+// 11:memory:/system.slice/kubelet.service
+// 10:devices:/system.slice/kubelet.service
+// ...省略
+// 4:cpuacct,cpu:/system.slice/kubelet.service
+// 3:pids:/system.slice/kubelet.service
+// 2:cpuset:/
+// 1:name=systemd:/system.slice/kubelet.service
+//
+// 	@param kubeletCgroups: ""
+//
+// caller: 
+// 	1. cmd/kubelet/app/server.go -> run()
+//
 // GetKubeletContainer returns the cgroup the kubelet will use
 func GetKubeletContainer(kubeletCgroups string) (string, error) {
 	if kubeletCgroups == "" {
+		// 这里 os.Getpid() 取的是 kubelet 进程自身的 pid
 		cont, err := getContainer(os.Getpid())
 		if err != nil {
 			return "", err
@@ -259,6 +289,12 @@ func GetKubeletContainer(kubeletCgroups string) (string, error) {
 	return kubeletCgroups, nil
 }
 
+// GetRuntimeContainer 这是获取docker进程的cgroup名称, GetKubeletContainer()
+// 则是为了获取当前kubelet的cgroup名称.
+//
+// @param containerRuntime: 可选值有docker, remote, 一般为docker, 在kubelet的命令行参数中指定.
+// @param runtimeCgroups: ""
+//
 // GetRuntimeContainer returns the cgroup used by the container runtime
 func GetRuntimeContainer(containerRuntime, runtimeCgroups string) (string, error) {
 	if containerRuntime == "docker" {

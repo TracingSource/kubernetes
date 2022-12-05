@@ -37,7 +37,9 @@ type internalContainerLifecycleImpl struct {
 	topologyManager topologymanager.Manager
 }
 
-func (i *internalContainerLifecycleImpl) PreStartContainer(pod *v1.Pod, container *v1.Container, containerID string) error {
+func (i *internalContainerLifecycleImpl) PreStartContainer(
+	pod *v1.Pod, container *v1.Container, containerID string,
+) error {
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
 		err := i.cpuManager.AddContainer(pod, container, containerID)
 		if err != nil {

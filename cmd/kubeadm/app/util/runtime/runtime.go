@@ -179,7 +179,8 @@ func (runtime *DockerRuntime) ImageExists(image string) (bool, error) {
 	return err == nil, nil
 }
 
-// detectCRISocketImpl is separated out only for test purposes, DON'T call it directly, use DetectCRISocket instead
+// detectCRISocketImpl is separated out only for test purposes,
+// DON'T call it directly, use DetectCRISocket instead
 func detectCRISocketImpl(isSocket func(string) bool) (string, error) {
 	foundCRISockets := []string{}
 	knownCRISockets := []string{
@@ -188,11 +189,14 @@ func detectCRISocketImpl(isSocket func(string) bool) (string, error) {
 	}
 
 	if isSocket(dockerSocket) {
-		// the path in dockerSocket is not CRI compatible, hence we should replace it with a CRI compatible socket
+		// the path in dockerSocket is not CRI compatible,
+		// hence we should replace it with a CRI compatible socket
 		foundCRISockets = append(foundCRISockets, constants.DefaultDockerCRISocket)
 	} else if isSocket(containerdSocket) {
-		// Docker 18.09 gets bundled together with containerd, thus having both dockerSocket and containerdSocket present.
-		// For compatibility reasons, we use the containerd socket only if Docker is not detected.
+		// Docker 18.09 gets bundled together with containerd,
+		// thus having both dockerSocket and containerdSocket present.
+		// For compatibility reasons, we use the containerd socket only if
+		// Docker is not detected.
 		foundCRISockets = append(foundCRISockets, containerdSocket)
 	}
 
@@ -211,11 +215,15 @@ func detectCRISocketImpl(isSocket func(string) bool) (string, error) {
 		return foundCRISockets[0], nil
 	default:
 		// Multiple CRIs installed?
-		return "", errors.Errorf("Found multiple CRI sockets, please use --cri-socket to select one: %s", strings.Join(foundCRISockets, ", "))
+		return "", errors.Errorf(
+			"Found multiple CRI sockets, please use --cri-socket to select one: %s", 
+			strings.Join(foundCRISockets, ", "),
+		)
 	}
 }
 
-// DetectCRISocket uses a list of known CRI sockets to detect one. If more than one or none is discovered, an error is returned.
+// DetectCRISocket uses a list of known CRI sockets to detect one.
+// If more than one or none is discovered, an error is returned.
 func DetectCRISocket() (string, error) {
 	return detectCRISocketImpl(isExistingSocket)
 }

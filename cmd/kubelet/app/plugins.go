@@ -54,6 +54,11 @@ import (
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
 )
 
+// ProbeVolumePlugins 返回支持的存储插件列表, 如 emptydir, hostpath, nfs 等.
+//
+// caller: 
+// 	1. cmd/kubelet/app/server.go -> UnsecuredDependencies()
+//
 // ProbeVolumePlugins collects all volume plugins into an easy to use list.
 func ProbeVolumePlugins(featureGate featuregate.FeatureGate) ([]volume.VolumePlugin, error) {
 	allPlugins := []volume.VolumePlugin{}
@@ -92,6 +97,14 @@ func ProbeVolumePlugins(featureGate featuregate.FeatureGate) ([]volume.VolumePlu
 	return allPlugins, nil
 }
 
+// GetDynamicPluginProber ...
+//
+// 	@param pluginDir: 如 "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/"
+// 	@param runner: 一个只经过初始化的 exec 对象.
+//
+// caller: 
+// 	1. cmd/kubelet/app/server.go -> UnsecuredDependencies()
+//
 // GetDynamicPluginProber gets the probers of dynamically discoverable plugins
 // for kubelet.
 // Currently only Flexvolume plugins are dynamically discoverable.

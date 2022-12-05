@@ -49,6 +49,8 @@ type PodLifecycleEvent struct {
 	Data interface{}
 }
 
+// PodLifecycleEventGenerator 由 pkg/kubelet/pleg/generic.go -> GenericPLEG{} 实现
+//
 // PodLifecycleEventGenerator contains functions for generating pod life cycle events.
 type PodLifecycleEventGenerator interface {
 	Start()

@@ -202,12 +202,19 @@ func (s *objectStore) Get(namespace, name string) (runtime.Object, error) {
 	return data.object, data.err
 }
 
+// cacheBasedManager 实现了 pkg/kubelet/util/manager/manager.go -> Manager 接口.
+//
 // cacheBasedManager keeps a store with objects necessary
 // for registered pods. Different implementations of the store
 // may result in different semantics for freshness of objects
 // (e.g. ttl-based implementation vs watch-based implementation).
 type cacheBasedManager struct {
 	objectStore          Store
+	// getReferencedObjects 从目标 Pod 中取出被引用的 configmap 或 secret 等资源的名称列表.
+	// 可被赋值的选项有:
+	// 	1. pkg/kubelet/configmap/configmap_manager.go -> getConfigMapNames() 
+	// 	2. pkg/kubelet/secret/secret_manager.go -> getSecretNames()
+	// 
 	getReferencedObjects func(*v1.Pod) sets.String
 
 	lock           sync.Mutex
@@ -218,6 +225,11 @@ func (c *cacheBasedManager) GetObject(namespace, name string) (runtime.Object, e
 	return c.objectStore.Get(namespace, name)
 }
 
+// RegisterPod ...
+//
+// caller: 
+// 	1. pkg/kubelet/secret/secret_manager.go -> secretManager.RegisterPod() 
+// 	2. pkg/kubelet/configmap/configmap_manager.go -> configMapManager.RegisterPod()
 func (c *cacheBasedManager) RegisterPod(pod *v1.Pod) {
 	names := c.getReferencedObjects(pod)
 	c.lock.Lock()

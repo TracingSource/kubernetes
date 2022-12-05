@@ -62,16 +62,29 @@ type Configurer struct {
 
 	// If non-nil, use this for container DNS server.
 	clusterDNS []net.IP
+	// ClusterDomain 取自 /var/lib/kubelet/config.yaml 文件中 clusterDomain 字段的值.
+	// 默认为 cluster.local
+	//
 	// If non-empty, use this for container DNS search.
 	ClusterDomain string
+	// ResolverConfig 宿主机的 /etc/resolv.conf 文件
+	//
 	// The path to the DNS resolver configuration file used as the base to generate
 	// the container's DNS resolver configuration file. This can be used in
 	// conjunction with clusterDomain and clusterDNS.
 	ResolverConfig string
 }
 
+// NewConfigurer 构造 Configurer{} 对象并返回(很简单的流程)
+//
+// caller:
+// 	1. pkg/kubelet/kubelet__new.go -> NewMainKubelet() 在 kubelet 启动过程中被调用.
+//
 // NewConfigurer returns a DNS configurer for launching pods.
-func NewConfigurer(recorder record.EventRecorder, nodeRef *v1.ObjectReference, nodeIP net.IP, clusterDNS []net.IP, clusterDomain, resolverConfig string) *Configurer {
+func NewConfigurer(
+	recorder record.EventRecorder, nodeRef *v1.ObjectReference, nodeIP net.IP, 
+	clusterDNS []net.IP, clusterDomain, resolverConfig string,
+) *Configurer {
 	return &Configurer{
 		recorder:       recorder,
 		nodeRef:        nodeRef,
@@ -155,6 +168,12 @@ func (c *Configurer) generateSearchesForDNSClusterFirst(hostSearch []string, pod
 	return omitDuplicates(append(clusterSearch, hostSearch...))
 }
 
+// CheckLimitsForResolvConf 验证 kubelet 所在宿主机的 /etc/resolv.conf 文件的正确性.
+// 尤其是 search 字段, 后缀不能过多.
+//
+// caller:
+// 	1. pkg/kubelet/kubelet.go -> Kubelet.HandlePodAdditions()
+//
 // CheckLimitsForResolvConf checks limits in resolv.conf.
 func (c *Configurer) CheckLimitsForResolvConf() {
 	f, err := os.Open(c.ResolverConfig)
