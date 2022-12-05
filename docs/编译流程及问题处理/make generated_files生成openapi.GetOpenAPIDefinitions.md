@@ -2,8 +2,9 @@
 
 初始 clone kubernetes 仓库并启动apiserver前, 需要先执行`make generated_files`, 生成如下文件.
 
-staging/src/k8s.io/code-generator/_examples/apiserver/openapi/zz_generated.openapi.go
-staging/src/k8s.io/sample-apiserver/pkg/generated/openapi/zz_generated.openapi.go
+- staging/src/k8s.io/code-generator/_examples/apiserver/openapi/zz_generated.openapi.go
+- staging/src/k8s.io/sample-apiserver/pkg/generated/openapi/zz_generated.openapi.go
+- staging/src/k8s.io/apiextensions-apiserver/pkg/generated/openapi/zz_generated.openapi.go
 
 否则启动会报错
 
@@ -81,4 +82,6 @@ ln -s ../../staging/src/k8s.io/api                      ./api
 mv ../kube-utils                ./vendor/k8s.io/utils
 ```
 
-然后生成那两个文件后, 再移出来就可以了.
+然后生成那3个文件后, 再移出来就可以了.
+
+注意, 其中有一个文件是生成在 apiextensions-apiserver 工程中的, 独立出来之后注意提交.
