@@ -224,7 +224,7 @@ func (o *Options) Validate() []error {
 // Config return a scheduler config object
 func (o *Options) Config() (*schedulerappconfig.Config, error) {
 	if o.SecureServing != nil {
-		err = o.SecureServing.MaybeDefaultWithSelfSignedCerts(
+		err := o.SecureServing.MaybeDefaultWithSelfSignedCerts(
 			"localhost", nil, []net.IP{net.ParseIP("127.0.0.1")},
 		)
 		if err != nil {
