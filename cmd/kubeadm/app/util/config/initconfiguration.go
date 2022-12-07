@@ -186,7 +186,16 @@ func DefaultedInitConfiguration(versionedInitCfg *kubeadmapiv1beta2.InitConfigur
 	return internalcfg, nil
 }
 
-// LoadInitConfigurationFromFile loads a supported versioned InitConfiguration from a file, converts it into internal config, defaults it and verifies it.
+// LoadInitConfigurationFromFile 读取目标路径下的 kubeadm config.yaml 文件, 并将其解析
+// 成为 InitConfiguration 结构体对象.
+//
+// 	@param cfgPath: kubeadm init --config 所指定的配置文件路径. 如果为空, 则会去默认路径寻找.
+//
+// caller:
+// 	1. LoadOrDefaultInitConfiguration()
+//
+// LoadInitConfigurationFromFile loads a supported versioned InitConfiguration from a file,
+// converts it into internal config, defaults it and verifies it.
 func LoadInitConfigurationFromFile(cfgPath string) (*kubeadmapi.InitConfiguration, error) {
 	klog.V(1).Infof("loading configuration from %q", cfgPath)
 
@@ -198,12 +207,23 @@ func LoadInitConfigurationFromFile(cfgPath string) (*kubeadmapi.InitConfiguratio
 	return BytesToInitConfiguration(b)
 }
 
-// LoadOrDefaultInitConfiguration takes a path to a config file and a versioned configuration that can serve as the default config
-// If cfgPath is specified, the versioned configs will always get overridden with the one in the file (specified by cfgPath).
+// 	@param cfgPath: kubeadm init --config 所指定的配置文件路径. 如果为空, 则会去默认路径寻找.
+//
+// caller:
+// 	1. cmd/kubeadm/app/cmd/init.go -> newInitData()
+//
+// LoadOrDefaultInitConfiguration takes a path to a config file
+// and a versioned configuration that can serve as the default config
+// If cfgPath is specified, the versioned configs will always get overridden
+// with the one in the file (specified by cfgPath).
 // The external, versioned configuration is defaulted and converted to the internal type.
-// Right thereafter, the configuration is defaulted again with dynamic values (like IP addresses of a machine, etc)
+// Right thereafter, the configuration is defaulted again with dynamic values
+// (like IP addresses of a machine, etc)
 // Lastly, the internal config is validated and returned.
-func LoadOrDefaultInitConfiguration(cfgPath string, versionedInitCfg *kubeadmapiv1beta2.InitConfiguration, versionedClusterCfg *kubeadmapiv1beta2.ClusterConfiguration) (*kubeadmapi.InitConfiguration, error) {
+func LoadOrDefaultInitConfiguration(
+	cfgPath string, versionedInitCfg *kubeadmapiv1beta2.InitConfiguration, 
+	versionedClusterCfg *kubeadmapiv1beta2.ClusterConfiguration,
+) (*kubeadmapi.InitConfiguration, error) {
 	if cfgPath != "" {
 		// Loads configuration from config file, if provided
 		// Nb. --config overrides command line flags

@@ -20,7 +20,9 @@ type InitConfiguration struct {
 	// When InitConfiguration is marshalled to bytes in the external version, this information IS NOT preserved (which can be seen from
 	// the `json:"-"` tag in the external variant of these API types.
 	ClusterConfiguration `json:"-"`
-
+	// BootstrapTokens 在 cmd/kubeadm/app/util/config/initconfiguration.go -> SetBootstrapTokensDynamicDefaults()
+	// 完成填充, 一般就是取2个固定长度的随机数, 然后用点号拼接, 赋值给 Token 成员就行了.
+	//
 	// BootstrapTokens is respected at `kubeadm init` time and describes a set of Bootstrap Tokens to create.
 	BootstrapTokens []BootstrapToken
 
@@ -234,6 +236,9 @@ type Networking struct {
 // TODO: The BootstrapToken object should move out to either k8s.io/client-go or k8s.io/api in the future
 // (probably as part of Bootstrap Tokens going GA). It should not be staged under the kubeadm API as it is now.
 type BootstrapToken struct {
+	// Token 在 cmd/kubeadm/app/util/config/initconfiguration.go -> SetBootstrapTokensDynamicDefaults()
+	// 完成赋值, 一般就是取2个固定长度的随机数, 然后用点号拼接就行了.
+	//
 	// Token is used for establishing bidirectional trust between nodes and control-planes.
 	// Used for joining nodes in the cluster.
 	Token *BootstrapTokenString

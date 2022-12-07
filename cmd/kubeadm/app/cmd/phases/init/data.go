@@ -15,6 +15,7 @@ type InitData interface {
 	CertificateKey() string
 	SetCertificateKey(key string)
 	SkipCertificateKeyPrint() bool
+	// 返回结构体中的 cfg 字段, 该字段的内容即是 kubeadm-config.yaml 的配置对象
 	Cfg() *kubeadmapi.InitConfiguration
 	DryRun() bool
 	SkipTokenPrint() bool
