@@ -11,3 +11,14 @@ make WHAT=cmd/kube-controller-manager
 make WHAT=cmd/kubectl
 make WHAT=cmd/kube-apiserver
 ```
+
+git clone https://gitee.com/skeyes/kubernetes.git
+git clone https://gitee.com/skeyes/apimachinery.git
+git clone https://gitee.com/skeyes/kube-api.git
+git clone https://gitee.com/skeyes/kube-utils.git
+git clone https://gitee.com/skeyes/kubectl.git
+git clone https://gitee.com/skeyes/apiserver.git
+git clone https://gitee.com/skeyes/kube-aggregator.git
+git clone https://gitee.com/skeyes/apiextensions-apiserver.git
+git clone https://gitee.com/skeyes/client-go.git
+

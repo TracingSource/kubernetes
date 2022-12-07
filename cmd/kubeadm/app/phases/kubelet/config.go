@@ -47,6 +47,14 @@ func WriteConfigToDisk(kubeletConfig *kubeletconfigv1beta1.KubeletConfiguration,
 	return writeConfigBytesToDisk(kubeletBytes, kubeletDir)
 }
 
+// UploadConfiguration 在 kubeadm init 3大件启动完成后, 将 kubelet 的 config.yaml 配置,
+// 存放到 kube-system 下, 名为 kubelet-config-${k8s-version} 的 ConfigMap 对象中.
+//
+// caller:
+// 	1. cmd/kubeadm/app/cmd/phases/init/uploadconfig.go -> runUploadKubeletConfig()
+// 	kubeadm init 过程中, 等到 apiserver, kcm, scheduler 3大件启动完成后, 调用该方法,
+// 	将 kubelet 配置文件存放到 configMap 中.
+//
 // CreateConfigMap creates a ConfigMap with the generic kubelet configuration.
 // Used at "kubeadm init" and "kubeadm upgrade" time
 func CreateConfigMap(cfg *kubeletconfigv1beta1.KubeletConfiguration, k8sVersionStr string, client clientset.Interface) error {
@@ -57,7 +65,10 @@ func CreateConfigMap(cfg *kubeletconfigv1beta1.KubeletConfiguration, k8sVersionS
 	}
 
 	configMapName := kubeadmconstants.GetKubeletConfigMapName(k8sVersion)
-	fmt.Printf("[kubelet] Creating a ConfigMap %q in namespace %s with the configuration for the kubelets in the cluster\n", configMapName, metav1.NamespaceSystem)
+	fmt.Printf(
+		"[kubelet] Creating a ConfigMap %q in namespace %s with the configuration for the kubelets in the cluster\n", 
+		configMapName, metav1.NamespaceSystem,
+	)
 
 	kubeletBytes, err := getConfigBytes(cfg)
 	if err != nil {

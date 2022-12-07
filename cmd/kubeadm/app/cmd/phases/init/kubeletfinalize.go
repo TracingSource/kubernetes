@@ -64,8 +64,8 @@ func NewKubeletFinalizePhase() workflow.Phase {
 }
 
 // runKubeletFinalizeCertRotation detects if the kubelet certificate rotation is enabled
-// and updates the kubelet.conf file to point to a rotatable certificate and key for the
-// Node user.
+// and updates the kubelet.conf file to point to a rotatable certificate and key
+// for the Node user.
 func runKubeletFinalizeCertRotation(c workflow.RunData) error {
 	data, ok := c.(InitData)
 	if !ok {
@@ -81,23 +81,37 @@ func runKubeletFinalizeCertRotation(c workflow.RunData) error {
 		pkiPath = val
 	}
 
-	// Check for the existence of the kubelet-client-current.pem file in the kubelet certificate directory.
+	// Check for the existence of the kubelet-client-current.pem file
+	// in the kubelet certificate directory.
 	rotate := false
 	pemPath := filepath.Join(pkiPath, "kubelet-client-current.pem")
 	if _, err := os.Stat(pemPath); err == nil {
-		klog.V(1).Infof("[kubelet-finalize] Assuming that kubelet client certificate rotation is enabled: found %q", pemPath)
+		klog.V(1).Infof(
+			"[kubelet-finalize] Assuming that kubelet client certificate rotation "+
+			"is enabled: found %q", pemPath,
+		)
 		rotate = true
 	} else {
-		klog.V(1).Infof("[kubelet-finalize] Assuming that kubelet client certificate rotation is disabled: %v", err)
+		klog.V(1).Infof(
+			"[kubelet-finalize] Assuming that kubelet client certificate rotation "+
+			"is disabled: %v", err,
+		)
 	}
 
 	// Exit early if rotation is disabled.
 	if !rotate {
 		return nil
 	}
-
-	kubeconfigPath := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)
-	fmt.Printf("[kubelet-finalize] Updating %q to point to a rotatable kubelet client certificate and key\n", kubeconfigPath)
+	// /etc/kubernetes/kubelet.conf (保存着 apiserver 的访问地址与认证信息)
+	// 在这个配置文件中, user 字段为 "system:node:${主机名}"
+	kubeconfigPath := filepath.Join(
+		kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName,
+	)
+	fmt.Printf(
+		"[kubelet-finalize] Updating %q to point to a rotatable "+
+		"kubelet client certificate and key\n", 
+		kubeconfigPath,
+	)
 
 	// Exit early if dry-running is enabled.
 	if data.DryRun() {
@@ -110,14 +124,21 @@ func runKubeletFinalizeCertRotation(c workflow.RunData) error {
 		return errors.Wrapf(err, "could not load %q", kubeconfigPath)
 	}
 
-	// Perform basic validation. The errors here can only happen if the kubelet.conf was corrupted.
-	userName := fmt.Sprintf("%s%s", kubeadmconstants.NodesUserPrefix, cfg.NodeRegistration.Name)
+	// Perform basic validation.
+	// The errors here can only happen if the kubelet.conf was corrupted.
+	userName := fmt.Sprintf(
+		"%s%s", kubeadmconstants.NodesUserPrefix, cfg.NodeRegistration.Name,
+	)
 	info, ok := kubeconfig.AuthInfos[userName]
 	if !ok {
-		return errors.Errorf("the file %q does not contain authentication for user %q", kubeconfigPath, cfg.NodeRegistration.Name)
+		return errors.Errorf(
+			"the file %q does not contain authentication for user %q", 
+			kubeconfigPath, cfg.NodeRegistration.Name,
+		)
 	}
 
-	// Update the client certificate and key of the node authorizer to point to the PEM symbolic link.
+	// Update the client certificate and key of the node authorizer to
+	// point to the PEM symbolic link.
 	info.ClientKeyData = []byte{}
 	info.ClientCertificateData = []byte{}
 	info.ClientKey = pemPath
@@ -129,7 +150,10 @@ func runKubeletFinalizeCertRotation(c workflow.RunData) error {
 	}
 
 	// Restart the kubelet.
-	klog.V(1).Info("[kubelet-finalize] Restarting the kubelet to enable client certificate rotation")
+	klog.V(1).Info(
+		"[kubelet-finalize] Restarting the kubelet to "+
+		"enable client certificate rotation",
+	)
 	kubeletphase.TryRestartKubelet()
 
 	return nil

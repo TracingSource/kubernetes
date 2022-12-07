@@ -35,6 +35,7 @@ type KubeadmCert struct {
 	Name     string
 	LongName string
 	BaseName string
+	// 签发该证书的父级 ca.crt 的 CN 名称
 	CAName   string
 	// Some attributes will depend on the InitConfiguration, only known at runtime.
 	// These functions will be run in series, passed both the InitConfiguration and a cert Config.

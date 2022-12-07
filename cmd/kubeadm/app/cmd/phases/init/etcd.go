@@ -40,6 +40,8 @@ var (
 		`)
 )
 
+// NewEtcdPhase 创建 etcd 的 static pod.
+//
 // NewEtcdPhase creates a kubeadm workflow phase that implements handling of etcd.
 func NewEtcdPhase() workflow.Phase {
 	phase := workflow.Phase{

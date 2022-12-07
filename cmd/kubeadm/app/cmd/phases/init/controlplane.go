@@ -61,7 +61,10 @@ func getPhaseDescription(component string) string {
 	return fmt.Sprintf("Generates the %s static Pod manifest", component)
 }
 
-// NewControlPlanePhase creates a kubeadm workflow phase that implements bootstrapping the control plane.
+// NewControlPlanePhase 为 apiserver, kcm, scheduler 3大件, 创建 static pod.
+//
+// NewControlPlanePhase creates a kubeadm workflow phase
+// that implements bootstrapping the control plane.
 func NewControlPlanePhase() workflow.Phase {
 	phase := workflow.Phase{
 		Name:  "control-plane",

@@ -85,10 +85,12 @@ func newCertSubPhases() []workflow.Phase {
 	subPhases = append(subPhases, allPhase)
 
 	// This loop assumes that GetDefaultCertList() always returns a list of
-	// certificate that is preceded by the CAs that sign them.
+	// certificate that is preceded(在..之前) by the CAs that sign them.
 	var lastCACert *certsphase.KubeadmCert
 	for _, cert := range certsphase.GetDefaultCertList() {
 		var phase workflow.Phase
+		// CAName 为空表示该证书没有被任何其他证书签发, 即为顶级证书 ca.crt.
+		// ta 是用来签发其他证书的.
 		if cert.CAName == "" {
 			phase = newCertSubPhase(cert, runCAPhase(cert))
 			lastCACert = cert
@@ -235,7 +237,8 @@ func runCAPhase(ca *certsphase.KubeadmCert) func(c workflow.RunData) error {
 			return nil
 		}
 
-		// if dryrunning, write certificates authority to a temporary folder (and defer restore to the path originally specified by the user)
+		// if dryrunning, write certificates authority to a temporary folder
+		// (and defer restore to the path originally specified by the user)
 		cfg := data.Cfg()
 		cfg.CertificatesDir = data.CertificateWriteDir()
 		defer func() { cfg.CertificatesDir = data.CertificateDir() }()
@@ -245,6 +248,7 @@ func runCAPhase(ca *certsphase.KubeadmCert) func(c workflow.RunData) error {
 	}
 }
 
+// 	@param caCert: 顶级证书 ca.crt 文件, 用于签发其他子证书.
 func runCertPhase(cert *certsphase.KubeadmCert, caCert *certsphase.KubeadmCert) func(c workflow.RunData) error {
 	return func(c workflow.RunData) error {
 		data, ok := c.(InitData)
@@ -265,7 +269,10 @@ func runCertPhase(cert *certsphase.KubeadmCert, caCert *certsphase.KubeadmCert) 
 			}
 
 			if err := certData.CheckSignatureFrom(caCertData); err != nil {
-				return errors.Wrapf(err, "[certs] certificate %s not signed by CA certificate %s", cert.BaseName, caCert.BaseName)
+				return errors.Wrapf(
+					err, "[certs] certificate %s not signed by CA certificate %s", 
+					cert.BaseName, caCert.BaseName,
+				)
 			}
 
 			fmt.Printf("[certs] Using existing %s certificate and key on disk\n", cert.BaseName)
@@ -281,7 +288,8 @@ func runCertPhase(cert *certsphase.KubeadmCert, caCert *certsphase.KubeadmCert) 
 			return certsphase.CreateCSR(cert, data.Cfg(), csrDir)
 		}
 
-		// if dryrunning, write certificates to a temporary folder (and defer restore to the path originally specified by the user)
+		// if dryrunning, write certificates to a temporary folder
+		// (and defer restore to the path originally specified by the user)
 		cfg := data.Cfg()
 		cfg.CertificatesDir = data.CertificateWriteDir()
 		defer func() { cfg.CertificatesDir = data.CertificateDir() }()

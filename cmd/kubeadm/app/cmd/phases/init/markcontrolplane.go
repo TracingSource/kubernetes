@@ -34,7 +34,14 @@ var (
 		`)
 )
 
-// NewMarkControlPlanePhase creates a kubeadm workflow phase that implements mark-controlplane checks.
+
+// MarkControlPlane 为 master 节点添加 label(标签) 与 taints(污点) 配置.
+//
+// 	由于 kubelet 会自动向 apiserver 注册自己,
+// 	所以在调用本函数之前, node 应该已经存在于 apiserver 里了, 这里只是 patch 一下而已.
+//
+// NewMarkControlPlanePhase creates a kubeadm workflow phase
+// that implements mark-controlplane checks.
 func NewMarkControlPlanePhase() workflow.Phase {
 	return workflow.Phase{
 		Name:    "mark-control-plane",
@@ -61,5 +68,7 @@ func runMarkControlPlane(c workflow.RunData) error {
 	}
 
 	nodeRegistration := data.Cfg().NodeRegistration
-	return markcontrolplanephase.MarkControlPlane(client, nodeRegistration.Name, nodeRegistration.Taints)
+	return markcontrolplanephase.MarkControlPlane(
+		client, nodeRegistration.Name, nodeRegistration.Taints,
+	)
 }

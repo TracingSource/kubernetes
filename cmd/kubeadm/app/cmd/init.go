@@ -143,11 +143,11 @@ func NewCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 
 			data := c.(*initData)
 			fmt.Printf("[init] Using Kubernetes version: %s\n", data.cfg.KubernetesVersion)
-
+			// 开始执行 init 流程
 			if err := initRunner.Run(args); err != nil {
 				return err
 			}
-
+			// init 完成后, 打印 join 语句, 以添加新节点.
 			return showJoinCommand(data, out)
 		},
 		Args: cobra.NoArgs,
@@ -167,9 +167,16 @@ func NewCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	initRunner.SetAdditionalFlags(func(flags *flag.FlagSet) {
 		options.AddKubeConfigFlag(flags, &initOptions.kubeconfigPath)
 		options.AddKubeConfigDirFlag(flags, &initOptions.kubeconfigDir)
-		options.AddControlPlanExtraArgsFlags(flags, &initOptions.externalClusterCfg.APIServer.ExtraArgs, &initOptions.externalClusterCfg.ControllerManager.ExtraArgs, &initOptions.externalClusterCfg.Scheduler.ExtraArgs)
+		options.AddControlPlanExtraArgsFlags(
+			flags, 
+			&initOptions.externalClusterCfg.APIServer.ExtraArgs, 
+			&initOptions.externalClusterCfg.ControllerManager.ExtraArgs, 
+			&initOptions.externalClusterCfg.Scheduler.ExtraArgs,
+		)
 	})
 
+	// kubeadm init 整个流程要**依次**经历如下阶段.
+	//
 	// initialize the workflow runner with the list of phases
 	initRunner.AppendPhase(phases.NewPreflightPhase())
 	initRunner.AppendPhase(phases.NewKubeletStartPhase())
@@ -514,7 +521,10 @@ func (d *initData) OutputWriter() io.Writer {
 func (d *initData) Client() (clientset.Interface, error) {
 	if d.client == nil {
 		if d.dryRun {
-			svcSubnetCIDR, err := kubeadmconstants.GetKubernetesServiceCIDR(d.cfg.Networking.ServiceSubnet, features.Enabled(d.cfg.FeatureGates, features.IPv6DualStack))
+			svcSubnetCIDR, err := kubeadmconstants.GetKubernetesServiceCIDR(
+				d.cfg.Networking.ServiceSubnet, 
+				features.Enabled(d.cfg.FeatureGates, features.IPv6DualStack),
+			)
 			if err != nil {
 				return nil, errors.Wrapf(err, "unable to get internal Kubernetes Service IP from the given service CIDR (%s)", d.cfg.Networking.ServiceSubnet)
 			}

@@ -82,7 +82,10 @@ func (w *KubeWaiter) WaitForAPI() error {
 			return false, nil
 		}
 
-		fmt.Printf("[apiclient] All control plane components are healthy after %f seconds\n", time.Since(start).Seconds())
+		fmt.Printf(
+			"[apiclient] All control plane components are healthy after %f seconds\n", 
+			time.Since(start).Seconds(),
+		)
 		return true, nil
 	})
 }

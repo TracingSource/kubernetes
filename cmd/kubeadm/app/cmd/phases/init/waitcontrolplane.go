@@ -76,7 +76,9 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 		return errors.Wrap(err, "error printing files on dryrun")
 	}
 
-	// waiter holds the apiclient.Waiter implementation of choice, responsible for querying the API server in various ways and waiting for conditions to be fulfilled
+	// waiter holds the apiclient.Waiter implementation of choice,
+	// responsible for querying the API server in various ways
+	// and waiting for conditions to be fulfilled
 	klog.V(1).Infoln("[wait-control-plane] Waiting for the API server to be healthy")
 
 	client, err := data.Client()
@@ -90,7 +92,11 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 		return errors.Wrap(err, "error creating waiter")
 	}
 
-	fmt.Printf("[wait-control-plane] Waiting for the kubelet to boot up the control plane as static Pods from directory %q. This can take up to %v\n", data.ManifestDir(), timeout)
+	fmt.Printf(
+		"[wait-control-plane] Waiting for the kubelet to boot up the control plane "+
+		"as static Pods from directory %q. This can take up to %v\n", 
+		data.ManifestDir(), timeout,
+	)
 
 	if err := waiter.WaitForKubeletAndFunc(waiter.WaitForAPI); err != nil {
 		ctx := map[string]string{
@@ -103,7 +109,8 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 	return nil
 }
 
-// printFilesIfDryRunning prints the Static Pod manifests to stdout and informs about the temporary directory to go and lookup
+// printFilesIfDryRunning prints the Static Pod manifests to stdout
+// and informs about the temporary directory to go and lookup
 func printFilesIfDryRunning(data InitData) error {
 	if !data.DryRun() {
 		return nil

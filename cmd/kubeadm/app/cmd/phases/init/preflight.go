@@ -34,7 +34,8 @@ var (
 		`)
 )
 
-// NewPreflightPhase creates a kubeadm workflow phase that implements preflight checks for a new control-plane node.
+// NewPreflightPhase creates a kubeadm workflow phase that
+// implements preflight checks for a new control-plane node.
 func NewPreflightPhase() workflow.Phase {
 	return workflow.Phase{
 		Name:    "preflight",

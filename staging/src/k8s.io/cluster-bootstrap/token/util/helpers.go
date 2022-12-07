@@ -117,7 +117,10 @@ func ValidateBootstrapGroupName(name string) error {
 	if BootstrapGroupRegexp.Match([]byte(name)) {
 		return nil
 	}
-	return fmt.Errorf("bootstrap group %q is invalid (must match %s)", name, api.BootstrapGroupPattern)
+	return fmt.Errorf(
+		"bootstrap group %q is invalid (must match %s)", 
+		name, api.BootstrapGroupPattern,
+	)
 }
 
 // ValidateUsages validates that the passed in string are valid usage strings for bootstrap tokens.
@@ -130,7 +133,11 @@ func ValidateUsages(usages []string) error {
 		}
 	}
 	if len(invalidUsages) > 0 {
-		return fmt.Errorf("invalid bootstrap token usage string: %s, valid usage options: %s", strings.Join(invalidUsages.List(), ","), strings.Join(api.KnownTokenUsages, ","))
+		return fmt.Errorf(
+			"invalid bootstrap token usage string: %s, valid usage options: %s", 
+			strings.Join(invalidUsages.List(), ","), 
+			strings.Join(api.KnownTokenUsages, ","),
+		)
 	}
 	return nil
 }

@@ -61,7 +61,7 @@ func NewBootstrapTokenPhase() workflow.Phase {
 	}
 }
 
-func runBootstrapToken(c workflow.RunData) error {
+func runBootstrapToken(c workflow.RunData) (err error) {
 	data, ok := c.(InitData)
 	if !ok {
 		return errors.New("bootstrap-token phase invoked with an invalid data struct")
@@ -83,28 +83,39 @@ func runBootstrapToken(c workflow.RunData) error {
 
 	fmt.Println("[bootstrap-token] Configuring bootstrap tokens, cluster-info ConfigMap, RBAC Roles")
 	// Create the default node bootstrap token
-	if err := nodebootstraptokenphase.UpdateOrCreateTokens(client, false, data.Cfg().BootstrapTokens); err != nil {
+	err = nodebootstraptokenphase.UpdateOrCreateTokens(
+		client, false, data.Cfg().BootstrapTokens,
+	)
+	if err != nil {
 		return errors.Wrap(err, "error updating or creating token")
 	}
 	// Create RBAC rules that makes the bootstrap tokens able to post CSRs
-	if err := nodebootstraptokenphase.AllowBootstrapTokensToPostCSRs(client); err != nil {
+	err = nodebootstraptokenphase.AllowBootstrapTokensToPostCSRs(client)
+	if err != nil {
 		return errors.Wrap(err, "error allowing bootstrap tokens to post CSRs")
 	}
 	// Create RBAC rules that makes the bootstrap tokens able to get their CSRs approved automatically
-	if err := nodebootstraptokenphase.AutoApproveNodeBootstrapTokens(client); err != nil {
+	err = nodebootstraptokenphase.AutoApproveNodeBootstrapTokens(client)
+	if err != nil {
 		return errors.Wrap(err, "error auto-approving node bootstrap tokens")
 	}
 
-	// Create/update RBAC rules that makes the nodes to rotate certificates and get their CSRs approved automatically
-	if err := nodebootstraptokenphase.AutoApproveNodeCertificateRotation(client); err != nil {
+	// Create/update RBAC rules that makes the nodes to rotate certificates
+	// and get their CSRs approved automatically
+	err = nodebootstraptokenphase.AutoApproveNodeCertificateRotation(client)
+	if err != nil {
 		return err
 	}
 
 	// Create the cluster-info ConfigMap with the associated RBAC rules
-	if err := clusterinfophase.CreateBootstrapConfigMapIfNotExists(client, data.KubeConfigPath()); err != nil {
+	err = clusterinfophase.CreateBootstrapConfigMapIfNotExists(
+		client, data.KubeConfigPath(),
+	)
+	if err != nil {
 		return errors.Wrap(err, "error creating bootstrap ConfigMap")
 	}
-	if err := clusterinfophase.CreateClusterInfoRBACRules(client); err != nil {
+	err = clusterinfophase.CreateClusterInfoRBACRules(client)
+	if err != nil {
 		return errors.Wrap(err, "error creating clusterinfo RBAC rules")
 	}
 	return nil

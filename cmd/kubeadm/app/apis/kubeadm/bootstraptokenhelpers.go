@@ -30,6 +30,11 @@ import (
 	bootstrapsecretutil "k8s.io/cluster-bootstrap/util/secrets"
 )
 
+// ToSecret 构建一个 bootstrap.kubernetes.io/token 类型的 Secret 对象, 将当前 token 的内容放在里面.
+//
+// caller:
+// 	1. cmd/kubeadm/app/phases/bootstraptoken/node/token.go -> UpdateOrCreateTokens()
+//
 // ToSecret converts the given BootstrapToken object to its Secret representation that
 // may be submitted to the API Server in order to be stored.
 func (bt *BootstrapToken) ToSecret() *v1.Secret {
@@ -43,8 +48,9 @@ func (bt *BootstrapToken) ToSecret() *v1.Secret {
 	}
 }
 
-// encodeTokenSecretData takes the token discovery object and an optional duration and returns the .Data for the Secret
-// now is passed in order to be able to used in unit testing
+// encodeTokenSecretData takes the token discovery object and an optional duration
+// and returns the .Data for the Secret now is passed
+// in order to be able to used in unit testing
 func encodeTokenSecretData(token *BootstrapToken, now time.Time) map[string][]byte {
 	data := map[string][]byte{
 		bootstrapapi.BootstrapTokenIDKey:     []byte(token.Token.ID),

@@ -60,7 +60,14 @@ var (
 	}
 )
 
-// NewKubeConfigPhase creates a kubeadm workflow phase that creates all kubeconfig files necessary to establish the control plane and the admin kubeconfig file.
+// NewKubeConfigPhase 创建各组件连接 apiserver 的 yaml 配置.
+// 这些 yaml 配置文件包含 apiserver 的连接地址, 端口, 以及属于各组件自身的 crt/key 信息.
+//
+// 如 /etc/kubernetes/{admin.conf,kubelet.conf,...}
+//
+// NewKubeConfigPhase creates a kubeadm workflow phase
+// that creates all kubeconfig files necessary to establish the control plane
+// and the admin kubeconfig file.
 func NewKubeConfigPhase() workflow.Phase {
 	return workflow.Phase{
 		Name:  "kubeconfig",

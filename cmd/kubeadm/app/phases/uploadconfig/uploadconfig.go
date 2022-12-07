@@ -62,13 +62,29 @@ func ResetClusterStatusForNode(nodeName string, client clientset.Interface) erro
 	})
 }
 
-// UploadConfiguration saves the InitConfiguration used for later reference (when upgrading for instance)
-func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Interface) error {
-	fmt.Printf("[upload-config] Storing the configuration used in ConfigMap %q in the %q Namespace\n", kubeadmconstants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
+// UploadConfiguration 在 kubeadm init 3大件启动完成后, 将 kubeadm 的 config.yaml 配置,
+// 存放到 kube-system 下, 名为 kubeadm-config 的 ConfigMap 对象中.
+//
+// caller:
+// 	1. cmd/kubeadm/app/cmd/phases/init/uploadconfig.go -> runUploadKubeadmConfig()
+// 	kubeadm init 过程中, 等到 apiserver, kcm, scheduler 3大件启动完成后, 调用该方法,
+// 	将 kubeadm 配置文件存放到 configMap 中.
+//
+// UploadConfiguration saves the InitConfiguration used for later reference
+// (when upgrading for instance)
+func UploadConfiguration(
+	cfg *kubeadmapi.InitConfiguration, client clientset.Interface,
+) error {
+	fmt.Printf(
+		"[upload-config] Storing the configuration used in ConfigMap %q in the %q Namespace\n", 
+		kubeadmconstants.KubeadmConfigConfigMap, metav1.NamespaceSystem,
+	)
 
 	// Prepare the ClusterConfiguration for upload
-	// The components store their config in their own ConfigMaps, then reset the .ComponentConfig struct;
-	// We don't want to mutate the cfg itself, so create a copy of it using .DeepCopy of it first
+	// The components store their config in their own ConfigMaps,
+	// then reset the .ComponentConfig struct;
+	// We don't want to mutate the cfg itself,
+	// so create a copy of it using .DeepCopy of it first
 	clusterConfigurationToUpload := cfg.ClusterConfiguration.DeepCopy()
 	clusterConfigurationToUpload.ComponentConfigs = kubeadmapi.ComponentConfigs{}
 

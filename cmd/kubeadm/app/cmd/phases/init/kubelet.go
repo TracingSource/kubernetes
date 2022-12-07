@@ -51,28 +51,39 @@ func NewKubeletStartPhase() workflow.Phase {
 }
 
 // runKubeletStart executes kubelet start logic.
-func runKubeletStart(c workflow.RunData) error {
+func runKubeletStart(c workflow.RunData) (err error) {
 	data, ok := c.(InitData)
 	if !ok {
 		return errors.New("kubelet-start phase invoked with an invalid data struct")
 	}
 
-	// First off, configure the kubelet. In this short timeframe, kubeadm is trying to stop/restart the kubelet
+	// First off, configure the kubelet.
+	// In this short timeframe, kubeadm is trying to stop/restart the kubelet
 	// Try to stop the kubelet service so no race conditions occur when configuring it
 	if !data.DryRun() {
 		klog.V(1).Infoln("Stopping the kubelet")
 		kubeletphase.TryStopKubelet()
 	}
 
-	// Write env file with flags for the kubelet to use. We do not need to write the --register-with-taints for the control-plane,
+	// Write env file with flags for the kubelet to use.
+	// We do not need to write the --register-with-taints for the control-plane,
 	// as we handle that ourselves in the mark-control-plane phase
-	// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the mark-control-plane phase?
-	if err := kubeletphase.WriteKubeletDynamicEnvFile(&data.Cfg().ClusterConfiguration, &data.Cfg().NodeRegistration, false, data.KubeletDir()); err != nil {
+	// TODO: Maybe we want to do that some time in the future,
+	// in order to remove some logic from the mark-control-plane phase?
+	err = kubeletphase.WriteKubeletDynamicEnvFile(
+		&data.Cfg().ClusterConfiguration, 
+		&data.Cfg().NodeRegistration, 
+		false, data.KubeletDir(),
+	)
+	if err != nil {
 		return errors.Wrap(err, "error writing a dynamic environment file for the kubelet")
 	}
 
 	// Write the kubelet configuration file to disk.
-	if err := kubeletphase.WriteConfigToDisk(data.Cfg().ComponentConfigs.Kubelet, data.KubeletDir()); err != nil {
+	err = kubeletphase.WriteConfigToDisk(
+		data.Cfg().ComponentConfigs.Kubelet, data.KubeletDir(),
+	)
+	if err != nil {
 		return errors.Wrap(err, "error writing kubelet configuration to disk")
 	}
 

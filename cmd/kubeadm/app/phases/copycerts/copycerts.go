@@ -49,6 +49,9 @@ const (
 	externalEtcdKey  = "external-etcd.key"
 )
 
+// caller:
+// 	1. cmd/kubeadm/app/cmd/phases/init/uploadcerts.go -> runUploadCerts()
+//
 // createShortLivedBootstrapToken creates the token used to manager kubeadm-certs
 // and return the tokenID
 func createShortLivedBootstrapToken(client clientset.Interface) (string, error) {
@@ -74,6 +77,10 @@ func createShortLivedBootstrapToken(client clientset.Interface) (string, error) 
 	return tokens[0].Token.ID, nil
 }
 
+// caller:
+// 	1. cmd/kubeadm/app/cmd/phases/init/uploadcerts.go -> runUploadCerts()
+// 	在 kubeadm init 过程中调用(3大件已经启动完成).
+//
 //CreateCertificateKey returns a cryptographically secure random key
 func CreateCertificateKey() (string, error) {
 	randBytes, err := cryptoutil.CreateRandBytes(kubeadmconstants.CertificateKeySize)
@@ -83,9 +90,18 @@ func CreateCertificateKey() (string, error) {
 	return hex.EncodeToString(randBytes), nil
 }
 
+// caller:
+// 	1. cmd/kubeadm/app/cmd/phases/init/uploadcerts.go -> runUploadCerts()
+// 	在 kubeadm init 过程中调用(3大件已经启动完成).
+//
 //UploadCerts save certs needs to join a new control-plane on kubeadm-certs sercret.
-func UploadCerts(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, key string) error {
-	fmt.Printf("[upload-certs] Storing the certificates in Secret %q in the %q Namespace\n", kubeadmconstants.KubeadmCertsSecret, metav1.NamespaceSystem)
+func UploadCerts(
+	client clientset.Interface, cfg *kubeadmapi.InitConfiguration, key string,
+) error {
+	fmt.Printf(
+		"[upload-certs] Storing the certificates in Secret %q in the %q Namespace\n", 
+		kubeadmconstants.KubeadmCertsSecret, metav1.NamespaceSystem,
+	)
 	decodedKey, err := hex.DecodeString(key)
 	if err != nil {
 		return errors.Wrap(err, "error decoding certificate key")
