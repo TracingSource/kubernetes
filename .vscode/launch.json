@@ -123,7 +123,7 @@
             ]
         },
         {
-            "name": "kubeadm",
+            "name": "kubeadm init",
             "type": "go", 
             "request": "launch",
             "mode": "auto",
@@ -134,8 +134,26 @@
             "program": "${workspaceFolder}/cmd/kubeadm/",
             "args": [
                 "init",
-                "--config",
-                "${workspaceFolder}/.vscode/kubeadm/config.yaml",
+                "--config", "${workspaceFolder}/.vscode/kubeadm/config.yaml",
+            ]
+        },
+        {
+            "name": "kubeadm join",
+            "type": "go", 
+            "request": "launch",
+            "mode": "auto",
+            "env": {
+                "GO111MODULE": "auto",
+                "CGO_ENABLED": "0",
+            },
+            "program": "${workspaceFolder}/cmd/kubeadm/",
+            "args": [
+                "join",
+                "172.16.42.39:6443",
+                "--token", "llhv2n.avh88zmjtz01xza4", // 这是 bootstrap token 的内容.
+                "--discovery-token-ca-cert-hash",
+                "sha256:04c2f16c91f9552acb950409a4f531f108ee4c86d7e1693c5a48a934943aff99",
+                "--control-plane",
             ]
         },
     ]

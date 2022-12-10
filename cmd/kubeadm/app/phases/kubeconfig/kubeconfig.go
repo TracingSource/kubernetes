@@ -152,7 +152,6 @@ func getKubeConfigSpecs(cfg *kubeadmapi.InitConfiguration) (map[string]*kubeConf
 
 // buildKubeConfigFromSpec creates a kubeconfig object for the given kubeConfigSpec
 func buildKubeConfigFromSpec(spec *kubeConfigSpec, clustername string) (*clientcmdapi.Config, error) {
-
 	// If this kubeconfig should use token
 	if spec.TokenAuth != nil {
 		// create a kubeconfig with a token
@@ -256,16 +255,24 @@ func createKubeConfigFileIfNotExists(outDir, filename string, config *clientcmda
 	return nil
 }
 
-// WriteKubeConfigWithClientCert writes a kubeconfig file - with a client certificate as authentication info  - to the given writer.
-func WriteKubeConfigWithClientCert(out io.Writer, cfg *kubeadmapi.InitConfiguration, clientName string, organizations []string) error {
+// WriteKubeConfigWithClientCert writes a kubeconfig file
+// - with a client certificate as authentication info - to the given writer.
+func WriteKubeConfigWithClientCert(
+	out io.Writer, cfg *kubeadmapi.InitConfiguration, 
+	clientName string, organizations []string,
+) error {
 
 	// creates the KubeConfigSpecs, actualized for the current InitConfiguration
-	caCert, caKey, err := pkiutil.TryLoadCertAndKeyFromDisk(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
+	caCert, caKey, err := pkiutil.TryLoadCertAndKeyFromDisk(
+		cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName,
+	)
 	if err != nil {
 		return errors.Wrap(err, "couldn't create a kubeconfig; the CA files couldn't be loaded")
 	}
 
-	controlPlaneEndpoint, err := kubeadmutil.GetControlPlaneEndpoint(cfg.ControlPlaneEndpoint, &cfg.LocalAPIEndpoint)
+	controlPlaneEndpoint, err := kubeadmutil.GetControlPlaneEndpoint(
+		cfg.ControlPlaneEndpoint, &cfg.LocalAPIEndpoint,
+	)
 	if err != nil {
 		return err
 	}
@@ -283,16 +290,22 @@ func WriteKubeConfigWithClientCert(out io.Writer, cfg *kubeadmapi.InitConfigurat
 	return writeKubeConfigFromSpec(out, spec, cfg.ClusterName)
 }
 
-// WriteKubeConfigWithToken writes a kubeconfig file - with a token as client authentication info - to the given writer.
-func WriteKubeConfigWithToken(out io.Writer, cfg *kubeadmapi.InitConfiguration, clientName, token string) error {
-
+// WriteKubeConfigWithToken writes a kubeconfig file
+// - with a token as client authentication info - to the given writer.
+func WriteKubeConfigWithToken(
+	out io.Writer, cfg *kubeadmapi.InitConfiguration, clientName, token string,
+) error {
 	// creates the KubeConfigSpecs, actualized for the current InitConfiguration
-	caCert, _, err := pkiutil.TryLoadCertAndKeyFromDisk(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
+	caCert, _, err := pkiutil.TryLoadCertAndKeyFromDisk(
+		cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName,
+	)
 	if err != nil {
 		return errors.Wrap(err, "couldn't create a kubeconfig; the CA files couldn't be loaded")
 	}
 
-	controlPlaneEndpoint, err := kubeadmutil.GetControlPlaneEndpoint(cfg.ControlPlaneEndpoint, &cfg.LocalAPIEndpoint)
+	controlPlaneEndpoint, err := kubeadmutil.GetControlPlaneEndpoint(
+		cfg.ControlPlaneEndpoint, &cfg.LocalAPIEndpoint,
+	)
 	if err != nil {
 		return err
 	}
@@ -309,9 +322,9 @@ func WriteKubeConfigWithToken(out io.Writer, cfg *kubeadmapi.InitConfiguration, 
 	return writeKubeConfigFromSpec(out, spec, cfg.ClusterName)
 }
 
-// writeKubeConfigFromSpec creates a kubeconfig object from a kubeConfigSpec and writes it to the given writer.
+// writeKubeConfigFromSpec creates a kubeconfig object from a kubeConfigSpec
+// and writes it to the given writer.
 func writeKubeConfigFromSpec(out io.Writer, spec *kubeConfigSpec, clustername string) error {
-
 	// builds the KubeConfig object
 	config, err := buildKubeConfigFromSpec(spec, clustername)
 	if err != nil {

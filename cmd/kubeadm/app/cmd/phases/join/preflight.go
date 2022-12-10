@@ -63,7 +63,7 @@ func NewPreflightPhase() workflow.Phase {
 }
 
 // runPreflight executes preflight checks logic.
-func runPreflight(c workflow.RunData) error {
+func runPreflight(c workflow.RunData) (err error) {
 	j, ok := c.(JoinData)
 	if !ok {
 		return errors.New("preflight phase invoked with an invalid data struct")
@@ -72,7 +72,10 @@ func runPreflight(c workflow.RunData) error {
 
 	// Start with general checks
 	klog.V(1).Infoln("[preflight] Running general checks")
-	if err := preflight.RunJoinNodeChecks(utilsexec.New(), j.Cfg(), j.IgnorePreflightErrors()); err != nil {
+	err = preflight.RunJoinNodeChecks(
+		utilsexec.New(), j.Cfg(), j.IgnorePreflightErrors(),
+	)
+	if err != nil {
 		return err
 	}
 
@@ -87,7 +90,10 @@ func runPreflight(c workflow.RunData) error {
 		// Checks if the cluster configuration supports
 		// joining a new control plane instance and if all the necessary certificates are provided
 		hasCertificateKey := len(j.CertificateKey()) > 0
-		if err := checkIfReadyForAdditionalControlPlane(&initCfg.ClusterConfiguration, hasCertificateKey); err != nil {
+		err = checkIfReadyForAdditionalControlPlane(
+			&initCfg.ClusterConfiguration, hasCertificateKey,
+		)
+		if err != nil {
 			// outputs the not ready for hosting a new control plane instance message
 			ctx := map[string]string{
 				"Error": err.Error(),
@@ -100,27 +106,41 @@ func runPreflight(c workflow.RunData) error {
 
 		// run kubeadm init preflight checks for checking all the prerequisites
 		fmt.Println("[preflight] Running pre-flight checks before initializing the new control plane instance")
-
-		if err := preflight.RunInitNodeChecks(utilsexec.New(), initCfg, j.IgnorePreflightErrors(), true, hasCertificateKey); err != nil {
+		err = preflight.RunInitNodeChecks(
+			utilsexec.New(), initCfg, j.IgnorePreflightErrors(), true, hasCertificateKey,
+		)
+		if err != nil {
 			return err
 		}
 
 		fmt.Println("[preflight] Pulling images required for setting up a Kubernetes cluster")
 		fmt.Println("[preflight] This might take a minute or two, depending on the speed of your internet connection")
 		fmt.Println("[preflight] You can also perform this action in beforehand using 'kubeadm config images pull'")
-		if err := preflight.RunPullImagesCheck(utilsexec.New(), initCfg, j.IgnorePreflightErrors()); err != nil {
+		err = preflight.RunPullImagesCheck(
+			utilsexec.New(), initCfg, j.IgnorePreflightErrors(),
+		)
+		if err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
+// 	@param hasCertificateKey: 如果 kubeadm join 添加新的 master 节点时, 
+// 	没有指定额外的 crt/key 对, 那么就表示, 所有 master 节点都使用相同的 ca.crt/ca.key ...
+// 	这要求部署人员事先将这些文件拷贝过去, 这是 precheck 的条件之一.
+//
 // checkIfReadyForAdditionalControlPlane ensures that the cluster is in a state that supports
 // joining an additional control plane instance and if the node is ready to preflight
-func checkIfReadyForAdditionalControlPlane(initConfiguration *kubeadmapi.ClusterConfiguration, hasCertificateKey bool) error {
+func checkIfReadyForAdditionalControlPlane(
+	initConfiguration *kubeadmapi.ClusterConfiguration, hasCertificateKey bool,
+) error {
 	// blocks if the cluster was created without a stable control plane endpoint
 	if initConfiguration.ControlPlaneEndpoint == "" {
-		return errors.New("unable to add a new control plane instance a cluster that doesn't have a stable controlPlaneEndpoint address")
+		return errors.New(
+			"unable to add a new control plane instance a cluster "+
+			"that doesn't have a stable controlPlaneEndpoint address",
+		)
 	}
 
 	if !hasCertificateKey {

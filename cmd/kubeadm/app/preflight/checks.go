@@ -852,11 +852,21 @@ func (ncc NumCPUCheck) Check() (warnings, errorList []error) {
 	return warnings, errorList
 }
 
+// RunInitNodeChecks 校验当前主机是否能够启动 master 组件.
+// 包括: cpu数量, apiserver,kcm,scheduler 的端口是否被占用, /etc/kubernetes 目录是否已存在等.
+//
+// caller:
+// 	1. cmd/kubeadm/app/cmd/phases/join/preflight.go -> runPreflight()
+//
 // RunInitNodeChecks executes all individual, applicable to control-plane node checks.
 // The boolean flag 'isSecondaryControlPlane' controls whether we are running checks in a --join-control-plane scenario.
 // The boolean flag 'downloadCerts' controls whether we should skip checks on certificates because we are downloading them.
 // If the flag is set to true we should skip checks already executed by RunJoinNodeChecks.
-func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.String, isSecondaryControlPlane bool, downloadCerts bool) error {
+func RunInitNodeChecks(
+	execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, 
+	ignorePreflightErrors sets.String, isSecondaryControlPlane bool, 
+	downloadCerts bool,
+) error {
 	if !isSecondaryControlPlane {
 		// First, check if we're root separately from the other preflight checks and fail fast
 		if err := RunRootCheckOnly(ignorePreflightErrors); err != nil {
@@ -932,8 +942,18 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
 }
 
+// RunJoinNodeChecks precheck, 检测当前主机是否满足 kube 节点要求.
+// 检测项包含: /etc/kubernetes 目录/文件是否已存在, swap 是否禁用, kubelet 端口是否被占用等.
+//
+// caller:
+// 	1. cmd/kubeadm/app/cmd/phases/join/preflight.go -> runPreflight()
+// 	kubeadm join 向目标集群加入新节点时被调用.
+//
 // RunJoinNodeChecks executes all individual, applicable to node checks.
-func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfiguration, ignorePreflightErrors sets.String) error {
+func RunJoinNodeChecks(
+	execer utilsexec.Interface, 
+	cfg *kubeadmapi.JoinConfiguration, ignorePreflightErrors sets.String,
+) error {
 	// First, check if we're root separately from the other preflight checks and fail fast
 	if err := RunRootCheckOnly(ignorePreflightErrors); err != nil {
 		return err

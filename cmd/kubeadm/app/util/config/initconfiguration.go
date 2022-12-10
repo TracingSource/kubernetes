@@ -37,7 +37,10 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.InitConfiguration) error {
 	if err := SetAPIEndpointDynamicDefaults(&cfg.LocalAPIEndpoint); err != nil {
 		return err
 	}
-	return SetClusterDynamicDefaults(&cfg.ClusterConfiguration, cfg.LocalAPIEndpoint.AdvertiseAddress, cfg.LocalAPIEndpoint.BindPort)
+	return SetClusterDynamicDefaults(
+		&cfg.ClusterConfiguration, 
+		cfg.LocalAPIEndpoint.AdvertiseAddress, cfg.LocalAPIEndpoint.BindPort,
+	)
 }
 
 // SetBootstrapTokensDynamicDefaults checks and sets configuration values for the BootstrapTokens object
@@ -113,8 +116,9 @@ func SetAPIEndpointDynamicDefaults(cfg *kubeadmapi.APIEndpoint) error {
 		return errors.New("unable to resolve link-local addresses")
 	}
 
-	// This is the same logic as the API Server uses, except that if no interface is found the address is set to 0.0.0.0, which is invalid and cannot be used
-	// for bootstrapping a cluster.
+	// This is the same logic as the API Server uses, 
+	// except that if no interface is found the address is set to 0.0.0.0,
+	// which is invalid and cannot be used for bootstrapping a cluster.
 	ip, err := ChooseAPIServerBindAddress(addressIP)
 	if err != nil {
 		return err
@@ -159,8 +163,12 @@ func SetClusterDynamicDefaults(cfg *kubeadmapi.ClusterConfiguration, advertiseAd
 	return nil
 }
 
-// DefaultedInitConfiguration takes a versioned init config (often populated by flags), defaults it and converts it into internal InitConfiguration
-func DefaultedInitConfiguration(versionedInitCfg *kubeadmapiv1beta2.InitConfiguration, versionedClusterCfg *kubeadmapiv1beta2.ClusterConfiguration) (*kubeadmapi.InitConfiguration, error) {
+// DefaultedInitConfiguration takes a versioned init config (often populated by flags),
+// defaults it and converts it into internal InitConfiguration
+func DefaultedInitConfiguration(
+	versionedInitCfg *kubeadmapiv1beta2.InitConfiguration, 
+	versionedClusterCfg *kubeadmapiv1beta2.ClusterConfiguration,
+) (*kubeadmapi.InitConfiguration, error) {
 	internalcfg := &kubeadmapi.InitConfiguration{}
 
 	// Takes passed flags into account; the defaulting is executed once again enforcing assignment of

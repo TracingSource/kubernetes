@@ -24,7 +24,8 @@ var controlPlanePrepareExample = cmdutil.Examples(`
 	kubeadm join phase control-plane-prepare all
 `)
 
-// NewControlPlanePreparePhase creates a kubeadm workflow phase that implements the preparation of the node to serve a control plane
+// NewControlPlanePreparePhase creates a kubeadm workflow phase
+// that implements the preparation of the node to serve a control plane
 func NewControlPlanePreparePhase() workflow.Phase {
 	return workflow.Phase{
 		Name:    "control-plane-prepare",
@@ -263,6 +264,8 @@ func runControlPlanePrepareKubeconfigPhaseLocal(c workflow.RunData) error {
 	return nil
 }
 
+// caller:
+// 	1. runControlPlanePrepareDownloadCertsPhaseLocal()
 func bootstrapClient(data JoinData) (clientset.Interface, error) {
 	tlsBootstrapCfg, err := data.TLSBootstrapCfg()
 	if err != nil {

@@ -23,6 +23,8 @@ var (
 		`)
 )
 
+// NewAddonPhase 部署 kube-proxy, coredns 组件.
+//
 // NewAddonPhase returns the addon Cobra command
 func NewAddonPhase() workflow.Phase {
 	return workflow.Phase{

@@ -362,11 +362,19 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 	// in case the command doesn't have flags for discovery, makes the join cfg validation pass checks on discovery
 	if cmd.Flags().Lookup(options.FileDiscovery) == nil {
 		if _, err := os.Stat(adminKubeConfigPath); os.IsNotExist(err) {
-			return nil, errors.Errorf("File %s does not exists. Please use 'kubeadm join phase control-plane-prepare' subcommands to generate it.", adminKubeConfigPath)
+			return nil, errors.Errorf(
+				"File %s does not exists. Please use "+
+				"'kubeadm join phase control-plane-prepare' subcommands to generate it.", 
+				adminKubeConfigPath,
+			)
 		}
 		klog.V(1).Infof("[preflight] found discovery flags missing for this command. using FileDiscovery: %s", adminKubeConfigPath)
-		opt.externalcfg.Discovery.File = &kubeadmapiv1beta2.FileDiscovery{KubeConfigPath: adminKubeConfigPath}
-		opt.externalcfg.Discovery.BootstrapToken = nil //NB. this could be removed when we get better control on args (e.g. phases without discovery should have NoArgs )
+		opt.externalcfg.Discovery.File = &kubeadmapiv1beta2.FileDiscovery{
+			KubeConfigPath: adminKubeConfigPath,
+		}
+		//NB. this could be removed when we get better control on args
+		// (e.g. phases without discovery should have NoArgs )
+		opt.externalcfg.Discovery.BootstrapToken = nil 
 	}
 
 	cfg, err := configutil.LoadOrDefaultJoinConfiguration(opt.cfgPath, opt.externalcfg)
@@ -374,11 +382,14 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 		return nil, err
 	}
 
-	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(opt.ignorePreflightErrors, cfg.NodeRegistration.IgnorePreflightErrors)
+	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(
+		opt.ignorePreflightErrors, cfg.NodeRegistration.IgnorePreflightErrors,
+	)
 	if err != nil {
 		return nil, err
 	}
-	// Also set the union of pre-flight errors to JoinConfiguration, to provide a consistent view of the runtime configuration:
+	// Also set the union of pre-flight errors to JoinConfiguration,
+	// to provide a consistent view of the runtime configuration:
 	cfg.NodeRegistration.IgnorePreflightErrors = ignorePreflightErrorsSet.List()
 
 	// override node name and CRI socket from the command line opt

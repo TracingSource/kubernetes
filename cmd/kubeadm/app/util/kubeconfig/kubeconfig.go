@@ -62,6 +62,11 @@ func ClientSetFromFile(path string) (*clientset.Clientset, error) {
 	return ToClientSet(config)
 }
 
+// ToClientSet 就只是初始化一个通用的 client set 客户端而已, 没什么特殊的.
+//
+// caller:
+// 	1. cmd/kubeadm/app/cmd/phases/join/controlplaneprepare.go -> bootstrapClient()
+//
 // ToClientSet converts a KubeConfig object to a client
 func ToClientSet(config *clientcmdapi.Config) (*clientset.Clientset, error) {
 	overrides := clientcmd.ConfigOverrides{Timeout: "10s"}

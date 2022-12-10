@@ -35,7 +35,8 @@ func getControlPlaneJoinPhaseFlags(name string) []string {
 	return flags
 }
 
-// NewControlPlaneJoinPhase creates a kubeadm workflow phase that implements joining a machine as a control plane instance
+// NewControlPlaneJoinPhase creates a kubeadm workflow phase
+// that implements joining a machine as a control plane instance
 func NewControlPlaneJoinPhase() workflow.Phase {
 	return workflow.Phase{
 		Name:    "control-plane-join",
@@ -90,7 +91,7 @@ func newMarkControlPlaneSubphase() workflow.Phase {
 	}
 }
 
-func runEtcdPhase(c workflow.RunData) error {
+func runEtcdPhase(c workflow.RunData) (err error) {
 	data, ok := c.(JoinData)
 	if !ok {
 		return errors.New("control-plane-join phase invoked with an invalid data struct")
@@ -115,22 +116,34 @@ func runEtcdPhase(c workflow.RunData) error {
 		return nil
 	}
 
-	// Adds a new etcd instance; in order to do this the new etcd instance should be "announced" to
-	// the existing etcd members before being created.
-	// This operation must be executed after kubelet is already started in order to minimize the time
-	// between the new etcd member is announced and the start of the static pod running the new etcd member, because during
-	// this time frame etcd gets temporary not available (only when moving from 1 to 2 members in the etcd cluster).
+	// Adds a new etcd instance; in order to do this the new etcd instance
+	// should be "announced" to the existing etcd members before being created.
+	// This operation must be executed after kubelet is already started
+	// in order to minimize the time between the new etcd member is announced 
+	// and the start of the static pod running the new etcd member,
+	// because during this time frame etcd gets temporary not available
+	// (only when moving from 1 to 2 members in the etcd cluster).
 	// From https://coreos.com/etcd/docs/latest/v2/runtime-configuration.html
-	// "If you add a new member to a 1-node cluster, the cluster cannot make progress before the new member starts
-	// because it needs two members as majority to agree on the consensus. You will only see this behavior between the time
-	// etcdctl member add informs the cluster about the new member and the new member successfully establishing a connection to the 	// existing one."
-	if err := etcdphase.CreateStackedEtcdStaticPodManifestFile(client, kubeadmconstants.GetStaticPodDirectory(), data.KustomizeDir(), cfg.NodeRegistration.Name, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint); err != nil {
+	// "If you add a new member to a 1-node cluster,
+	// the cluster cannot make progress before the new member starts
+	// because it needs two members as majority to agree on the consensus.
+	// You will only see this behavior between the time
+	// etcdctl member add informs the cluster about the new member
+	// and the new member successfully establishing a connection to the existing one."
+	err = etcdphase.CreateStackedEtcdStaticPodManifestFile(
+		client, kubeadmconstants.GetStaticPodDirectory(), data.KustomizeDir(), 
+		cfg.NodeRegistration.Name, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint,
+	)
+	if err != nil {
 		return errors.Wrap(err, "error creating local etcd static pod manifest file")
 	}
 
 	return nil
 }
 
+// runUpdateStatusPhase 加入新节点, 需要将新节点的信息更新到 kube-system/kubeadm-config 
+// 的 ConfigMap 中, 该 cm 中包含一个 ClusterStatus 文件, 其中包含所有 master 的节点信息.
+// (调用到此函数, 说明节点已经添加成功了)
 func runUpdateStatusPhase(c workflow.RunData) error {
 	data, ok := c.(JoinData)
 	if !ok {
@@ -158,7 +171,9 @@ func runUpdateStatusPhase(c workflow.RunData) error {
 	return nil
 }
 
-func runMarkControlPlanePhase(c workflow.RunData) error {
+// runMarkControlPlanePhase 为 master 节点添加 label(标签) 与 taints(污点) 配置.
+// (调用到此函数, 说明节点已经添加成功了)
+func runMarkControlPlanePhase(c workflow.RunData) (err error) {
 	data, ok := c.(JoinData)
 	if !ok {
 		return errors.New("control-plane-join phase invoked with an invalid data struct")
@@ -177,8 +192,10 @@ func runMarkControlPlanePhase(c workflow.RunData) error {
 	if err != nil {
 		return err
 	}
-
-	if err := markcontrolplanephase.MarkControlPlane(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.Taints); err != nil {
+	err = markcontrolplanephase.MarkControlPlane(
+		client, cfg.NodeRegistration.Name, cfg.NodeRegistration.Taints,
+	)
+	if err != nil {
 		return errors.Wrap(err, "error applying control-plane label and taints")
 	}
 

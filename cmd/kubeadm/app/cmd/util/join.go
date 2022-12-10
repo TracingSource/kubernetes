@@ -13,6 +13,11 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin"
 )
 
+/*
+ kubeadm join 172.16.42.39:6443 --token fl6bwd.3ube1uwcyk3a5o6b \
+    --discovery-token-ca-cert-hash sha256:4eb77bb5abf037c8643d21efca30062c57862ab15d112e3166e88bf190f9e936 \
+    --control-plane
+*/
 var joinCommandTemplate = template.Must(template.New("join").Parse(`` +
 	`kubeadm join {{.ControlPlaneHostPort}} --token {{.Token}} \
     {{range $h := .CAPubKeyPins}}--discovery-token-ca-cert-hash {{$h}} {{end}}{{if .ControlPlane}}\
@@ -25,13 +30,35 @@ func GetJoinWorkerCommand(kubeConfigFile, token string, skipTokenPrint bool) (st
 	return getJoinCommand(kubeConfigFile, token, "", false, skipTokenPrint, false)
 }
 
+// GetJoinControlPlaneCommand ...
+//
+// 	@param kubeConfigFile: /etc/kubernetes/admin.conf
+// 	@param token: kube-system/bootstrap-token-${xxx} Secret 的内容.
+//
+// caller:
+// 	1. cmd/kubeadm/app/cmd/init.go -> printJoinCommand()
+// 	kubeadm init 构建完成的最后一步被调用, 打印 join 命令
+//
 // GetJoinControlPlaneCommand returns the kubeadm join command for a given token and
 // and Kubernetes cluster (the current cluster in the kubeconfig file)
-func GetJoinControlPlaneCommand(kubeConfigFile, token, key string, skipTokenPrint, skipCertificateKeyPrint bool) (string, error) {
-	return getJoinCommand(kubeConfigFile, token, key, true, skipTokenPrint, skipCertificateKeyPrint)
+func GetJoinControlPlaneCommand(
+	kubeConfigFile, token, key string, skipTokenPrint, skipCertificateKeyPrint bool,
+) (string, error) {
+	return getJoinCommand(
+		kubeConfigFile, token, key,
+		true, skipTokenPrint, skipCertificateKeyPrint,
+	)
 }
 
-func getJoinCommand(kubeConfigFile, token, key string, controlPlane, skipTokenPrint, skipCertificateKeyPrint bool) (string, error) {
+// getJoinCommand ...参数介绍见上面的主调函数
+//
+// caller:
+// 	1. GetJoinControlPlaneCommand()
+//
+func getJoinCommand(
+	kubeConfigFile, token, key string,
+	controlPlane, skipTokenPrint, skipCertificateKeyPrint bool,
+) (string, error) {
 	// load the kubeconfig file to get the CA certificate and endpoint
 	config, err := clientcmd.LoadFromFile(kubeConfigFile)
 	if err != nil {

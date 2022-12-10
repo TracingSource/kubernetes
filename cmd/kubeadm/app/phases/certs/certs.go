@@ -17,8 +17,14 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
-// CreatePKIAssets will create and write to disk all PKI assets necessary to establish the control plane.
-// If the PKI assets already exists in the target folder, they are used only if evaluated equal; otherwise an error is returned.
+// caller:
+// 	1. cmd/kubeadm/app/cmd/phases/join/controlplaneprepare.go -> runControlPlanePrepareCertsPhaseLocal()
+// 	在 kubeadm join 添加新的 master 节点时被调用.
+//
+// CreatePKIAssets will create and write to disk all PKI assets necessary to
+// establish the control plane.
+// If the PKI assets already exists in the target folder,
+// they are used only if evaluated equal; otherwise an error is returned.
 func CreatePKIAssets(cfg *kubeadmapi.InitConfiguration) error {
 	klog.V(1).Infoln("creating PKI assets")
 
@@ -48,19 +54,30 @@ func CreatePKIAssets(cfg *kubeadmapi.InitConfiguration) error {
 	return CreateServiceAccountKeyAndPublicKeyFiles(cfg.CertificatesDir)
 }
 
-// CreateServiceAccountKeyAndPublicKeyFiles create a new public/private key files for signing service account users.
-// If the sa public/private key files already exists in the target folder, they are used only if evaluated equals; otherwise an error is returned.
+// 	@param certsDir: /etc/kubernetes/pki
+//
+// CreateServiceAccountKeyAndPublicKeyFiles create a new public/private key files
+// for signing service account users.
+// If the sa public/private key files already exists in the target folder,
+// they are used only if evaluated equals; otherwise an error is returned.
 func CreateServiceAccountKeyAndPublicKeyFiles(certsDir string) error {
 	klog.V(1).Infoln("creating a new public/private key files for signing service account users")
-	_, err := keyutil.PrivateKeyFromFile(filepath.Join(certsDir, kubeadmconstants.ServiceAccountPrivateKeyName))
+	_, err := keyutil.PrivateKeyFromFile(
+		filepath.Join(certsDir, kubeadmconstants.ServiceAccountPrivateKeyName),
+	)
 	if err == nil {
 		// kubeadm doesn't validate the existing certificate key more than this;
 		// Basically, if we find a key file with the same path kubeadm thinks those files
 		// are equal and doesn't bother writing a new file
-		fmt.Printf("[certs] Using the existing %q key\n", kubeadmconstants.ServiceAccountKeyBaseName)
+		fmt.Printf(
+			"[certs] Using the existing %q key\n", kubeadmconstants.ServiceAccountKeyBaseName,
+		)
 		return nil
 	} else if !os.IsNotExist(err) {
-		return errors.Wrapf(err, "file %s existed but it could not be loaded properly", kubeadmconstants.ServiceAccountPrivateKeyName)
+		return errors.Wrapf(
+			err, "file %s existed but it could not be loaded properly", 
+			kubeadmconstants.ServiceAccountPrivateKeyName,
+		)
 	}
 
 	// The key does NOT exist, let's generate it now
@@ -269,8 +286,21 @@ type certKeyLocation struct {
 	uxName     string
 }
 
+// SharedCertificateExists 读取并校验 /etc/kubernetes/pki 目录下, 成对的 crt/key, 或 pri/pub 密钥信息.
+//
+// 该函数在 kubeadm join 添加新的 master 节点, 且未指定额外的 crt/key 的情况下被调用.
+// 这种情况下要求, 待 join 的新节点, 与初始 master 节点拥有相同的: 
+// 	1. {ca.crt, ca.key}
+// 	2. {sa.crt, sa.pub}
+// 	3. {etcd/ca.crt, etcd/ca.key}
+// 不过本函数貌似不校验内容, 只校验格式是否合法.
+//
+// caller:
+// 	1. cmd/kubeadm/app/cmd/phases/join/preflight.go -> runPreflight()
+//
 // SharedCertificateExists verifies if the shared certificates - the certificates that must be
-// equal across control-plane nodes: ca.key, ca.crt, sa.key, sa.pub + etcd/ca.key, etcd/ca.crt if local/stacked etcd
+// equal across control-plane nodes: ca.key, ca.crt, sa.key, sa.pub
+// + etcd/ca.key, etcd/ca.crt if local/stacked etcd
 func SharedCertificateExists(cfg *kubeadmapi.ClusterConfiguration) (bool, error) {
 
 	if err := validateCACertAndKey(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName, "", "CA"}); err != nil {

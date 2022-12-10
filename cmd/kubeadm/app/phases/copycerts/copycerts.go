@@ -213,9 +213,15 @@ func getDataFromDisk(cfg *kubeadmapi.InitConfiguration, key []byte) (map[string]
 	return secretData, nil
 }
 
+// caller:
+// 	1. cmd/kubeadm/app/cmd/phases/join/controlplaneprepare.go -> runControlPlanePrepareDownloadCertsPhaseLocal()
+//
 // DownloadCerts downloads the certificates needed to join a new control plane.
 func DownloadCerts(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, key string) error {
-	fmt.Printf("[download-certs] Downloading the certificates in Secret %q in the %q Namespace\n", kubeadmconstants.KubeadmCertsSecret, metav1.NamespaceSystem)
+	fmt.Printf(
+		"[download-certs] Downloading the certificates in Secret %q in the %q Namespace\n", 
+		kubeadmconstants.KubeadmCertsSecret, metav1.NamespaceSystem,
+	)
 
 	decodedKey, err := hex.DecodeString(key)
 	if err != nil {
@@ -235,10 +241,16 @@ func DownloadCerts(client clientset.Interface, cfg *kubeadmapi.InitConfiguration
 	for certOrKeyName, certOrKeyPath := range certsToTransfer(cfg) {
 		certOrKeyData, found := secretData[certOrKeyNameToSecretName(certOrKeyName)]
 		if !found {
-			return errors.Errorf("the Secret does not include the required certificate or key - name: %s, path: %s", certOrKeyName, certOrKeyPath)
+			return errors.Errorf(
+				"the Secret does not include the required certificate or key - name: %s, path: %s", 
+				certOrKeyName, certOrKeyPath,
+			)
 		}
 		if len(certOrKeyData) == 0 {
-			klog.V(1).Infof("[download-certs] Not saving %q to disk, since it is empty in the %q Secret\n", certOrKeyName, kubeadmconstants.KubeadmCertsSecret)
+			klog.V(1).Infof(
+				"[download-certs] Not saving %q to disk, since it is empty in the %q Secret\n", 
+				certOrKeyName, kubeadmconstants.KubeadmCertsSecret,
+			)
 			continue
 		}
 		if err := writeCertOrKey(certOrKeyPath, certOrKeyData); err != nil {

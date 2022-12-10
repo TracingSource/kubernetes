@@ -118,6 +118,16 @@ func (w *KubeWaiter) WaitForPodToDisappear(podName string) error {
 	})
 }
 
+// WaitForHealthyKubelet kubeadm init 过程中, 等待 kubelet 将 static pod 启动并正常运行.
+// 
+// 	@note: 这是最容易出问题的地方.
+//
+// 	@param initalTimeout: 一般为 40s.
+// 	@param healthzEndpoint: http://localhost:%d/healthz
+//
+// caller: 
+// 	1. WaitForKubeletAndFunc()
+//
 // WaitForHealthyKubelet blocks until the kubelet /healthz endpoint returns 'ok'
 func (w *KubeWaiter) WaitForHealthyKubelet(initalTimeout time.Duration, healthzEndpoint string) error {
 	time.Sleep(initalTimeout)
@@ -140,13 +150,19 @@ func (w *KubeWaiter) WaitForHealthyKubelet(initalTimeout time.Duration, healthzE
 	}, 5) // a failureThreshold of five means waiting for a total of 155 seconds
 }
 
-// WaitForKubeletAndFunc waits primarily for the function f to execute, even though it might take some time. If that takes a long time, and the kubelet
-// /healthz continuously are unhealthy, kubeadm will error out after a period of exponential backoff
+// WaitForKubeletAndFunc waits primarily for the function f to execute,
+// even though it might take some time.
+// If that takes a long time, and the kubelet /healthz continuously are unhealthy,
+// kubeadm will error out after a period of exponential backoff
 func (w *KubeWaiter) WaitForKubeletAndFunc(f func() error) error {
 	errorChan := make(chan error, 1)
 
 	go func(errC chan error, waiter Waiter) {
-		if err := waiter.WaitForHealthyKubelet(40*time.Second, fmt.Sprintf("http://localhost:%d/healthz", kubeadmconstants.KubeletHealthzPort)); err != nil {
+		err := waiter.WaitForHealthyKubelet(
+			40*time.Second, fmt.Sprintf("http://localhost:%d/healthz", 
+			kubeadmconstants.KubeletHealthzPort),
+		)
+		if err != nil {
 			errC <- err
 		}
 	}(errorChan, w)

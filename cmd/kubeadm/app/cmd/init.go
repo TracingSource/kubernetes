@@ -73,8 +73,8 @@ type initOptions struct {
 	cfgPath                 string
 	skipTokenPrint          bool
 	dryRun                  bool
-	kubeconfigDir           string
-	kubeconfigPath          string
+	kubeconfigDir           string // /etc/kubernetes
+	kubeconfigPath          string // /etc/kubernetes/admin.conf
 	featureGatesString      string
 	ignorePreflightErrors   []string
 	bto                     *options.BootstrapTokenOptions
@@ -94,10 +94,10 @@ type initData struct {
 	cfg                     *kubeadmapi.InitConfiguration
 	skipTokenPrint          bool
 	dryRun                  bool
-	kubeconfigDir           string
-	kubeconfigPath          string
+	kubeconfigDir           string // /etc/kubernetes
+	kubeconfigPath          string // /etc/kubernetes/admin.conf
 	ignorePreflightErrors   sets.String
-	certificatesDir         string
+	certificatesDir         string // /etc/kubernetes/pki
 	dryRunDir               string
 	externalCA              bool
 	client                  clientset.Interface
@@ -192,11 +192,14 @@ func NewCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 // AddInitConfigFlags adds init flags bound to the config to the specified flagset
 func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta2.InitConfiguration) {
 	flagSet.StringVar(
-		&cfg.LocalAPIEndpoint.AdvertiseAddress, options.APIServerAdvertiseAddress, cfg.LocalAPIEndpoint.AdvertiseAddress,
-		"The IP address the API Server will advertise it's listening on. If not set the default network interface will be used.",
+		&cfg.LocalAPIEndpoint.AdvertiseAddress, 
+		options.APIServerAdvertiseAddress, cfg.LocalAPIEndpoint.AdvertiseAddress,
+		"The IP address the API Server will advertise it's listening on. "+
+		"If not set the default network interface will be used.",
 	)
 	flagSet.Int32Var(
-		&cfg.LocalAPIEndpoint.BindPort, options.APIServerBindPort, cfg.LocalAPIEndpoint.BindPort,
+		&cfg.LocalAPIEndpoint.BindPort, 
+		options.APIServerBindPort, cfg.LocalAPIEndpoint.BindPort,
 		"Port for the API Server to bind to.",
 	)
 	flagSet.StringVar(
@@ -211,14 +214,19 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta2.InitConfig
 }
 
 // AddClusterConfigFlags adds cluster flags bound to the config to the specified flagset
-func AddClusterConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta2.ClusterConfiguration, featureGatesString *string) {
+func AddClusterConfigFlags(
+	flagSet *flag.FlagSet, cfg *kubeadmapiv1beta2.ClusterConfiguration, 
+	featureGatesString *string,
+) {
 	flagSet.StringVar(
-		&cfg.Networking.ServiceSubnet, options.NetworkingServiceSubnet, cfg.Networking.ServiceSubnet,
+		&cfg.Networking.ServiceSubnet, options.NetworkingServiceSubnet, 
+		cfg.Networking.ServiceSubnet,
 		"Use alternative range of IP address for service VIPs.",
 	)
 	flagSet.StringVar(
 		&cfg.Networking.PodSubnet, options.NetworkingPodSubnet, cfg.Networking.PodSubnet,
-		"Specify range of IP addresses for the pod network. If set, the control plane will automatically allocate CIDRs for every node.",
+		"Specify range of IP addresses for the pod network. "+
+		"If set, the control plane will automatically allocate CIDRs for every node.",
 	)
 	flagSet.StringVar(
 		&cfg.Networking.DNSDomain, options.NetworkingDNSDomain, cfg.Networking.DNSDomain,
@@ -238,18 +246,22 @@ func AddClusterConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta2.Cluster
 	)
 	flagSet.StringSliceVar(
 		&cfg.APIServer.CertSANs, options.APIServerCertSANs, cfg.APIServer.CertSANs,
-		`Optional extra Subject Alternative Names (SANs) to use for the API Server serving certificate. Can be both IP addresses and DNS names.`,
+		`Optional extra Subject Alternative Names (SANs) to use for "+
+		"the API Server serving certificate. Can be both IP addresses and DNS names.`,
 	)
 	options.AddFeatureGatesStringFlag(flagSet, featureGatesString)
 }
 
 // AddInitOtherFlags adds init flags that are not bound to a configuration file to the given flagset
-// Note: All flags that are not bound to the cfg object should be allowed in cmd/kubeadm/app/apis/kubeadm/validation/validation.go
+// Note: All flags that are not bound to the cfg object should be allowed in
+// cmd/kubeadm/app/apis/kubeadm/validation/validation.go
 func AddInitOtherFlags(flagSet *flag.FlagSet, initOptions *initOptions) {
 	options.AddConfigFlag(flagSet, &initOptions.cfgPath)
 	flagSet.StringSliceVar(
-		&initOptions.ignorePreflightErrors, options.IgnorePreflightErrors, initOptions.ignorePreflightErrors,
-		"A list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.",
+		&initOptions.ignorePreflightErrors, options.IgnorePreflightErrors, 
+		initOptions.ignorePreflightErrors,
+		"A list of checks whose errors will be shown as warnings. "+
+		"Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.",
 	)
 	flagSet.BoolVar(
 		&initOptions.skipTokenPrint, options.SkipTokenPrint, initOptions.skipTokenPrint,
@@ -264,7 +276,8 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, initOptions *initOptions) {
 		"Upload control-plane certificates to the kubeadm-certs Secret.",
 	)
 	flagSet.BoolVar(
-		&initOptions.skipCertificateKeyPrint, options.SkipCertificateKeyPrint, initOptions.skipCertificateKeyPrint,
+		&initOptions.skipCertificateKeyPrint, options.SkipCertificateKeyPrint, 
+		initOptions.skipCertificateKeyPrint,
 		"Don't print the key used to encrypt the control-plane certificates.",
 	)
 	options.AddKustomizePodsFlag(flagSet, &initOptions.kustomizeDir)
@@ -279,7 +292,8 @@ func newInitOptions() *initOptions {
 	externalClusterCfg := &kubeadmapiv1beta2.ClusterConfiguration{}
 	kubeadmscheme.Scheme.Default(externalClusterCfg)
 
-	// Create the options object for the bootstrap token-related flags, and override the default value for .Description
+	// Create the options object for the bootstrap token-related flags,
+	// and override the default value for .Description
 	bto := options.NewBootstrapTokenOptions()
 	bto.Description = "The default bootstrap token generated by 'kubeadm init'."
 
@@ -304,7 +318,10 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 	// Validate standalone flags values and/or combination of flags and then assigns
 	// validated values to the public kubeadm config API when applicable
 	var err error
-	if options.externalClusterCfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, options.featureGatesString); err != nil {
+	options.externalClusterCfg.FeatureGates, err = features.NewFeatureGate(
+		&features.InitFeatureGates, options.featureGatesString,
+	)
+	if err != nil {
 		return nil, err
 	}
 
@@ -316,8 +333,8 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 		return nil, err
 	}
 
-	// Either use the config file if specified, or convert public kubeadm API to the internal InitConfiguration
-	// and validates InitConfiguration
+	// Either use the config file if specified, or convert public kubeadm API
+	// to the internal InitConfiguration and validates InitConfiguration
 	cfg, err := configutil.LoadOrDefaultInitConfiguration(
 		options.cfgPath, options.externalInitCfg, options.externalClusterCfg,
 	)
@@ -325,11 +342,14 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 		return nil, err
 	}
 
-	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(options.ignorePreflightErrors, cfg.NodeRegistration.IgnorePreflightErrors)
+	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(
+		options.ignorePreflightErrors, cfg.NodeRegistration.IgnorePreflightErrors,
+	)
 	if err != nil {
 		return nil, err
 	}
-	// Also set the union of pre-flight errors to InitConfiguration, to provide a consistent view of the runtime configuration:
+	// Also set the union of pre-flight errors to InitConfiguration,
+	// to provide a consistent view of the runtime configuration:
 	cfg.NodeRegistration.IgnorePreflightErrors = ignorePreflightErrorsSet.List()
 
 	// override node name and CRI socket from the command line options
@@ -379,7 +399,8 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 	// (when the Front-Proxy CA Cert is present but the Front-Proxy CA Key is not)
 	externalFrontProxyCA, err := certsphase.UsingExternalFrontProxyCA(&cfg.ClusterConfiguration)
 	if externalFrontProxyCA {
-		// In case the certificates signed by Front-Proxy CA (that should be provided by the user) are missing or invalid,
+		// In case the certificates signed by Front-Proxy CA
+		// (that should be provided by the user) are missing or invalid,
 		// returns, because kubeadm can't regenerate them without the Front-Proxy CA Key
 		if err != nil {
 			return nil, errors.Wrapf(err, "invalid or incomplete external front-proxy CA")
@@ -447,7 +468,8 @@ func (d *initData) IgnorePreflightErrors() sets.String {
 	return d.ignorePreflightErrors
 }
 
-// CertificateWriteDir returns the path to the certificate folder or the temporary folder path in case of DryRun.
+// CertificateWriteDir returns the path to the certificate folder
+// or the temporary folder path in case of DryRun.
 func (d *initData) CertificateWriteDir() string {
 	if d.dryRun {
 		return d.dryRunDir
@@ -455,12 +477,17 @@ func (d *initData) CertificateWriteDir() string {
 	return d.certificatesDir
 }
 
+// KubeConfigPath /etc/kubernetes/pki
+//
 // CertificateDir returns the CertificateDir as originally specified by the user.
 func (d *initData) CertificateDir() string {
 	return d.certificatesDir
 }
 
-// KubeConfigDir returns the path of the Kubernetes configuration folder or the temporary folder path in case of DryRun.
+// KubeConfigPath /etc/kubernetes
+//
+// KubeConfigDir returns the path of the Kubernetes configuration folder
+// or the temporary folder path in case of DryRun.
 func (d *initData) KubeConfigDir() string {
 	if d.dryRun {
 		return d.dryRunDir
@@ -468,6 +495,8 @@ func (d *initData) KubeConfigDir() string {
 	return d.kubeconfigDir
 }
 
+// KubeConfigPath /etc/kubernetes/admin.conf
+//
 // KubeConfigPath returns the path to the kubeconfig file to use for connecting to Kubernetes
 func (d *initData) KubeConfigPath() string {
 	if d.dryRun {
@@ -476,7 +505,8 @@ func (d *initData) KubeConfigPath() string {
 	return d.kubeconfigPath
 }
 
-// ManifestDir returns the path where manifest should be stored or the temporary folder path in case of DryRun.
+// ManifestDir returns the path where manifest should be stored
+// or the temporary folder path in case of DryRun.
 func (d *initData) ManifestDir() string {
 	if d.dryRun {
 		return d.dryRunDir
@@ -486,7 +516,8 @@ func (d *initData) ManifestDir() string {
 
 // KubeletDir 一般返回 /var/lib/kubelet
 //
-// KubeletDir returns path of the kubelet configuration folder or the temporary folder in case of DryRun.
+// KubeletDir returns path of the kubelet configuration folder
+// or the temporary folder in case of DryRun.
 func (d *initData) KubeletDir() string {
 	if d.dryRun {
 		return d.dryRunDir
@@ -523,7 +554,9 @@ func (d *initData) Client() (clientset.Interface, error) {
 			}
 			// If we're dry-running, we should create a faked client that answers some GETs
 			// in order to be able to do the full init flow and just logs the rest of requests
-			dryRunGetter := apiclient.NewInitDryRunGetter(d.cfg.NodeRegistration.Name, svcSubnetCIDR.String())
+			dryRunGetter := apiclient.NewInitDryRunGetter(
+				d.cfg.NodeRegistration.Name, svcSubnetCIDR.String(),
+			)
 			d.client = apiclient.NewDryRunClient(dryRunGetter, os.Stdout)
 		} else {
 			// If we're acting for real, we should create a connection to the API server
@@ -552,6 +585,7 @@ func (d *initData) KustomizeDir() string {
 	return d.kustomizeDir
 }
 
+// 	@param adminKubeConfigPath: /etc/kubernetes/admin.conf
 func printJoinCommand(out io.Writer, adminKubeConfigPath, token string, i *initData) error {
 	joinControlPlaneCommand, err := cmdutil.GetJoinControlPlaneCommand(
 		adminKubeConfigPath, token, 

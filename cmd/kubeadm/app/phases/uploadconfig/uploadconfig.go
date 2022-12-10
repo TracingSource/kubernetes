@@ -47,7 +47,7 @@ func ResetClusterStatusForNode(nodeName string, client clientset.Interface) erro
 }
 
 // UploadConfiguration 在 kubeadm init 3大件启动完成后, 将 kubeadm 的 config.yaml 配置,
-// 存放到 kube-system 下, 名为 kubeadm-config 的 ConfigMap 对象中.
+// 存放到 kube-system/kubeadm-config 的 ConfigMap 对象中.
 //
 // caller:
 // 	1. cmd/kubeadm/app/cmd/phases/init/uploadconfig.go -> runUploadKubeadmConfig()
