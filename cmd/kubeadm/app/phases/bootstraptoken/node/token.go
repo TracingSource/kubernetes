@@ -18,6 +18,10 @@ func CreateNewTokens(client clientset.Interface, tokens []kubeadmapi.BootstrapTo
 	return UpdateOrCreateTokens(client, true, tokens)
 }
 
+// UpdateOrCreateTokens 创建名为 bootstrap-token-${xxxxxx} 的 secret 资源对象.
+//
+// 	@param tokens: 这里的 tokens 是预先生成的一个随机字符串数组(一般只有一个成员, 如, xxx.yyyyyy).
+//
 // caller:
 // 	1. cmd/kubeadm/app/cmd/phases/init/bootstraptoken.go -> runBootstrapToken()
 // 	在 kubeadm init 过程中被调用.
@@ -28,6 +32,7 @@ func UpdateOrCreateTokens(
 	client clientset.Interface, failIfExists bool, tokens []kubeadmapi.BootstrapToken,
 ) error {
 	for _, token := range tokens {
+		// 假设该 token 为 xxx.yyyyyy, 则其中 xxx 将作为 secret 的名称
 		secretName := bootstraputil.BootstrapTokenSecretName(token.Token.ID)
 		secret, err := client.CoreV1().Secrets(metav1.NamespaceSystem).Get(secretName, metav1.GetOptions{})
 		if secret != nil && err == nil && failIfExists {

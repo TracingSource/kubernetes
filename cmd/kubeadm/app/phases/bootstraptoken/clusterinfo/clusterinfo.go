@@ -21,10 +21,18 @@ const (
 	BootstrapSignerClusterRoleName = "kubeadm:bootstrap-signer-clusterinfo"
 )
 
+// CreateBootstrapConfigMapIfNotExists 创建 kube-public/cluster-info 的 ConfigMap 资源对象.
+//
+// caller:
+// 	1. cmd/kubeadm/app/cmd/phases/init/bootstraptoken.go -> runBootstrapToken()
+// 	在 kubeadm init 过程中, 创建完成 bootstrap-token-${xxxxxx} 的 secret 资源对象后被调用.
+//
 // CreateBootstrapConfigMapIfNotExists creates the kube-public ConfigMap if it doesn't exist already
 func CreateBootstrapConfigMapIfNotExists(client clientset.Interface, file string) error {
-
-	fmt.Printf("[bootstrap-token] Creating the %q ConfigMap in the %q namespace\n", bootstrapapi.ConfigMapClusterInfo, metav1.NamespacePublic)
+	fmt.Printf(
+		"[bootstrap-token] Creating the %q ConfigMap in the %q namespace\n", 
+		bootstrapapi.ConfigMapClusterInfo, metav1.NamespacePublic,
+	)
 
 	klog.V(1).Infoln("[bootstrap-token] loading admin kubeconfig")
 	adminConfig, err := clientcmd.LoadFromFile(file)
@@ -33,7 +41,8 @@ func CreateBootstrapConfigMapIfNotExists(client clientset.Interface, file string
 	}
 
 	adminCluster := adminConfig.Contexts[adminConfig.CurrentContext].Cluster
-	// Copy the cluster from admin.conf to the bootstrap kubeconfig, contains the CA cert and the server URL
+	// Copy the cluster from admin.conf to the bootstrap kubeconfig,
+	// contains the CA cert and the server URL
 	klog.V(1).Infoln("[bootstrap-token] copying the cluster from admin.conf to the bootstrap kubeconfig")
 	bootstrapConfig := &clientcmdapi.Config{
 		Clusters: map[string]*clientcmdapi.Cluster{

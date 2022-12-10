@@ -375,7 +375,8 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 		}
 	}
 
-	// Checks if an external Front-Proxy CA is provided by the user (when the Front-Proxy CA Cert is present but the Front-Proxy CA Key is not)
+	// Checks if an external Front-Proxy CA is provided by the user
+	// (when the Front-Proxy CA Cert is present but the Front-Proxy CA Key is not)
 	externalFrontProxyCA, err := certsphase.UsingExternalFrontProxyCA(&cfg.ClusterConfiguration)
 	if externalFrontProxyCA {
 		// In case the certificates signed by Front-Proxy CA (that should be provided by the user) are missing or invalid,
@@ -483,6 +484,8 @@ func (d *initData) ManifestDir() string {
 	return kubeadmconstants.GetStaticPodDirectory()
 }
 
+// KubeletDir 一般返回 /var/lib/kubelet
+//
 // KubeletDir returns path of the kubelet configuration folder or the temporary folder in case of DryRun.
 func (d *initData) KubeletDir() string {
 	if d.dryRun {
@@ -502,7 +505,8 @@ func (d *initData) OutputWriter() io.Writer {
 }
 
 // Client returns a Kubernetes client to be used by kubeadm.
-// This function is implemented as a singleton, thus avoiding to recreate the client when it is used by different phases.
+// This function is implemented as a singleton,
+// thus avoiding to recreate the client when it is used by different phases.
 // Important. This function must be called after the admin.conf kubeconfig file is created.
 func (d *initData) Client() (clientset.Interface, error) {
 	if d.client == nil {
@@ -512,13 +516,18 @@ func (d *initData) Client() (clientset.Interface, error) {
 				features.Enabled(d.cfg.FeatureGates, features.IPv6DualStack),
 			)
 			if err != nil {
-				return nil, errors.Wrapf(err, "unable to get internal Kubernetes Service IP from the given service CIDR (%s)", d.cfg.Networking.ServiceSubnet)
+				return nil, errors.Wrapf(
+					err, "unable to get internal Kubernetes Service IP from the given service CIDR (%s)", 
+					d.cfg.Networking.ServiceSubnet,
+				)
 			}
-			// If we're dry-running, we should create a faked client that answers some GETs in order to be able to do the full init flow and just logs the rest of requests
+			// If we're dry-running, we should create a faked client that answers some GETs
+			// in order to be able to do the full init flow and just logs the rest of requests
 			dryRunGetter := apiclient.NewInitDryRunGetter(d.cfg.NodeRegistration.Name, svcSubnetCIDR.String())
 			d.client = apiclient.NewDryRunClient(dryRunGetter, os.Stdout)
 		} else {
-			// If we're acting for real, we should create a connection to the API server and wait for it to come up
+			// If we're acting for real, we should create a connection to the API server
+			// and wait for it to come up
 			var err error
 			d.client, err = kubeconfigutil.ClientSetFromFile(d.KubeConfigPath())
 			if err != nil {
@@ -544,12 +553,17 @@ func (d *initData) KustomizeDir() string {
 }
 
 func printJoinCommand(out io.Writer, adminKubeConfigPath, token string, i *initData) error {
-	joinControlPlaneCommand, err := cmdutil.GetJoinControlPlaneCommand(adminKubeConfigPath, token, i.CertificateKey(), i.skipTokenPrint, i.skipCertificateKeyPrint)
+	joinControlPlaneCommand, err := cmdutil.GetJoinControlPlaneCommand(
+		adminKubeConfigPath, token, 
+		i.CertificateKey(), i.skipTokenPrint, i.skipCertificateKeyPrint,
+	)
 	if err != nil {
 		return err
 	}
 
-	joinWorkerCommand, err := cmdutil.GetJoinWorkerCommand(adminKubeConfigPath, token, i.skipTokenPrint)
+	joinWorkerCommand, err := cmdutil.GetJoinWorkerCommand(
+		adminKubeConfigPath, token, i.skipTokenPrint,
+	)
 	if err != nil {
 		return err
 	}

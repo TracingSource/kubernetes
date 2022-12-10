@@ -29,9 +29,17 @@ const (
 	NodeAutoApproveCertificateRotationClusterRoleBinding = "kubeadm:node-autoapprove-certificate-rotation"
 )
 
-// AllowBootstrapTokensToPostCSRs creates RBAC rules in a way the makes Node Bootstrap Tokens able to post CSRs
+// caller:
+// 	1. cmd/kubeadm/app/cmd/phases/init/bootstraptoken.go -> runBootstrapToken()
+// 	在 kubeadm init 过程中, 创建完成 bootstrap-token-${xxxxxx} 的 secret 资源对象后被调用.
+//
+// AllowBootstrapTokensToPostCSRs creates RBAC rules in a way
+// that makes Node Bootstrap Tokens able to post CSRs
 func AllowBootstrapTokensToPostCSRs(client clientset.Interface) error {
-	fmt.Println("[bootstrap-token] configured RBAC rules to allow Node Bootstrap tokens to post CSRs in order for nodes to get long term certificate credentials")
+	fmt.Println(
+		"[bootstrap-token] configured RBAC rules to allow Node Bootstrap tokens "+
+		"to post CSRs in order for nodes to get long term certificate credentials",
+	)
 
 	return apiclient.CreateOrUpdateClusterRoleBinding(client, &rbac.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
@@ -51,9 +59,17 @@ func AllowBootstrapTokensToPostCSRs(client clientset.Interface) error {
 	})
 }
 
-// AutoApproveNodeBootstrapTokens creates RBAC rules in a way that makes Node Bootstrap Tokens' CSR auto-approved by the csrapprover controller
+// caller:
+// 	1. cmd/kubeadm/app/cmd/phases/init/bootstraptoken.go -> runBootstrapToken()
+// 	在 kubeadm init 过程中, 创建完成 bootstrap-token-${xxxxxx} 的 secret 资源对象后被调用.
+//
+// AutoApproveNodeBootstrapTokens creates RBAC rules in a way
+// that makes Node Bootstrap Tokens' CSR auto-approved by the csrapprover controller
 func AutoApproveNodeBootstrapTokens(client clientset.Interface) error {
-	fmt.Println("[bootstrap-token] configured RBAC rules to allow the csrapprover controller automatically approve CSRs from a Node Bootstrap Token")
+	fmt.Println(
+		"[bootstrap-token] configured RBAC rules to allow the csrapprover controller "+
+		"automatically approve CSRs from a Node Bootstrap Token",
+	)
 
 	// Always create this kubeadm-specific binding though
 	return apiclient.CreateOrUpdateClusterRoleBinding(client, &rbac.ClusterRoleBinding{
@@ -74,9 +90,17 @@ func AutoApproveNodeBootstrapTokens(client clientset.Interface) error {
 	})
 }
 
-// AutoApproveNodeCertificateRotation creates RBAC rules in a way that makes Node certificate rotation CSR auto-approved by the csrapprover controller
+// caller:
+// 	1. cmd/kubeadm/app/cmd/phases/init/bootstraptoken.go -> runBootstrapToken()
+// 	在 kubeadm init 过程中, 创建完成 bootstrap-token-${xxxxxx} 的 secret 资源对象后被调用.
+//
+// AutoApproveNodeCertificateRotation creates RBAC rules in a way
+// that makes Node certificate rotation CSR auto-approved by the csrapprover controller
 func AutoApproveNodeCertificateRotation(client clientset.Interface) error {
-	fmt.Println("[bootstrap-token] configured RBAC rules to allow certificate rotation for all node client certificates in the cluster")
+	fmt.Println(
+		"[bootstrap-token] configured RBAC rules to allow certificate rotation "+
+		"for all node client certificates in the cluster",
+	)
 
 	return apiclient.CreateOrUpdateClusterRoleBinding(client, &rbac.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{

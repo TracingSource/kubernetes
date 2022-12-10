@@ -88,6 +88,11 @@ func IsValidBootstrapTokenID(tokenID string) bool {
 	return BootstrapTokenIDRegexp.MatchString(tokenID)
 }
 
+// BootstrapTokenSecretName 返回 bootstrap-token-${xxxxxx}
+//
+// caller:
+// 	1. cmd/kubeadm/app/phases/bootstraptoken/node/token.go -> UpdateOrCreateTokens()
+//
 // BootstrapTokenSecretName returns the expected name for the Secret storing the
 // Bootstrap Token in the Kubernetes API.
 func BootstrapTokenSecretName(tokenID string) string {
