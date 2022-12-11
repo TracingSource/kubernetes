@@ -28,14 +28,25 @@ type kubeletFlagsOpts struct {
 	defaultHostname          string
 }
 
+// WriteKubeletDynamicEnvFile 构造 kubelet 启动参数, 并写入 /var/lib/kubelet/kubeadm-flags.env
+//
+// 	@param kubeletDir: /var/lib/kubelet
+//
 // WriteKubeletDynamicEnvFile writes an environment file with dynamic flags to the kubelet.
 // Used at "kubeadm init" and "kubeadm join" time.
-func WriteKubeletDynamicEnvFile(cfg *kubeadmapi.ClusterConfiguration, nodeReg *kubeadmapi.NodeRegistrationOptions, registerTaintsUsingFlags bool, kubeletDir string) error {
+func WriteKubeletDynamicEnvFile(
+	cfg *kubeadmapi.ClusterConfiguration, 
+	nodeReg *kubeadmapi.NodeRegistrationOptions, 
+	registerTaintsUsingFlags bool, kubeletDir string,
+) error {
+	// 待加入的新主机的 hostname
 	hostName, err := kubeadmutil.GetHostname("")
 	if err != nil {
 		return err
 	}
-
+	// flagOpts 包含的是 kubelet 的启动参数, 如
+	// --cgroup-driver=cgroupfs --network-plugin=cni 
+	// --pod-infra-container-image=pause:3.1
 	flagOpts := kubeletFlagsOpts{
 		nodeRegOpts:              nodeReg,
 		featureGates:             cfg.FeatureGates,
@@ -53,12 +64,16 @@ func WriteKubeletDynamicEnvFile(cfg *kubeadmapi.ClusterConfiguration, nodeReg *k
 	}
 	stringMap := buildKubeletArgMap(flagOpts)
 	argList := kubeadmutil.BuildArgumentListFromMap(stringMap, nodeReg.KubeletExtraArgs)
-	envFileContent := fmt.Sprintf("%s=%q\n", constants.KubeletEnvFileVariableName, strings.Join(argList, " "))
+	// 如 KUBELET_KUBEADM_ARGS="--cgroup-driver=cgroupfs --network-plugin=cni ..."
+	envFileContent := fmt.Sprintf(
+		"%s=%q\n", constants.KubeletEnvFileVariableName, strings.Join(argList, " "),
+	)
 
 	return writeKubeletFlagBytesToDisk([]byte(envFileContent), kubeletDir)
 }
 
-// buildKubeletArgMap takes a kubeletFlagsOpts object and builds based on that a string-string map with flags
+// buildKubeletArgMap takes a kubeletFlagsOpts object and builds based on
+// that a string-string map with flags
 // that should be given to the local kubelet daemon.
 func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
 	kubeletFlags := map[string]string{}
@@ -68,7 +83,10 @@ func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
 		kubeletFlags["network-plugin"] = "cni"
 		driver, err := kubeadmutil.GetCgroupDriverDocker(opts.execer)
 		if err != nil {
-			klog.Warningf("cannot automatically assign a '--cgroup-driver' value when starting the Kubelet: %v\n", err)
+			klog.Warningf(
+				"cannot automatically assign a '--cgroup-driver' value "+
+				"when starting the Kubelet: %v\n", err,
+			)
 		} else {
 			kubeletFlags["cgroup-driver"] = driver
 		}

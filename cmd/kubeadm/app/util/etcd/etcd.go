@@ -287,7 +287,8 @@ func (c *Client) AddMember(name string, peerAddrs string) ([]Member, error) {
 	// Returns the updated list of etcd members
 	ret := []Member{}
 	for _, m := range resp.Members {
-		// fixes the entry for the joining member (that doesn't have a name set in the initialCluster returned by etcd)
+		// fixes the entry for the joining member
+		// (that doesn't have a name set in the initialCluster returned by etcd)
 		if m.Name == "" {
 			ret = append(ret, Member{Name: name, PeerURL: m.PeerURLs[0]})
 		} else {

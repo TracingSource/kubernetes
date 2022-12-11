@@ -8,10 +8,22 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
 
+// AnnotateCRISocket kubeadm join 添加新节点时, kubelet 启动, 将自身注册到 apiserver 后被调用, 
+// 	将 cri 相关信息补充到 Node 的 annotation 中. 
+//
+// 	@param criSocket: 一般为 /var/run/dockershim.sock
+//
+// caller:
+// 	1. cmd/kubeadm/app/cmd/phases/join/kubelet.go -> runKubeletStartJoinPhase()
+//	kubeadm join 添加新节点时, kubelet 启动, 将自身注册到 apiserver 后被调用, 
+// 	将 cri 相关信息补充到 Node 的 annotation 中. 
+//
 // AnnotateCRISocket annotates the node with the given crisocket
 func AnnotateCRISocket(client clientset.Interface, nodeName string, criSocket string) error {
-
-	klog.V(1).Infof("[patchnode] Uploading the CRI Socket information %q to the Node API object %q as an annotation\n", criSocket, nodeName)
+	klog.V(1).Infof(
+		"[patchnode] Uploading the CRI Socket information %q "+
+		"to the Node API object %q as an annotation\n", criSocket, nodeName,
+	)
 
 	return apiclient.PatchNode(client, nodeName, func(n *v1.Node) {
 		annotateNodeWithCRISocket(n, criSocket)

@@ -35,6 +35,10 @@ func getControlPlaneJoinPhaseFlags(name string) []string {
 	return flags
 }
 
+// NewControlPlaneJoinPhase 创建 etcd 的 static pod yaml 文件(由 kubelet 启动), 
+// 更新 kube-system/kubeadm-config 的 ConfigMap 中的主机信息,
+// 并为新添加的 master 节点添加 label(标签)和 taints(污点)
+//
 // NewControlPlaneJoinPhase creates a kubeadm workflow phase
 // that implements joining a machine as a control plane instance
 func NewControlPlaneJoinPhase() workflow.Phase {
@@ -91,6 +95,10 @@ func newMarkControlPlaneSubphase() workflow.Phase {
 	}
 }
 
+// runEtcdPhase 创建 /etc/kubernetes/manifests/etcd.yaml 文件, kubelet 会自动启动该 etcd pod.
+// 在 kubeadm join 添加新的 master 节点时被调用, 此时 kubelet 已启动. 
+// 主 master 的 etcd 节点中, 也已经注册了新主机上的 etcd 节点, 之后自动加入即可.
+//
 func runEtcdPhase(c workflow.RunData) (err error) {
 	data, ok := c.(JoinData)
 	if !ok {

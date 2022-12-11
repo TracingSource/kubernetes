@@ -119,19 +119,33 @@ func createConfigMapRBACRules(client clientset.Interface, k8sVersion *version.Ve
 	})
 }
 
+// DownloadConfig kube-system/kubelet-config-1.17 的 ConfigMap 对象.
+// 然后写入到 /var/lib/kubelet/config.yaml 文件中.
+//
+// 	@param kubeletDir: /var/lib/kubelet
+//
+// caller:
+// 	1. cmd/kubeadm/app/cmd/phases/join/kubelet.go -> runKubeletStartJoinPhase()
+// 	kubeadm join 添加新节点时被调用.
+//
 // DownloadConfig downloads the kubelet configuration from a ConfigMap and writes it to disk.
 // Used at "kubeadm join" time
-func DownloadConfig(client clientset.Interface, kubeletVersion *version.Version, kubeletDir string) error {
-
+func DownloadConfig(
+	client clientset.Interface, kubeletVersion *version.Version, kubeletDir string,
+) error {
+	// kubelet-config-1.17
+	//
 	// Download the ConfigMap from the cluster based on what version the kubelet is
 	configMapName := kubeadmconstants.GetKubeletConfigMapName(kubeletVersion)
 
-	fmt.Printf("[kubelet-start] Downloading configuration for the kubelet from the %q ConfigMap in the %s namespace\n",
-		configMapName, metav1.NamespaceSystem)
+	fmt.Printf(
+		"[kubelet-start] Downloading configuration for the kubelet from the %q ConfigMap in the %s namespace\n",
+		configMapName, metav1.NamespaceSystem,
+	)
 
 	kubeletCfg, err := apiclient.GetConfigMapWithRetry(client, metav1.NamespaceSystem, configMapName)
-	// If the ConfigMap wasn't found and the kubelet version is v1.10.x, where we didn't support the config file yet
-	// just return, don't error out
+	// If the ConfigMap wasn't found and the kubelet version is v1.10.x,
+	// where we didn't support the config file yet just return, don't error out
 	if apierrors.IsNotFound(err) && kubeletVersion.Minor() == 10 {
 		return nil
 	}
@@ -139,12 +153,19 @@ func DownloadConfig(client clientset.Interface, kubeletVersion *version.Version,
 		return err
 	}
 
-	return writeConfigBytesToDisk([]byte(kubeletCfg.Data[kubeadmconstants.KubeletBaseConfigurationConfigMapKey]), kubeletDir)
+	return writeConfigBytesToDisk(
+		[]byte(kubeletCfg.Data[kubeadmconstants.KubeletBaseConfigurationConfigMapKey]), 
+		kubeletDir,
+	)
 }
 
-// configMapRBACName returns the name for the Role/RoleBinding for the kubelet config configmap for the right branch of k8s
+// configMapRBACName returns the name for the Role/RoleBinding for
+// the kubelet config configmap for the right branch of k8s
 func configMapRBACName(k8sVersion *version.Version) string {
-	return fmt.Sprintf("%s%d.%d", kubeadmconstants.KubeletBaseConfigMapRolePrefix, k8sVersion.Major(), k8sVersion.Minor())
+	return fmt.Sprintf(
+		"%s%d.%d", kubeadmconstants.KubeletBaseConfigMapRolePrefix, 
+		k8sVersion.Major(), k8sVersion.Minor(),
+	)
 }
 
 // getConfigBytes marshals a KubeletConfiguration object to bytes
@@ -152,7 +173,15 @@ func getConfigBytes(kubeletConfig *kubeletconfigv1beta1.KubeletConfiguration) ([
 	return componentconfigs.Known[componentconfigs.KubeletConfigurationKind].Marshal(kubeletConfig)
 }
 
-// writeConfigBytesToDisk writes a byte slice down to disk at the specific location of the kubelet config file
+// writeConfigBytesToDisk 将目标内容写入到 /var/lib/kubelet/config.yaml 文件中.
+//
+// 	@param kubeletDir: /var/lib/kubelet
+//
+// caller:
+// 	1. DownloadConfig() kubeadm join 添加新节点时被调用.
+//
+// writeConfigBytesToDisk writes a byte slice down to disk
+// at the specific location of the kubelet config file
 func writeConfigBytesToDisk(b []byte, kubeletDir string) error {
 	configFile := filepath.Join(kubeletDir, kubeadmconstants.KubeletConfigurationFileName)
 	fmt.Printf("[kubelet-start] Writing kubelet configuration to file %q\n", configFile)
@@ -163,7 +192,9 @@ func writeConfigBytesToDisk(b []byte, kubeletDir string) error {
 	}
 
 	if err := ioutil.WriteFile(configFile, b, 0644); err != nil {
-		return errors.Wrapf(err, "failed to write kubelet configuration to the file %q", configFile)
+		return errors.Wrapf(
+			err, "failed to write kubelet configuration to the file %q", configFile,
+		)
 	}
 	return nil
 }

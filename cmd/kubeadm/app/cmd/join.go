@@ -299,7 +299,8 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 	// Validate standalone flags values and/or combination of flags and then assigns
 	// validated values to the public kubeadm config API when applicable
 
-	// if a token is provided, use this value for both discovery-token and tls-bootstrap-token when those values are not provided
+	// if a token is provided, use this value for both discovery-token
+	// and tls-bootstrap-token when those values are not provided
 	if len(opt.token) > 0 {
 		if len(opt.externalcfg.Discovery.TLSBootstrapToken) == 0 {
 			opt.externalcfg.Discovery.TLSBootstrapToken = opt.token
@@ -309,12 +310,14 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 		}
 	}
 
-	// if a file or URL from which to load cluster information was not provided, unset the Discovery.File object
+	// if a file or URL from which to load cluster information was not provided,
+	// unset the Discovery.File object
 	if len(opt.externalcfg.Discovery.File.KubeConfigPath) == 0 {
 		opt.externalcfg.Discovery.File = nil
 	}
 
-	// if an APIServerEndpoint from which to retrieve cluster information was not provided, unset the Discovery.BootstrapToken object
+	// if an APIServerEndpoint from which to retrieve cluster information was not provided,
+	// unset the Discovery.BootstrapToken object
 	if len(args) == 0 {
 		opt.externalcfg.Discovery.BootstrapToken = nil
 	} else {
@@ -327,17 +330,22 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 	// if not joining a control plane, unset the ControlPlane object
 	if !opt.controlPlane {
 		if opt.externalcfg.ControlPlane != nil {
-			klog.Warningf("[preflight] WARNING: JoinControlPane.controlPlane settings will be ignored when %s flag is not set.", options.ControlPlane)
+			klog.Warningf(
+				"[preflight] WARNING: JoinControlPane.controlPlane settings "+
+				"will be ignored when %s flag is not set.", options.ControlPlane,
+			)
 		}
 		opt.externalcfg.ControlPlane = nil
 	}
 
 	// if the admin.conf file already exists, use it for skipping the discovery process.
-	// NB. this case can happen when we are joining a control-plane node only (and phases are invoked atomically)
+	// NB. this case can happen when we are joining a control-plane node only
+	// (and phases are invoked atomically)
 	var adminKubeConfigPath = kubeadmconstants.GetAdminKubeConfigPath()
 	var tlsBootstrapCfg *clientcmdapi.Config
 	if _, err := os.Stat(adminKubeConfigPath); err == nil && opt.controlPlane {
-		// use the admin.conf as tlsBootstrapCfg, that is the kubeconfig file used for reading the kubeadm-config during discovery
+		// use the admin.conf as tlsBootstrapCfg,
+		// that is the kubeconfig file used for reading the kubeadm-config during discovery
 		klog.V(1).Infof("[preflight] found %s. Use it for skipping discovery", adminKubeConfigPath)
 		tlsBootstrapCfg, err = clientcmd.LoadFromFile(adminKubeConfigPath)
 		if err != nil {
@@ -349,17 +357,22 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 		return nil, err
 	}
 
-	// Either use the config file if specified, or convert public kubeadm API to the internal JoinConfiguration
+	// Either use the config file if specified,
+	// or convert public kubeadm API to the internal JoinConfiguration
 	// and validates JoinConfiguration
 	if opt.externalcfg.NodeRegistration.Name == "" {
 		klog.V(1).Infoln("[preflight] found NodeName empty; using OS hostname as NodeName")
 	}
 
 	if opt.externalcfg.ControlPlane != nil && opt.externalcfg.ControlPlane.LocalAPIEndpoint.AdvertiseAddress == "" {
-		klog.V(1).Infoln("[preflight] found advertiseAddress empty; using default interface's IP address as advertiseAddress")
+		klog.V(1).Infoln(
+			"[preflight] found advertiseAddress empty; "+
+			"using default interface's IP address as advertiseAddress",
+		)
 	}
 
-	// in case the command doesn't have flags for discovery, makes the join cfg validation pass checks on discovery
+	// in case the command doesn't have flags for discovery,
+	// makes the join cfg validation pass checks on discovery
 	if cmd.Flags().Lookup(options.FileDiscovery) == nil {
 		if _, err := os.Stat(adminKubeConfigPath); os.IsNotExist(err) {
 			return nil, errors.Errorf(
@@ -368,7 +381,10 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 				adminKubeConfigPath,
 			)
 		}
-		klog.V(1).Infof("[preflight] found discovery flags missing for this command. using FileDiscovery: %s", adminKubeConfigPath)
+		klog.V(1).Infof(
+			"[preflight] found discovery flags missing for this command. "+
+			"using FileDiscovery: %s", adminKubeConfigPath,
+		)
 		opt.externalcfg.Discovery.File = &kubeadmapiv1beta2.FileDiscovery{
 			KubeConfigPath: adminKubeConfigPath,
 		}
@@ -482,8 +498,11 @@ func (j *joinData) KustomizeDir() string {
 	return j.kustomizeDir
 }
 
-// fetchInitConfigurationFromJoinConfiguration retrieves the init configuration from a join configuration, performing the discovery
-func fetchInitConfigurationFromJoinConfiguration(cfg *kubeadmapi.JoinConfiguration, tlsBootstrapCfg *clientcmdapi.Config) (*kubeadmapi.InitConfiguration, error) {
+// fetchInitConfigurationFromJoinConfiguration retrieves the init configuration
+// from a join configuration, performing the discovery
+func fetchInitConfigurationFromJoinConfiguration(
+	cfg *kubeadmapi.JoinConfiguration, tlsBootstrapCfg *clientcmdapi.Config,
+) (*kubeadmapi.InitConfiguration, error) {
 	// Retrieves the kubeadm configuration
 	klog.V(1).Infoln("[preflight] Retrieving KubeConfig objects")
 	initConfiguration, err := fetchInitConfiguration(tlsBootstrapCfg)
@@ -491,7 +510,8 @@ func fetchInitConfigurationFromJoinConfiguration(cfg *kubeadmapi.JoinConfigurati
 		return nil, err
 	}
 
-	// Create the final KubeConfig file with the cluster name discovered after fetching the cluster configuration
+	// Create the final KubeConfig file with the cluster name discovered
+	// after fetching the cluster configuration
 	clusterinfo := kubeconfigutil.GetClusterFromKubeConfig(tlsBootstrapCfg)
 	tlsBootstrapCfg.Clusters = map[string]*clientcmdapi.Cluster{
 		initConfiguration.ClusterName: clusterinfo,
@@ -516,7 +536,9 @@ func fetchInitConfiguration(tlsBootstrapCfg *clientcmdapi.Config) (*kubeadmapi.I
 	}
 
 	// Fetches the init configuration
-	initConfiguration, err := configutil.FetchInitConfigurationFromCluster(tlsClient, os.Stdout, "preflight", true)
+	initConfiguration, err := configutil.FetchInitConfigurationFromCluster(
+		tlsClient, os.Stdout, "preflight", true,
+	)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to fetch the kubeadm-config ConfigMap")
 	}
