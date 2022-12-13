@@ -18,7 +18,9 @@ import (
 )
 
 // ListContainers lists all containers matching the filter.
-func (ds *dockerService) ListContainers(_ context.Context, r *runtimeapi.ListContainersRequest) (*runtimeapi.ListContainersResponse, error) {
+func (ds *dockerService) ListContainers(
+	_ context.Context, r *runtimeapi.ListContainersRequest,
+) (*runtimeapi.ListContainersResponse, error) {
 	filter := r.GetFilter()
 	opts := dockertypes.ContainerListOptions{All: true}
 
@@ -69,7 +71,9 @@ func (ds *dockerService) ListContainers(_ context.Context, r *runtimeapi.ListCon
 // Docker cannot store the log to an arbitrary location (yet), so we create an
 // symlink at LogPath, linking to the actual path of the log.
 // TODO: check if the default values returned by the runtime API are ok.
-func (ds *dockerService) CreateContainer(_ context.Context, r *runtimeapi.CreateContainerRequest) (*runtimeapi.CreateContainerResponse, error) {
+func (ds *dockerService) CreateContainer(
+	_ context.Context, r *runtimeapi.CreateContainerRequest,
+) (*runtimeapi.CreateContainerResponse, error) {
 	podSandboxID := r.PodSandboxId
 	config := r.GetConfig()
 	sandboxConfig := r.GetSandboxConfig()
@@ -128,7 +132,10 @@ func (ds *dockerService) CreateContainer(_ context.Context, r *runtimeapi.Create
 	}
 
 	hc := createConfig.HostConfig
-	err = ds.updateCreateConfig(&createConfig, config, sandboxConfig, podSandboxID, securityOptSeparator, apiVersion)
+	err = ds.updateCreateConfig(
+		&createConfig, config, sandboxConfig, podSandboxID, 
+		securityOptSeparator, apiVersion,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update container create config: %v", err)
 	}
@@ -143,9 +150,15 @@ func (ds *dockerService) CreateContainer(_ context.Context, r *runtimeapi.Create
 	}
 	hc.Resources.Devices = devices
 
-	securityOpts, err := ds.getSecurityOpts(config.GetLinux().GetSecurityContext().GetSeccompProfilePath(), securityOptSeparator)
+	securityOpts, err := ds.getSecurityOpts(
+		config.GetLinux().GetSecurityContext().GetSeccompProfilePath(), 
+		securityOptSeparator,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate security options for container %q: %v", config.Metadata.Name, err)
+		return nil, fmt.Errorf(
+			"failed to generate security options for container %q: %v", 
+			config.Metadata.Name, err,
+		)
 	}
 
 	hc.SecurityOpt = append(hc.SecurityOpt, securityOpts...)
@@ -157,7 +170,9 @@ func (ds *dockerService) CreateContainer(_ context.Context, r *runtimeapi.Create
 
 	createResp, createErr := ds.client.CreateContainer(createConfig)
 	if createErr != nil {
-		createResp, createErr = recoverFromCreationConflictIfNeeded(ds.client, createConfig, createErr)
+		createResp, createErr = recoverFromCreationConflictIfNeeded(
+			ds.client, createConfig, createErr,
+		)
 	}
 
 	if createResp != nil {
@@ -245,7 +260,9 @@ func (ds *dockerService) removeContainerLogSymlink(containerID string) error {
 }
 
 // StartContainer starts the container.
-func (ds *dockerService) StartContainer(_ context.Context, r *runtimeapi.StartContainerRequest) (*runtimeapi.StartContainerResponse, error) {
+func (ds *dockerService) StartContainer(
+	_ context.Context, r *runtimeapi.StartContainerRequest,
+) (*runtimeapi.StartContainerResponse, error) {
 	err := ds.client.StartContainer(r.ContainerId)
 
 	// Create container log symlink for all containers (including failed ones).
@@ -266,7 +283,9 @@ func (ds *dockerService) StartContainer(_ context.Context, r *runtimeapi.StartCo
 }
 
 // StopContainer stops a running container with a grace period (i.e., timeout).
-func (ds *dockerService) StopContainer(_ context.Context, r *runtimeapi.StopContainerRequest) (*runtimeapi.StopContainerResponse, error) {
+func (ds *dockerService) StopContainer(
+	_ context.Context, r *runtimeapi.StopContainerRequest,
+) (*runtimeapi.StopContainerResponse, error) {
 	err := ds.client.StopContainer(r.ContainerId, time.Duration(r.Timeout)*time.Second)
 	if err != nil {
 		return nil, err
@@ -275,7 +294,9 @@ func (ds *dockerService) StopContainer(_ context.Context, r *runtimeapi.StopCont
 }
 
 // RemoveContainer removes the container.
-func (ds *dockerService) RemoveContainer(_ context.Context, r *runtimeapi.RemoveContainerRequest) (*runtimeapi.RemoveContainerResponse, error) {
+func (ds *dockerService) RemoveContainer(
+	_ context.Context, r *runtimeapi.RemoveContainerRequest,
+) (*runtimeapi.RemoveContainerResponse, error) {
 	// Ideally, log lifecycle should be independent of container lifecycle.
 	// However, docker will remove container log after container is removed,
 	// we can't prevent that now, so we also clean up the symlink here.
@@ -315,7 +336,9 @@ func getContainerTimestamps(r *dockertypes.ContainerJSON) (time.Time, time.Time,
 }
 
 // ContainerStatus inspects the docker container and returns the status.
-func (ds *dockerService) ContainerStatus(_ context.Context, req *runtimeapi.ContainerStatusRequest) (*runtimeapi.ContainerStatusResponse, error) {
+func (ds *dockerService) ContainerStatus(
+	_ context.Context, req *runtimeapi.ContainerStatusRequest,
+) (*runtimeapi.ContainerStatusResponse, error) {
 	containerID := req.ContainerId
 	r, err := ds.client.InspectContainer(containerID)
 	if err != nil {
@@ -331,7 +354,10 @@ func (ds *dockerService) ContainerStatus(_ context.Context, req *runtimeapi.Cont
 	// Convert the image id to a pullable id.
 	ir, err := ds.client.InspectImageByID(r.Image)
 	if err != nil {
-		return nil, fmt.Errorf("unable to inspect docker image %q while inspecting docker container %q: %v", r.Image, containerID, err)
+		return nil, fmt.Errorf(
+			"unable to inspect docker image %q while inspecting docker container %q: %v", 
+			r.Image, containerID, err,
+		)
 	}
 	imageID := toPullableImageID(r.Image, ir)
 
@@ -419,7 +445,9 @@ func (ds *dockerService) ContainerStatus(_ context.Context, req *runtimeapi.Cont
 	return &runtimeapi.ContainerStatusResponse{Status: status}, nil
 }
 
-func (ds *dockerService) UpdateContainerResources(_ context.Context, r *runtimeapi.UpdateContainerResourcesRequest) (*runtimeapi.UpdateContainerResourcesResponse, error) {
+func (ds *dockerService) UpdateContainerResources(
+	_ context.Context, r *runtimeapi.UpdateContainerResourcesRequest,
+) (*runtimeapi.UpdateContainerResourcesResponse, error) {
 	resources := r.Linux
 	updateConfig := dockercontainer.UpdateConfig{
 		Resources: dockercontainer.Resources{

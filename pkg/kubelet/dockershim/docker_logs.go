@@ -8,6 +8,8 @@ import (
 )
 
 // ReopenContainerLog reopens the container log file.
-func (ds *dockerService) ReopenContainerLog(_ context.Context, _ *runtimeapi.ReopenContainerLogRequest) (*runtimeapi.ReopenContainerLogResponse, error) {
+func (ds *dockerService) ReopenContainerLog(
+	_ context.Context, _ *runtimeapi.ReopenContainerLogRequest,
+) (*runtimeapi.ReopenContainerLogResponse, error) {
 	return nil, fmt.Errorf("docker does not support reopening container log files")
 }

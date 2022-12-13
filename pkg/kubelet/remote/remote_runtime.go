@@ -36,15 +36,18 @@ const (
 )
 
 // NewRemoteRuntimeService 构建连接 dockershim.sock 的对象,
-// 用于执行 docker 容器与镜像的相关函数.
+// 用于执行 docker 容器与镜像的相关函数(其实就是 dockershim 进程的 grpc 客户端).
 //
+// 可以通过此函数创建 Container grpc Service(service 是 grpc server 的一种成员).
+// 还有一个平级的 RemoteImageService{} 对象.
+//
+// 	@param endpoint: /var/run/dockershim.sock, 与 docker.sock 同目录.
 // 每个 docker 容器在启动时都会创建一个新的 containerd-shim 进程,
 // 并指定 dockershim.sock 路径
 //
-// 	@param endpoint: /var/run/dockershim.sock, 与 docker.sock 同目录.
-//
 // caller:
 // 	1. pkg/kubelet/kubelet.go -> getRuntimeAndImageServices()
+// 	kubelet 在启动时, 调用该函数创建 dockershim 的客户端, 以获取与 dockerd 服务通信的能力.
 //
 // NewRemoteRuntimeService creates a new internalapi.RuntimeService.
 func NewRemoteRuntimeService(

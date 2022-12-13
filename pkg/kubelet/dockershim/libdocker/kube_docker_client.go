@@ -22,15 +22,17 @@ import (
 	dockerstdcopy "github.com/docker/docker/pkg/stdcopy"
 )
 
-// kubeDockerClient is a wrapped layer of docker client for kubelet internal use. This layer is added to:
+// kubeDockerClient is a wrapped layer of docker client for kubelet internal use.
+// This layer is added to:
 //	1) Redirect stream for exec and attach operations.
 //	2) Wrap the context in this layer to make the Interface cleaner.
 type kubeDockerClient struct {
 	// timeout is the timeout of short running docker operations.
 	timeout time.Duration
-	// If no pulling progress is made before imagePullProgressDeadline, the image pulling will be cancelled.
-	// Docker reports image progress for every 512kB block, so normally there shouldn't be too long interval
-	// between progress updates.
+	// If no pulling progress is made before imagePullProgressDeadline,
+	// the image pulling will be cancelled.
+	// Docker reports image progress for every 512kB block,
+	// so normally there shouldn't be too long interval between progress updates.
 	imagePullProgressDeadline time.Duration
 	client                    *dockerapi.Client
 }
@@ -39,10 +41,16 @@ type kubeDockerClient struct {
 var _ Interface = &kubeDockerClient{}
 
 // There are 2 kinds of docker operations categorized by running time:
-// * Long running operation: The long running operation could run for arbitrary long time, and the running time
-// usually depends on some uncontrollable factors. These operations include: PullImage, Logs, StartExec, AttachToContainer.
-// * Non-long running operation: Given the maximum load of the system, the non-long running operation should finish
-// in expected and usually short time. These include all other operations.
+//
+// * Long running operation:
+// The long running operation could run for arbitrary long time,
+// and the running time usually depends on some uncontrollable factors.
+// These operations include: PullImage, Logs, StartExec, AttachToContainer.
+//
+// * Non-long running operation:
+// Given the maximum load of the system,
+// the non-long running operation should finish in expected and usually short time.
+// These include all other operations.
 // kubeDockerClient only applies timeout on non-long running operations.
 const (
 	// defaultTimeout is the default timeout of short running docker operations.
@@ -57,9 +65,12 @@ const (
 	defaultImagePullingProgressReportInterval = 10 * time.Second
 )
 
-// newKubeDockerClient creates an kubeDockerClient from an existing docker client. If requestTimeout is 0,
-// defaultTimeout will be applied.
-func newKubeDockerClient(dockerClient *dockerapi.Client, requestTimeout, imagePullProgressDeadline time.Duration) Interface {
+// newKubeDockerClient creates an kubeDockerClient from an existing docker client.
+// If requestTimeout is 0, defaultTimeout will be applied.
+func newKubeDockerClient(
+	dockerClient *dockerapi.Client, 
+	requestTimeout, imagePullProgressDeadline time.Duration,
+) Interface {
 	if requestTimeout == 0 {
 		requestTimeout = defaultTimeout
 	}
@@ -78,7 +89,9 @@ func newKubeDockerClient(dockerClient *dockerapi.Client, requestTimeout, imagePu
 	return k
 }
 
-func (d *kubeDockerClient) ListContainers(options dockertypes.ContainerListOptions) ([]dockertypes.Container, error) {
+func (d *kubeDockerClient) ListContainers(
+	options dockertypes.ContainerListOptions,
+) ([]dockertypes.Container, error) {
 	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
 	containers, err := d.client.ContainerList(ctx, options)
@@ -119,7 +132,9 @@ func (d *kubeDockerClient) InspectContainerWithSize(id string) (*dockertypes.Con
 	return &containerJSON, nil
 }
 
-func (d *kubeDockerClient) CreateContainer(opts dockertypes.ContainerCreateConfig) (*dockercontainer.ContainerCreateCreatedBody, error) {
+func (d *kubeDockerClient) CreateContainer(
+	opts dockertypes.ContainerCreateConfig,
+) (*dockercontainer.ContainerCreateCreatedBody, error) {
 	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
 	// we provide an explicit default shm size as to not depend on docker daemon.
@@ -127,7 +142,9 @@ func (d *kubeDockerClient) CreateContainer(opts dockertypes.ContainerCreateConfi
 	if opts.HostConfig != nil && opts.HostConfig.ShmSize <= 0 {
 		opts.HostConfig.ShmSize = defaultShmSize
 	}
-	createResp, err := d.client.ContainerCreate(ctx, opts.Config, opts.HostConfig, opts.NetworkingConfig, opts.Name)
+	createResp, err := d.client.ContainerCreate(
+		ctx, opts.Config, opts.HostConfig, opts.NetworkingConfig, opts.Name,
+	)
 	if ctxErr := contextError(ctx); ctxErr != nil {
 		return nil, ctxErr
 	}
@@ -296,8 +313,11 @@ type progressReporter struct {
 	imagePullProgressDeadline time.Duration
 }
 
-// newProgressReporter creates a new progressReporter for specific image with specified reporting interval
-func newProgressReporter(image string, cancel context.CancelFunc, imagePullProgressDeadline time.Duration) *progressReporter {
+// newProgressReporter creates a new progressReporter for specific image
+// with specified reporting interval
+func newProgressReporter(
+	image string, cancel context.CancelFunc, imagePullProgressDeadline time.Duration,
+) *progressReporter {
 	return &progressReporter{
 		progress:                  newProgress(),
 		image:                     image,
@@ -338,7 +358,9 @@ func (p *progressReporter) stop() {
 	close(p.stopCh)
 }
 
-func (d *kubeDockerClient) PullImage(image string, auth dockertypes.AuthConfig, opts dockertypes.ImagePullOptions) error {
+func (d *kubeDockerClient) PullImage(
+	image string, auth dockertypes.AuthConfig, opts dockertypes.ImagePullOptions,
+) error {
 	// RegistryAuth is the base64 encoded credentials for the registry
 	base64Auth, err := base64EncodeAuth(auth)
 	if err != nil {
@@ -373,7 +395,9 @@ func (d *kubeDockerClient) PullImage(image string, auth dockertypes.AuthConfig, 
 	return nil
 }
 
-func (d *kubeDockerClient) RemoveImage(image string, opts dockertypes.ImageRemoveOptions) ([]dockertypes.ImageDeleteResponseItem, error) {
+func (d *kubeDockerClient) RemoveImage(
+	image string, opts dockertypes.ImageRemoveOptions,
+) ([]dockertypes.ImageDeleteResponseItem, error) {
 	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
 	resp, err := d.client.ImageRemove(ctx, image, opts)
@@ -386,7 +410,9 @@ func (d *kubeDockerClient) RemoveImage(image string, opts dockertypes.ImageRemov
 	return resp, err
 }
 
-func (d *kubeDockerClient) Logs(id string, opts dockertypes.ContainerLogsOptions, sopts StreamOptions) error {
+func (d *kubeDockerClient) Logs(
+	id string, opts dockertypes.ContainerLogsOptions, sopts StreamOptions,
+) error {
 	ctx, cancel := d.getCancelableContext()
 	defer cancel()
 	resp, err := d.client.ContainerLogs(ctx, id, opts)
@@ -397,7 +423,9 @@ func (d *kubeDockerClient) Logs(id string, opts dockertypes.ContainerLogsOptions
 		return err
 	}
 	defer resp.Close()
-	return d.redirectResponseToOutputStream(sopts.RawTerminal, sopts.OutputStream, sopts.ErrorStream, resp)
+	return d.redirectResponseToOutputStream(
+		sopts.RawTerminal, sopts.OutputStream, sopts.ErrorStream, resp,
+	)
 }
 
 func (d *kubeDockerClient) Version() (*dockertypes.Version, error) {
@@ -440,7 +468,9 @@ func (d *kubeDockerClient) CreateExec(id string, opts dockertypes.ExecConfig) (*
 	return &resp, nil
 }
 
-func (d *kubeDockerClient) StartExec(startExec string, opts dockertypes.ExecStartCheck, sopts StreamOptions) error {
+func (d *kubeDockerClient) StartExec(
+	startExec string, opts dockertypes.ExecStartCheck, sopts StreamOptions,
+) error {
 	ctx, cancel := d.getCancelableContext()
 	defer cancel()
 	if opts.Detach {
@@ -463,14 +493,19 @@ func (d *kubeDockerClient) StartExec(startExec string, opts dockertypes.ExecStar
 	defer resp.Close()
 
 	if sopts.ExecStarted != nil {
-		// Send a message to the channel indicating that the exec has started. This is needed so
-		// interactive execs can handle resizing correctly - the request to resize the TTY has to happen
-		// after the call to d.client.ContainerExecAttach, and because d.holdHijackedConnection below
-		// blocks, we use sopts.ExecStarted to signal the caller that it's ok to resize.
+		// Send a message to the channel indicating that the exec has started.
+		// This is needed so interactive execs can handle resizing correctly
+		// - the request to resize the TTY has to happen
+		// after the call to d.client.ContainerExecAttach,
+		// and because d.holdHijackedConnection below blocks,
+		// we use sopts.ExecStarted to signal the caller that it's ok to resize.
 		sopts.ExecStarted <- struct{}{}
 	}
 
-	return d.holdHijackedConnection(sopts.RawTerminal || opts.Tty, sopts.InputStream, sopts.OutputStream, sopts.ErrorStream, resp)
+	return d.holdHijackedConnection(
+		sopts.RawTerminal || opts.Tty, 
+		sopts.InputStream, sopts.OutputStream, sopts.ErrorStream, resp,
+	)
 }
 
 func (d *kubeDockerClient) InspectExec(id string) (*dockertypes.ContainerExecInspect, error) {
@@ -486,7 +521,9 @@ func (d *kubeDockerClient) InspectExec(id string) (*dockertypes.ContainerExecIns
 	return &resp, nil
 }
 
-func (d *kubeDockerClient) AttachToContainer(id string, opts dockertypes.ContainerAttachOptions, sopts StreamOptions) error {
+func (d *kubeDockerClient) AttachToContainer(
+	id string, opts dockertypes.ContainerAttachOptions, sopts StreamOptions,
+) error {
 	ctx, cancel := d.getCancelableContext()
 	defer cancel()
 	resp, err := d.client.ContainerAttach(ctx, id, opts)
@@ -497,7 +534,10 @@ func (d *kubeDockerClient) AttachToContainer(id string, opts dockertypes.Contain
 		return err
 	}
 	defer resp.Close()
-	return d.holdHijackedConnection(sopts.RawTerminal, sopts.InputStream, sopts.OutputStream, sopts.ErrorStream, resp)
+	return d.holdHijackedConnection(
+		sopts.RawTerminal, sopts.InputStream, 
+		sopts.OutputStream, sopts.ErrorStream, resp,
+	)
 }
 
 func (d *kubeDockerClient) ResizeExecTTY(id string, height, width uint) error {
@@ -539,9 +579,11 @@ func (d *kubeDockerClient) GetContainerStats(id string) (*dockertypes.StatsJSON,
 	return &stats, nil
 }
 
-// redirectResponseToOutputStream redirect the response stream to stdout and stderr. When tty is true, all stream will
-// only be redirected to stdout.
-func (d *kubeDockerClient) redirectResponseToOutputStream(tty bool, outputStream, errorStream io.Writer, resp io.Reader) error {
+// redirectResponseToOutputStream redirect the response stream to stdout and stderr.
+// When tty is true, all stream will only be redirected to stdout.
+func (d *kubeDockerClient) redirectResponseToOutputStream(
+	tty bool, outputStream, errorStream io.Writer, resp io.Reader,
+) error {
 	if outputStream == nil {
 		outputStream = ioutil.Discard
 	}
@@ -557,9 +599,14 @@ func (d *kubeDockerClient) redirectResponseToOutputStream(tty bool, outputStream
 	return err
 }
 
-// holdHijackedConnection hold the HijackedResponse, redirect the inputStream to the connection, and redirect the response
-// stream to stdout and stderr. NOTE: If needed, we could also add context in this function.
-func (d *kubeDockerClient) holdHijackedConnection(tty bool, inputStream io.Reader, outputStream, errorStream io.Writer, resp dockertypes.HijackedResponse) error {
+// holdHijackedConnection hold the HijackedResponse,
+// redirect the inputStream to the connection,
+// and redirect the response stream to stdout and stderr.
+// NOTE: If needed, we could also add context in this function.
+func (d *kubeDockerClient) holdHijackedConnection(
+	tty bool, inputStream io.Reader, outputStream, errorStream io.Writer, 
+	resp dockertypes.HijackedResponse,
+) error {
 	receiveStdout := make(chan error)
 	if outputStream != nil || errorStream != nil {
 		go func() {
@@ -587,8 +634,10 @@ func (d *kubeDockerClient) holdHijackedConnection(tty bool, inputStream io.Reade
 	return nil
 }
 
-// getCancelableContext returns a new cancelable context. For long running requests without timeout, we use cancelable
-// context to avoid potential resource leak, although the current implementation shouldn't leak resource.
+// getCancelableContext returns a new cancelable context.
+// For long running requests without timeout,
+// we use cancelable context to avoid potential resource leak,
+// although the current implementation shouldn't leak resource.
 func (d *kubeDockerClient) getCancelableContext() (context.Context, context.CancelFunc) {
 	return context.WithCancel(context.Background())
 }
@@ -651,8 +700,8 @@ func (e ImageNotFoundError) Error() string {
 	return fmt.Sprintf("no such image: %q", e.ID)
 }
 
-// IsImageNotFoundError checks whether the error is image not found error. This is exposed
-// to share with dockershim.
+// IsImageNotFoundError checks whether the error is image not found error.
+// This is exposed to share with dockershim.
 func IsImageNotFoundError(err error) bool {
 	_, ok := err.(ImageNotFoundError)
 	return ok

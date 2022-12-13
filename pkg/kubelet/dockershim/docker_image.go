@@ -17,7 +17,9 @@ import (
 // This file implements methods in ImageManagerService.
 
 // ListImages lists existing images.
-func (ds *dockerService) ListImages(_ context.Context, r *runtimeapi.ListImagesRequest) (*runtimeapi.ListImagesResponse, error) {
+func (ds *dockerService) ListImages(
+	_ context.Context, r *runtimeapi.ListImagesRequest,
+) (*runtimeapi.ListImagesResponse, error) {
 	filter := r.GetFilter()
 	opts := dockertypes.ImageListOptions{}
 	if filter != nil {
@@ -45,7 +47,9 @@ func (ds *dockerService) ListImages(_ context.Context, r *runtimeapi.ListImagesR
 }
 
 // ImageStatus returns the status of the image, returns nil if the image doesn't present.
-func (ds *dockerService) ImageStatus(_ context.Context, r *runtimeapi.ImageStatusRequest) (*runtimeapi.ImageStatusResponse, error) {
+func (ds *dockerService) ImageStatus(
+	_ context.Context, r *runtimeapi.ImageStatusRequest,
+) (*runtimeapi.ImageStatusResponse, error) {
 	image := r.GetImage()
 
 	imageInspect, err := ds.client.InspectImageByRef(image.Image)
@@ -75,7 +79,9 @@ func (ds *dockerService) ImageStatus(_ context.Context, r *runtimeapi.ImageStatu
 }
 
 // PullImage pulls an image with authentication config.
-func (ds *dockerService) PullImage(_ context.Context, r *runtimeapi.PullImageRequest) (*runtimeapi.PullImageResponse, error) {
+func (ds *dockerService) PullImage(
+	_ context.Context, r *runtimeapi.PullImageRequest,
+) (*runtimeapi.PullImageResponse, error) {
 	image := r.GetImage()
 	auth := r.GetAuth()
 	authConfig := dockertypes.AuthConfig{}
@@ -104,7 +110,9 @@ func (ds *dockerService) PullImage(_ context.Context, r *runtimeapi.PullImageReq
 }
 
 // RemoveImage removes the image.
-func (ds *dockerService) RemoveImage(_ context.Context, r *runtimeapi.RemoveImageRequest) (*runtimeapi.RemoveImageResponse, error) {
+func (ds *dockerService) RemoveImage(
+	_ context.Context, r *runtimeapi.RemoveImageRequest,
+) (*runtimeapi.RemoveImageResponse, error) {
 	image := r.GetImage()
 	// If the image has multiple tags, we need to remove all the tags
 	// TODO: We assume image.Image is image ID here, which is true in the current implementation

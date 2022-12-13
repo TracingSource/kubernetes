@@ -86,8 +86,11 @@ func (ds *dockerService) ExecSync(_ context.Context, req *runtimeapi.ExecSyncReq
 	}, nil
 }
 
-// Exec prepares a streaming endpoint to execute a command in the container, and returns the address.
-func (ds *dockerService) Exec(_ context.Context, req *runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error) {
+// Exec prepares a streaming endpoint to execute a command in the container,
+// and returns the address.
+func (ds *dockerService) Exec(
+	_ context.Context, req *runtimeapi.ExecRequest,
+) (*runtimeapi.ExecResponse, error) {
 	if ds.streamingServer == nil {
 		return nil, streaming.NewErrorStreamingDisabled("exec")
 	}
@@ -98,8 +101,11 @@ func (ds *dockerService) Exec(_ context.Context, req *runtimeapi.ExecRequest) (*
 	return ds.streamingServer.GetExec(req)
 }
 
-// Attach prepares a streaming endpoint to attach to a running container, and returns the address.
-func (ds *dockerService) Attach(_ context.Context, req *runtimeapi.AttachRequest) (*runtimeapi.AttachResponse, error) {
+// Attach prepares a streaming endpoint to attach to a running container,
+// and returns the address.
+func (ds *dockerService) Attach(
+	_ context.Context, req *runtimeapi.AttachRequest,
+) (*runtimeapi.AttachResponse, error) {
 	if ds.streamingServer == nil {
 		return nil, streaming.NewErrorStreamingDisabled("attach")
 	}
@@ -110,8 +116,11 @@ func (ds *dockerService) Attach(_ context.Context, req *runtimeapi.AttachRequest
 	return ds.streamingServer.GetAttach(req)
 }
 
-// PortForward prepares a streaming endpoint to forward ports from a PodSandbox, and returns the address.
-func (ds *dockerService) PortForward(_ context.Context, req *runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error) {
+// PortForward prepares a streaming endpoint to forward ports from a PodSandbox,
+// and returns the address.
+func (ds *dockerService) PortForward(
+	_ context.Context, req *runtimeapi.PortForwardRequest,
+) (*runtimeapi.PortForwardResponse, error) {
 	if ds.streamingServer == nil {
 		return nil, streaming.NewErrorStreamingDisabled("port forward")
 	}
@@ -134,7 +143,11 @@ func checkContainerStatus(client libdocker.Interface, containerID string) (*dock
 	return container, nil
 }
 
-func attachContainer(client libdocker.Interface, containerID string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
+func attachContainer(
+	client libdocker.Interface, containerID string, 
+	stdin io.Reader, stdout, stderr io.WriteCloser, 
+	tty bool, resize <-chan remotecommand.TerminalSize,
+) error {
 	// Have to start this before the call to client.AttachToContainer because client.AttachToContainer is a blocking
 	// call :-( Otherwise, resize events don't get processed and the terminal never resizes.
 	kubecontainer.HandleResizing(resize, func(size remotecommand.TerminalSize) {

@@ -57,12 +57,14 @@ func (ds *dockerService) clearNetworkReady(podSandboxID string) {
 	delete(ds.networkReady, podSandboxID)
 }
 
-// RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure
-// the sandbox is in ready state.
+// RunPodSandbox creates and starts a pod-level sandbox.
+// Runtimes should ensure the sandbox is in ready state.
 // For docker, PodSandbox is implemented by a container holding the network
 // namespace for the pod.
 // Note: docker doesn't use LogDirectory (yet).
-func (ds *dockerService) RunPodSandbox(ctx context.Context, r *runtimeapi.RunPodSandboxRequest) (*runtimeapi.RunPodSandboxResponse, error) {
+func (ds *dockerService) RunPodSandbox(
+	ctx context.Context, r *runtimeapi.RunPodSandboxRequest,
+) (*runtimeapi.RunPodSandboxResponse, error) {
 	config := r.GetConfig()
 
 	// Step 1: Pull the image for the sandbox.
@@ -72,7 +74,8 @@ func (ds *dockerService) RunPodSandbox(ctx context.Context, r *runtimeapi.RunPod
 		image = podSandboxImage
 	}
 
-	// NOTE: To use a custom sandbox image in a private repository, users need to configure the nodes with credentials properly.
+	// NOTE: To use a custom sandbox image in a private repository,
+	// users need to configure the nodes with credentials properly.
 	// see: http://kubernetes.io/docs/user-guide/images/#configuring-nodes-to-authenticate-to-a-private-repository
 	// Only pull sandbox image when it's not present - v1.PullIfNotPresent.
 	if err := ensureSandboxImageExists(ds.client, image); err != nil {
@@ -185,7 +188,9 @@ func (ds *dockerService) RunPodSandbox(ctx context.Context, r *runtimeapi.RunPod
 // TODO: This function blocks sandbox teardown on networking teardown. Is it
 // better to cut our losses assuming an out of band GC routine will cleanup
 // after us?
-func (ds *dockerService) StopPodSandbox(ctx context.Context, r *runtimeapi.StopPodSandboxRequest) (*runtimeapi.StopPodSandboxResponse, error) {
+func (ds *dockerService) StopPodSandbox(
+	ctx context.Context, r *runtimeapi.StopPodSandboxRequest,
+) (*runtimeapi.StopPodSandboxResponse, error) {
 	var namespace, name string
 	var hostNetwork bool
 
@@ -266,7 +271,9 @@ func (ds *dockerService) StopPodSandbox(ctx context.Context, r *runtimeapi.StopP
 
 // RemovePodSandbox removes the sandbox. If there are running containers in the
 // sandbox, they should be forcibly removed.
-func (ds *dockerService) RemovePodSandbox(ctx context.Context, r *runtimeapi.RemovePodSandboxRequest) (*runtimeapi.RemovePodSandboxResponse, error) {
+func (ds *dockerService) RemovePodSandbox(
+	ctx context.Context, r *runtimeapi.RemovePodSandboxRequest,
+) (*runtimeapi.RemovePodSandboxResponse, error) {
 	podSandboxID := r.PodSandboxId
 	var errs []error
 
@@ -395,7 +402,9 @@ func (ds *dockerService) getPodSandboxDetails(podSandboxID string) (*dockertypes
 }
 
 // PodSandboxStatus returns the status of the PodSandbox.
-func (ds *dockerService) PodSandboxStatus(ctx context.Context, req *runtimeapi.PodSandboxStatusRequest) (*runtimeapi.PodSandboxStatusResponse, error) {
+func (ds *dockerService) PodSandboxStatus(
+	ctx context.Context, req *runtimeapi.PodSandboxStatusRequest,
+) (*runtimeapi.PodSandboxStatusResponse, error) {
 	podSandboxID := req.PodSandboxId
 
 	r, metadata, err := ds.getPodSandboxDetails(podSandboxID)
@@ -418,7 +427,8 @@ func (ds *dockerService) PodSandboxStatus(ctx context.Context, req *runtimeapi.P
 
 	var ips []string
 	// TODO: Remove this when sandbox is available on windows
-	// This is a workaround for windows, where sandbox is not in use, and pod IP is determined through containers belonging to the Pod.
+	// This is a workaround for windows, where sandbox is not in use,
+	// and pod IP is determined through containers belonging to the Pod.
 	if ips = ds.determinePodIPBySandboxID(podSandboxID); len(ips) == 0 {
 		ips = ds.getIPs(podSandboxID, r)
 	}
@@ -464,7 +474,9 @@ func (ds *dockerService) PodSandboxStatus(ctx context.Context, req *runtimeapi.P
 }
 
 // ListPodSandbox returns a list of Sandbox.
-func (ds *dockerService) ListPodSandbox(_ context.Context, r *runtimeapi.ListPodSandboxRequest) (*runtimeapi.ListPodSandboxResponse, error) {
+func (ds *dockerService) ListPodSandbox(
+	_ context.Context, r *runtimeapi.ListPodSandboxRequest,
+) (*runtimeapi.ListPodSandboxResponse, error) {
 	filter := r.GetFilter()
 
 	// By default, list all containers whether they are running or not.

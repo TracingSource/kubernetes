@@ -44,8 +44,8 @@ const (
 
 	// Internal docker labels used to identify whether a container is a sandbox
 	// or a regular container.
-	// TODO: This is not backward compatible with older containers. We will
-	// need to add filtering based on names.
+	// TODO: This is not backward compatible with older containers.
+	// We will need to add filtering based on names.
 	containerTypeLabelKey       = "io.kubernetes.docker.type"
 	containerTypeLabelSandbox   = "podsandbox"
 	containerTypeLabelContainer = "container"
@@ -141,10 +141,13 @@ type dockerNetworkHost struct {
 	*portMappingGetter
 }
 
-var internalLabelKeys = []string{containerTypeLabelKey, containerLogPathLabelKey, sandboxIDLabelKey}
+var internalLabelKeys = []string{
+	containerTypeLabelKey, containerLogPathLabelKey, sandboxIDLabelKey,
+}
 
 // ClientConfig is parameters used to initialize docker client
 type ClientConfig struct {
+	// DockerEndpoint 一般为 unix:///var/run/docker.sock
 	DockerEndpoint            string
 	RuntimeRequestTimeout     time.Duration
 	ImagePullProgressDeadline time.Duration
@@ -154,6 +157,15 @@ type ClientConfig struct {
 	WithTraceDisabled bool
 }
 
+// ConnectToDockerOrDie 调用 docker 官方库, 创建与 dockerd 服务进行通信的客户端并返回.
+//
+// 	@param dockerEndpoint: unix:///var/run/docker.sock
+//
+// caller:
+// 	1. NewDockerService()
+// 	kubelet 启动时, 建立与 dockerd 服务的通信, 同时启动 dockershim 进程, 
+// 	将通用的 cri 请求进行转换, 转换成 dockerd 服务接受的形式.
+//
 // NewDockerClientFromConfig create a docker client from given configure
 // return nil if nil configure is given.
 func NewDockerClientFromConfig(config *ClientConfig) libdocker.Interface {
@@ -235,8 +247,9 @@ func NewDockerService(
 
 	// dockershim currently only supports CNI plugins.
 	pluginSettings.PluginBinDirs = cni.SplitDirs(pluginSettings.PluginBinDirString)
-	// cni 的这几个 settings 其实是定值, 见 cmd/kubelet/app/options/container_runtime.go
-	// 中的 NewContainerRuntimeOptions() 函数.
+	// cni 的这几个 settings 其实是定值, 见 
+	// cmd/kubelet/app/options/container_runtime.go -> NewContainerRuntimeOptions()
+	//
 	// 这里 cniPlugins 是读取 /etc/cni/net.d 目录下 cni 配置文件与 /opt 目录的可执行文件,
 	// 得到的默认使用的插件, 下面使用的 kubenet.NewPlugin() 创建的是 kubenet 插件(kuber官方内置插件).
 	// 且 kubenet 排在后面, 一般不使用.
@@ -300,8 +313,9 @@ func NewDockerService(
 	return ds, nil
 }
 
-// dockerService 实现 DockerService 接口
+// dockerService 实现了 DockerService 接口
 type dockerService struct {
+	// client 调用 docker 官方库创建的, 与 dockerd 服务(/var/run/docker.sock)进行通信的客户端对象.
 	client           libdocker.Interface
 	os               kubecontainer.OSInterface
 	// 默认sandbox就是pause镜像, 这里写的是镜像地址(含版本).
@@ -337,7 +351,9 @@ type dockerService struct {
 // TODO: handle context.
 
 // Version returns the runtime name, runtime version and runtime API version
-func (ds *dockerService) Version(_ context.Context, r *runtimeapi.VersionRequest) (*runtimeapi.VersionResponse, error) {
+func (ds *dockerService) Version(
+	_ context.Context, r *runtimeapi.VersionRequest,
+) (*runtimeapi.VersionResponse, error) {
 	v, err := ds.getDockerVersion()
 	if err != nil {
 		return nil, err
@@ -363,7 +379,9 @@ func (ds *dockerService) getDockerVersion() (*dockertypes.Version, error) {
 }
 
 // UpdateRuntimeConfig updates the runtime config. Currently only handles podCIDR updates.
-func (ds *dockerService) UpdateRuntimeConfig(_ context.Context, r *runtimeapi.UpdateRuntimeConfigRequest) (*runtimeapi.UpdateRuntimeConfigResponse, error) {
+func (ds *dockerService) UpdateRuntimeConfig(
+	_ context.Context, r *runtimeapi.UpdateRuntimeConfigRequest,
+) (*runtimeapi.UpdateRuntimeConfigResponse, error) {
 	runtimeConfig := r.GetRuntimeConfig()
 	if runtimeConfig == nil {
 		return &runtimeapi.UpdateRuntimeConfigResponse{}, nil
@@ -379,9 +397,9 @@ func (ds *dockerService) UpdateRuntimeConfig(_ context.Context, r *runtimeapi.Up
 	return &runtimeapi.UpdateRuntimeConfigResponse{}, nil
 }
 
-// GetNetNS returns the network namespace of the given containerID. The ID
-// supplied is typically the ID of a pod sandbox. This getter doesn't try
-// to map non-sandbox IDs to their respective sandboxes.
+// GetNetNS returns the network namespace of the given containerID.
+// The ID supplied is typically the ID of a pod sandbox.
+// This getter doesn't try to map non-sandbox IDs to their respective sandboxes.
 func (ds *dockerService) GetNetNS(podSandboxID string) (string, error) {
 	r, err := ds.client.InspectContainer(podSandboxID)
 	if err != nil {
@@ -420,6 +438,9 @@ func (ds *dockerService) GetPodPortMappings(podSandboxID string) ([]*hostport.Po
 	return portMappings, nil
 }
 
+// caller:
+// 	1. pkg/kubelet/dockershim/remote/docker_server.go -> DockerServer.Start()
+//
 // Start initializes and starts components in dockerService.
 func (ds *dockerService) Start() error {
 	ds.initCleanup()
@@ -435,8 +456,8 @@ func (ds *dockerService) Start() error {
 	return ds.containerManager.Start()
 }
 
-// initCleanup is responsible for cleaning up any crufts left by previous
-// runs. If there are any errors, it simply logs them.
+// initCleanup is responsible for cleaning up any crufts left by previous runs.
+// If there are any errors, it simply logs them.
 func (ds *dockerService) initCleanup() {
 	errors := ds.platformSpecificContainerInitCleanup()
 
@@ -446,7 +467,9 @@ func (ds *dockerService) initCleanup() {
 }
 
 // Status returns the status of the runtime.
-func (ds *dockerService) Status(_ context.Context, r *runtimeapi.StatusRequest) (*runtimeapi.StatusResponse, error) {
+func (ds *dockerService) Status(
+	_ context.Context, r *runtimeapi.StatusRequest,
+) (*runtimeapi.StatusResponse, error) {
 	runtimeReady := &runtimeapi.RuntimeCondition{
 		Type:   runtimeapi.RuntimeReady,
 		Status: true,
@@ -509,7 +532,9 @@ func (ds *dockerService) checkVersionCompatibility() error {
 	// Verify the docker version.
 	result := apiVersion.Compare(minAPIVersion)
 	if result < 0 {
-		return fmt.Errorf("docker API version is older than %s", libdocker.MinimumDockerAPIVersion)
+		return fmt.Errorf(
+			"docker API version is older than %s", libdocker.MinimumDockerAPIVersion,
+		)
 	}
 
 	return nil
@@ -577,7 +602,10 @@ func effectiveHairpinMode(s *NetworkPluginSettings) error {
 			// This is not a valid combination, since promiscuous-bridge only works on kubenet. Users might be using the
 			// default values (from before the hairpin-mode flag existed) and we
 			// should keep the old behavior.
-			klog.Warningf("Hairpin mode set to %q but kubenet is not enabled, falling back to %q", s.HairpinMode, kubeletconfig.HairpinVeth)
+			klog.Warningf(
+				"Hairpin mode set to %q but kubenet is not enabled, falling back to %q", 
+				s.HairpinMode, kubeletconfig.HairpinVeth,
+			)
 			s.HairpinMode = kubeletconfig.HairpinVeth
 			return nil
 		}

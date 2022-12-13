@@ -24,7 +24,8 @@ const (
 	FakeDockerEndpoint = "fake://"
 )
 
-// Interface is an abstract interface for testability.  It abstracts the interface of docker client.
+// Interface is an abstract interface for testability. 
+// It abstracts the interface of docker client.
 type Interface interface {
 	ListContainers(options dockertypes.ContainerListOptions) ([]dockertypes.Container, error)
 	InspectContainer(id string) (*dockertypes.ContainerJSON, error)
@@ -52,8 +53,12 @@ type Interface interface {
 	GetContainerStats(id string) (*dockertypes.StatsJSON, error)
 }
 
-// Get a *dockerapi.Client, either using the endpoint passed in, or using
-// DOCKER_HOST, DOCKER_TLS_VERIFY, and DOCKER_CERT path per their spec
+// getDockerClient 调用 docker 官方库, 创建与 dockerd 服务进行通信的客户端并返回
+//
+// 	@param dockerEndpoint: unix:///var/run/docker.sock
+//
+// Get a *dockerapi.Client, either using the endpoint passed in,
+// or using DOCKER_HOST, DOCKER_TLS_VERIFY, and DOCKER_CERT path per their spec
 func getDockerClient(dockerEndpoint string) (*dockerapi.Client, error) {
 	if len(dockerEndpoint) > 0 {
 		klog.Infof("Connecting to docker on %s", dockerEndpoint)
@@ -62,14 +67,26 @@ func getDockerClient(dockerEndpoint string) (*dockerapi.Client, error) {
 	return dockerapi.NewClientWithOpts(dockerapi.FromEnv)
 }
 
+// ConnectToDockerOrDie 调用 docker 官方库, 创建与 dockerd 服务进行通信的客户端并返回
+//
+// 	@param dockerEndpoint: unix:///var/run/docker.sock
+//
+// caller:
+// 	1. pkg/kubelet/dockershim/docker_service.go -> NewDockerClientFromConfig()
+// 	kubelet 启动时, 建立与 dockerd 服务的通信, 同时启动 dockershim 进程, 
+// 	将通用的 cri 请求进行转换, 转换成 dockerd 服务接受的形式.
+//
 // ConnectToDockerOrDie creates docker client connecting to docker daemon.
-// If the endpoint passed in is "fake://", a fake docker client
-// will be returned. The program exits if error occurs. The requestTimeout
-// is the timeout for docker requests. If timeout is exceeded, the request
-// will be cancelled and throw out an error. If requestTimeout is 0, a default
-// value will be applied.
-func ConnectToDockerOrDie(dockerEndpoint string, requestTimeout, imagePullProgressDeadline time.Duration,
-	withTraceDisabled bool, enableSleep bool) Interface {
+// If the endpoint passed in is "fake://", a fake docker client will be returned.
+// The program exits if error occurs.
+// The requestTimeout is the timeout for docker requests.
+// If timeout is exceeded, the request will be cancelled and throw out an error.
+// If requestTimeout is 0, a default value will be applied.
+func ConnectToDockerOrDie(
+	dockerEndpoint string, 
+	requestTimeout, imagePullProgressDeadline time.Duration,
+	withTraceDisabled bool, enableSleep bool,
+) Interface {
 	if dockerEndpoint == FakeDockerEndpoint {
 		fakeClient := NewFakeDockerClient()
 		if withTraceDisabled {

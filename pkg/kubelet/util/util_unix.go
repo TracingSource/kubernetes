@@ -20,6 +20,9 @@ const (
 	unixProtocol = "unix"
 )
 
+// caller: 
+// 	1. pkg/kubelet/dockershim/remote/docker_server.go -> DockerServer.Start()
+//
 // CreateListener creates a listener on the specified endpoint.
 func CreateListener(endpoint string) (net.Listener, error) {
 	protocol, addr, err := parseEndpointWithFallbackProtocol(endpoint, unixProtocol)
