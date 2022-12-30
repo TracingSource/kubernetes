@@ -118,12 +118,18 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 
 	// X509 methods
 	if config.ClientCAContentProvider != nil {
-		certAuth := x509.NewDynamic(config.ClientCAContentProvider.VerifyOptions, x509.CommonNameUserConversion)
+		certAuth := x509.NewDynamic(
+			config.ClientCAContentProvider.VerifyOptions, 
+			x509.CommonNameUserConversion,
+		)
 		authenticators = append(authenticators, certAuth)
 	}
 
+	// 以下的 静态Token, SA Token, 以及 Bootstrap Token, 其实都是 Bearer Token.
+	//
 	// Bearer token methods, local first, then remote
 	if len(config.TokenAuthFile) > 0 {
+		// 所谓的"静态Token"
 		tokenAuth, err := newAuthenticatorFromTokenFile(config.TokenAuthFile)
 		if err != nil {
 			return nil, nil, err
@@ -175,7 +181,12 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 		tokenAuthenticators = append(tokenAuthenticators, oidcAuth)
 	}
 	if len(config.WebhookTokenAuthnConfigFile) > 0 {
-		webhookTokenAuth, err := newWebhookTokenAuthenticator(config.WebhookTokenAuthnConfigFile, config.WebhookTokenAuthnVersion, config.WebhookTokenAuthnCacheTTL, config.APIAudiences)
+		webhookTokenAuth, err := newWebhookTokenAuthenticator(
+			config.WebhookTokenAuthnConfigFile, 
+			config.WebhookTokenAuthnVersion, 
+			config.WebhookTokenAuthnCacheTTL, 
+			config.APIAudiences,
+		)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -192,7 +203,10 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 				tokenAuth, true, config.TokenSuccessCacheTTL, config.TokenFailureCacheTTL,
 			)
 		}
-		authenticators = append(authenticators, bearertoken.New(tokenAuth), websocket.NewProtocolAuthenticator(tokenAuth))
+		authenticators = append(
+			authenticators, bearertoken.New(tokenAuth), 
+			websocket.NewProtocolAuthenticator(tokenAuth),
+		)
 		securityDefinitions["BearerToken"] = &spec.SecurityScheme{
 			SecuritySchemeProps: spec.SecuritySchemeProps{
 				Type:        "apiKey",
