@@ -31,7 +31,8 @@ func createAPIExtensionsConfig(
 	authResolverWrapper webhook.AuthenticationInfoResolverWrapper,
 ) (*apiextensionsapiserver.Config, error) {
 	// make a shallow copy to let us twiddle a few things
-	// most of the config actually remains the same.  We only need to mess with a couple items related to the particulars of the apiextensions
+	// most of the config actually remains the same. 
+	// We only need to mess with a couple items related to the particulars of the apiextensions
 	genericConfig := kubeAPIServerConfig
 	genericConfig.PostStartHooks = map[string]genericapiserver.PostStartHookConfigEntry{}
 	genericConfig.RESTOptionsGetter = nil
@@ -50,10 +51,18 @@ func createAPIExtensionsConfig(
 
 	// copy the etcd options so we don't mutate originals.
 	etcdOptions := *commandOptions.Etcd
-	etcdOptions.StorageConfig.Paging = utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
-	etcdOptions.StorageConfig.Codec = apiextensionsapiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion, v1.SchemeGroupVersion)
-	etcdOptions.StorageConfig.EncodeVersioner = runtime.NewMultiGroupVersioner(v1beta1.SchemeGroupVersion, schema.GroupKind{Group: v1beta1.GroupName})
-	genericConfig.RESTOptionsGetter = &genericoptions.SimpleRestOptionsFactory{Options: etcdOptions}
+	etcdOptions.StorageConfig.Paging = utilfeature.DefaultFeatureGate.Enabled(
+		features.APIListChunking,
+	)
+	etcdOptions.StorageConfig.Codec = apiextensionsapiserver.Codecs.LegacyCodec(
+		v1beta1.SchemeGroupVersion, v1.SchemeGroupVersion,
+	)
+	etcdOptions.StorageConfig.EncodeVersioner = runtime.NewMultiGroupVersioner(
+		v1beta1.SchemeGroupVersion, schema.GroupKind{Group: v1beta1.GroupName},
+	)
+	genericConfig.RESTOptionsGetter = &genericoptions.SimpleRestOptionsFactory{
+		Options: etcdOptions,
+	}
 
 	// override MergedResourceConfig with apiextensions defaults and registry
 	if err := commandOptions.APIEnablement.ApplyTo(
@@ -81,7 +90,7 @@ func createAPIExtensionsConfig(
 
 // createAPIExtensionsServer ...
 //
-// 	@param delegateAPIServer: 一个 emptyDelegate{} 结构体对象.
+// 	@param delegateAPIServer: 一个 emptyDelegate{} 空的结构体对象.
 //
 // caller: 
 // 	1. cmd/kube-apiserver/app/server.go -> CreateServerChain()

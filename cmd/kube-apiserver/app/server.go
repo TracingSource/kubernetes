@@ -184,14 +184,21 @@ func CreateServerChain(
 		return nil, err
 	}
 
-	// 3. 启动扩展的API server
-	apiExtensionsServer, err := createAPIExtensionsServer(apiExtensionsConfig, genericapiserver.NewEmptyDelegate())
+	// 3. 创建扩展的API server
+	// apiExtensionsServer 是一个 CRD 对象, 可以附加到核心 apiserver,
+	// 单独处理 crd 相关的请求, 主要是 apiExtensionsServer.GenericAPIServer
+	// 
+	apiExtensionsServer, err := createAPIExtensionsServer(
+		apiExtensionsConfig, genericapiserver.NewEmptyDelegate(),
+	)
 	if err != nil {
 		return nil, err
 	}
 
 	// 4. 启动最核心的kubeAPIServer
-	kubeAPIServer, err := CreateKubeAPIServer(kubeAPIServerConfig, apiExtensionsServer.GenericAPIServer)
+	kubeAPIServer, err := CreateKubeAPIServer(
+		kubeAPIServerConfig, apiExtensionsServer.GenericAPIServer,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -242,11 +249,12 @@ func CreateServerChain(
 // 	@param delegateAPIServer: 前面的扩展 APIserver启动流程中, 生成的 GenericServer{} 对象
 //
 // caller:
-// 	1. CreateServerChain()
+// 	1. CreateServerChain() 只有这一处
 //
 // CreateKubeAPIServer creates and wires a workable kube-apiserver
 func CreateKubeAPIServer(
-	kubeAPIServerConfig *master.Config, delegateAPIServer genericapiserver.DelegationTarget,
+	kubeAPIServerConfig *master.Config, 
+	delegateAPIServer genericapiserver.DelegationTarget,
 ) (*master.Master, error) {
 	// kubeAPIServer 是一个 Master{} 对象.
 	kubeAPIServer, err := kubeAPIServerConfig.Complete().New(delegateAPIServer)
@@ -663,7 +671,8 @@ func BuildAuthorizer(
 	return authorizationConfig.New()
 }
 
-// completedServerRunOptions is a private wrapper that enforces a call of Complete() before Run can be invoked.
+// completedServerRunOptions is a private wrapper that enforces
+// a call of Complete() before Run can be invoked.
 type completedServerRunOptions struct {
 	*options.ServerRunOptions
 }

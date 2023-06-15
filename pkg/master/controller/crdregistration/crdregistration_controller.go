@@ -19,8 +19,8 @@ import (
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 )
 
-// AutoAPIServiceRegistration is an interface which callers can re-declare locally and properly cast to for
-// adding and removing APIServices
+// AutoAPIServiceRegistration is an interface which callers can re-declare locally
+// and properly cast to for adding and removing APIServices
 type AutoAPIServiceRegistration interface {
 	// AddAPIServiceToSync adds an API service to auto-register.
 	AddAPIServiceToSync(in *v1.APIService)
@@ -33,18 +33,20 @@ type crdRegistrationController struct {
 	crdSynced cache.InformerSynced
 
 	apiServiceRegistration AutoAPIServiceRegistration
-
+	// 被赋值为 crdRegistrationController.handleVersionUpdate() 自身的成员方法.
 	syncHandler func(groupVersion schema.GroupVersion) error
 
 	syncedInitialSet chan struct{}
 
-	// queue is where incoming work is placed to de-dup and to allow "easy" rate limited requeues on errors
+	// queue is where incoming work is placed to de-dup
+	// and to allow "easy" rate limited requeues on errors
 	// this is actually keyed by a groupVersion
 	queue workqueue.RateLimitingInterface
 }
 
 // caller: 
-// 	1. cmd/kube-apiserver/app/aggregator.go -> createAggregatorServer() 在聚合 APIServer 启动过程中被调用.
+// 	1. cmd/kube-apiserver/app/aggregator.go -> createAggregatorServer()
+// 	在聚合 APIServer 启动过程中被调用.
 //
 // NewCRDRegistrationController returns a controller which will register
 // CRD GroupVersions with the auto APIService registration controller 
@@ -58,7 +60,10 @@ func NewCRDRegistrationController(
 		crdSynced:              crdinformer.Informer().HasSynced,
 		apiServiceRegistration: apiServiceRegistration,
 		syncedInitialSet:       make(chan struct{}),
-		queue:                  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "crd_autoregistration_controller"),
+		queue:                  workqueue.NewNamedRateLimitingQueue(
+			workqueue.DefaultControllerRateLimiter(), 
+			"crd_autoregistration_controller",
+		),
 	}
 	c.syncHandler = c.handleVersionUpdate
 
@@ -113,7 +118,10 @@ func (c *crdRegistrationController) Run(threadiness int, stopCh <-chan struct{})
 	} else {
 		for _, crd := range crds {
 			for _, version := range crd.Spec.Versions {
-				if err := c.syncHandler(schema.GroupVersion{Group: crd.Spec.Group, Version: version.Name}); err != nil {
+				err := c.syncHandler(schema.GroupVersion{
+					Group: crd.Spec.Group, Version: version.Name,
+				})
+				if err != nil {
 					utilruntime.HandleError(err)
 				}
 			}
@@ -121,10 +129,11 @@ func (c *crdRegistrationController) Run(threadiness int, stopCh <-chan struct{})
 	}
 	close(c.syncedInitialSet)
 
-	// start up your worker threads based on threadiness.  Some controllers have multiple kinds of workers
+	// start up your worker threads based on threadiness. 
+	// Some controllers have multiple kinds of workers
 	for i := 0; i < threadiness; i++ {
-		// runWorker will loop until "something bad" happens.  The .Until will then rekick the worker
-		// after one second
+		// runWorker will loop until "something bad" happens. 
+		// The .Until will then rekick the worker after one second
 		go wait.Until(c.runWorker, time.Second, stopCh)
 	}
 
@@ -138,15 +147,18 @@ func (c *crdRegistrationController) WaitForInitialSync() {
 }
 
 func (c *crdRegistrationController) runWorker() {
-	// hot loop until we're told to stop.  processNextWorkItem will automatically wait until there's work
-	// available, so we don't worry about secondary waits
+	// hot loop until we're told to stop. 
+	// processNextWorkItem will automatically wait until there's work available,
+	// so we don't worry about secondary waits
 	for c.processNextWorkItem() {
 	}
 }
 
-// processNextWorkItem deals with one key off the queue.  It returns false when it's time to quit.
+// processNextWorkItem deals with one key off the queue. 
+// It returns false when it's time to quit.
 func (c *crdRegistrationController) processNextWorkItem() bool {
-	// pull the next work item from queue.  It should be a key we use to lookup something in a cache
+	// pull the next work item from queue. 
+	// It should be a key we use to lookup something in a cache
 	key, quit := c.queue.Get()
 	if quit {
 		return false
@@ -157,19 +169,21 @@ func (c *crdRegistrationController) processNextWorkItem() bool {
 	// do your work on the key.  This method will contains your "do stuff" logic
 	err := c.syncHandler(key.(schema.GroupVersion))
 	if err == nil {
-		// if you had no error, tell the queue to stop tracking history for your key.  This will
-		// reset things like failure counts for per-item rate limiting
+		// if you had no error, tell the queue to stop tracking history for your key. 
+		// This will reset things like failure counts for per-item rate limiting
 		c.queue.Forget(key)
 		return true
 	}
 
-	// there was a failure so be sure to report it.  This method allows for pluggable error handling
+	// there was a failure so be sure to report it. 
+	// This method allows for pluggable error handling
 	// which can be used for things like cluster-monitoring
 	utilruntime.HandleError(fmt.Errorf("%v failed with : %v", key, err))
-	// since we failed, we should requeue the item to work on later.  This method will add a backoff
-	// to avoid hotlooping on particular items (they're probably still not going to work right away)
-	// and overall controller protection (everything I've done is broken, this controller needs to
-	// calm down or it can starve other useful work) cases.
+	// since we failed, we should requeue the item to work on later. 
+	// This method will add a backoff to avoid hotlooping on particular items
+	// (they're probably still not going to work right away)
+	// and overall controller protection (everything I've done is broken,
+	// this controller needs to calm down or it can starve other useful work) cases.
 	c.queue.AddRateLimited(key)
 
 	return true
@@ -181,10 +195,12 @@ func (c *crdRegistrationController) enqueueCRD(crd *apiextensions.CustomResource
 	}
 }
 
+// handleVersionUpdate 作为 syncHandler 执行 controller 的主流程.
 func (c *crdRegistrationController) handleVersionUpdate(groupVersion schema.GroupVersion) error {
 	apiServiceName := groupVersion.Version + "." + groupVersion.Group
 
-	// check all CRDs.  There shouldn't that many, but if we have problems later we can index them
+	// check all CRDs. 
+	// There shouldn't that many, but if we have problems later we can index them
 	crds, err := c.crdLister.List(labels.Everything())
 	if err != nil {
 		return err
@@ -203,8 +219,11 @@ func (c *crdRegistrationController) handleVersionUpdate(groupVersion schema.Grou
 				Spec: v1.APIServiceSpec{
 					Group:                groupVersion.Group,
 					Version:              groupVersion.Version,
-					GroupPriorityMinimum: 1000, // CRDs should have relatively low priority
-					VersionPriority:      100,  // CRDs will be sorted by kube-like versions like any other APIService with the same VersionPriority
+					// CRDs should have relatively low priority
+					GroupPriorityMinimum: 1000,
+					// CRDs will be sorted by kube-like versions like any other
+					// APIService with the same VersionPriority
+					VersionPriority:      100,
 				},
 			})
 			return nil
