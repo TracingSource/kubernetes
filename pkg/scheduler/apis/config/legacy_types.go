@@ -8,6 +8,8 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// scheduler-policy.json 文件结构
+//
 // Policy describes a struct of a policy resource in api.
 type Policy struct {
 	metav1.TypeMeta
@@ -22,9 +24,11 @@ type Policy struct {
 	Priorities []PriorityPolicy
 	// Holds the information to communicate with the extender(s)
 	Extenders []Extender
-	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
+	// RequiredDuringScheduling affinity is not symmetric, but there is an 
+	// implicit PreferredDuringScheduling affinity rule
 	// corresponding to every RequiredDuringScheduling affinity rule.
-	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range 1-100.
+	// HardPodAffinitySymmetricWeight represents the weight of implicit
+	// PreferredDuringScheduling affinity rule, in the range 1-100.
 	HardPodAffinitySymmetricWeight int32
 
 	// When AlwaysCheckAllPredicates is set to true, scheduler checks all
@@ -48,7 +52,8 @@ type PredicatePolicy struct {
 type PriorityPolicy struct {
 	// Identifier of the priority policy
 	// For a custom priority, the name can be user-defined
-	// For the Kubernetes provided priority functions, the name is the identifier of the pre-defined priority function
+	// For the Kubernetes provided priority functions, the name is the identifier
+	// of the pre-defined priority function
 	Name string
 	// The numeric multiplier for the node scores that the priority function generates
 	// The weight should be a positive integer
@@ -57,7 +62,8 @@ type PriorityPolicy struct {
 	Argument *PriorityArgument
 }
 
-// PredicateArgument represents the arguments to configure predicate functions in scheduler policy configuration.
+// PredicateArgument represents the arguments to configure predicate functions
+// in scheduler policy configuration.
 // Only one of its members may be specified
 type PredicateArgument struct {
 	// The predicate that provides affinity for pods belonging to a service
@@ -68,7 +74,8 @@ type PredicateArgument struct {
 	LabelsPresence *LabelsPresence
 }
 
-// PriorityArgument represents the arguments to configure priority functions in scheduler policy configuration.
+// PriorityArgument represents the arguments to configure priority functions in
+// scheduler policy configuration.
 // Only one of its members may be specified
 type PriorityArgument struct {
 	// The priority function that ensures a good spread (anti-affinity) for pods belonging to a service
@@ -81,7 +88,8 @@ type PriorityArgument struct {
 	RequestedToCapacityRatioArguments *RequestedToCapacityRatioArguments
 }
 
-// ServiceAffinity holds the parameters that are used to configure the corresponding predicate in scheduler policy configuration.
+// ServiceAffinity holds the parameters that are used to configure the
+// corresponding predicate in scheduler policy configuration.
 type ServiceAffinity struct {
 	// The list of labels that identify node "groups"
 	// All of the labels should match for the node to be considered a fit for hosting the pod
@@ -91,9 +99,11 @@ type ServiceAffinity struct {
 // LabelsPresence holds the parameters that are used to configure the corresponding predicate in scheduler policy configuration.
 type LabelsPresence struct {
 	// The list of labels that identify node "groups"
-	// All of the labels should be either present (or absent) for the node to be considered a fit for hosting the pod
+	// All of the labels should be either present (or absent) for the node to be
+	// considered a fit for hosting the pod
 	Labels []string
-	// The boolean flag that indicates whether the labels should be present or absent from the node
+	// The boolean flag that indicates whether the labels should be present or
+	// absent from the node
 	Presence bool
 }
 
@@ -173,21 +183,26 @@ type ExtenderTLSConfig struct {
 	CAData []byte
 }
 
-// Extender holds the parameters used to communicate with the extender. If a verb is unspecified/empty,
-// it is assumed that the extender chose not to provide that extension.
+// Extender holds the parameters used to communicate with the extender.
+// If a verb is unspecified/empty, it is assumed that the extender chose not to
+// provide that extension.
 type Extender struct {
 	// URLPrefix at which the extender is available
 	URLPrefix string
-	// Verb for the filter call, empty if not supported. This verb is appended to the URLPrefix when issuing the filter call to extender.
+	// Verb for the filter call, empty if not supported. 
+	// This verb is appended to the URLPrefix when issuing the filter call to extender.
 	FilterVerb string
-	// Verb for the preempt call, empty if not supported. This verb is appended to the URLPrefix when issuing the preempt call to extender.
+	// Verb for the preempt call, empty if not supported. 
+	// This verb is appended to the URLPrefix when issuing the preempt call to extender.
 	PreemptVerb string
-	// Verb for the prioritize call, empty if not supported. This verb is appended to the URLPrefix when issuing the prioritize call to extender.
+	// Verb for the prioritize call, empty if not supported. 
+	// This verb is appended to the URLPrefix when issuing the prioritize call to extender.
 	PrioritizeVerb string
 	// The numeric multiplier for the node scores that the prioritize call generates.
 	// The weight should be a positive integer
 	Weight int64
-	// Verb for the bind call, empty if not supported. This verb is appended to the URLPrefix when issuing the bind call to extender.
+	// Verb for the bind call, empty if not supported. 
+	// This verb is appended to the URLPrefix when issuing the bind call to extender.
 	// If this method is implemented by the extender, it is the extender's responsibility to bind the pod to apiserver. Only one extender
 	// can implement this function.
 	BindVerb string

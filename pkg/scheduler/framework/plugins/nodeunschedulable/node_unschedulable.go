@@ -26,6 +26,9 @@ func (pl *NodeUnschedulable) Name() string {
 	return Name
 }
 
+// caller:
+// 	1. pkg/scheduler/framework/v1alpha1/framework.go -> framework.runFilterPlugin()
+//
 // Filter invoked at the filter extension point.
 func (pl *NodeUnschedulable) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
 	_, reasons, err := predicates.CheckNodeUnschedulablePredicate(pod, nil, nodeInfo)

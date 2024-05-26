@@ -14,23 +14,23 @@ func init() {
 		})
 
 	// IMPORTANT NOTES for predicate developers:
-	// Registers predicates and priorities that are not enabled by default, but user can pick when creating their
-	// own set of priorities/predicates.
+	// Registers predicates and priorities that are not enabled by default,
+	// but user can pick when creating their own set of priorities/predicates.
 
 	// PodFitsPorts has been replaced by PodFitsHostPorts for better user understanding.
 	// For backwards compatibility with 1.0, PodFitsPorts is registered as well.
 	scheduler.RegisterFitPredicate("PodFitsPorts", predicates.PodFitsHostPorts)
 	// Fit is defined based on the absence of port conflicts.
-	// This predicate is actually a default predicate, because it is invoked from
-	// predicates.GeneralPredicates()
+	// This predicate is actually a default predicate,
+	// because it is invoked from predicates.GeneralPredicates()
 	scheduler.RegisterFitPredicate(predicates.PodFitsHostPortsPred, predicates.PodFitsHostPorts)
 	// Fit is determined by resource availability.
-	// This predicate is actually a default predicate, because it is invoked from
-	// predicates.GeneralPredicates()
+	// This predicate is actually a default predicate,
+	// because it is invoked from predicates.GeneralPredicates()
 	scheduler.RegisterFitPredicate(predicates.PodFitsResourcesPred, predicates.PodFitsResources)
 	// Fit is determined by the presence of the Host parameter and a string match
-	// This predicate is actually a default predicate, because it is invoked from
-	// predicates.GeneralPredicates()
+	// This predicate is actually a default predicate,
+	// because it is invoked from predicates.GeneralPredicates()
 	scheduler.RegisterFitPredicate(predicates.HostNamePred, predicates.PodFitsHost)
 	// Fit is determined by node selector query.
 	scheduler.RegisterFitPredicate(predicates.MatchNodeSelectorPred, predicates.PodMatchNodeSelector)

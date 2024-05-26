@@ -4,14 +4,12 @@ package app
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
-	goruntime "runtime"
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -20,8 +18,6 @@ import (
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/healthz"
-	"k8s.io/apiserver/pkg/server/mux"
-	"k8s.io/apiserver/pkg/server/routes"
 	"k8s.io/apiserver/pkg/util/term"
 	"k8s.io/client-go/kubernetes/scheme"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -30,8 +26,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/cli/globalflag"
-	"k8s.io/component-base/logs"
-	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
 	"k8s.io/klog"
@@ -40,9 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
-	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/util/configz"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 )
@@ -97,6 +89,11 @@ through the API as necessary.`,
 	return cmd
 }
 
+// runCommand ...
+//
+// caller:
+// 	1. NewSchedulerCommand()
+//
 // runCommand runs the scheduler.
 func runCommand(cmd *cobra.Command, args []string, opts *options.Options, registryOptions ...Option) error {
 	verflag.PrintAndExitIfRequested()
@@ -106,10 +103,12 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.Options, regist
 		fmt.Fprint(os.Stderr, "arguments are not supported\n")
 	}
 
+	// 校验 KubeSchedulerConfiguration、认证、授权相关配置
 	if errs := opts.Validate(); len(errs) > 0 {
 		return utilerrors.NewAggregate(errs)
 	}
 
+	//如果开启了 --write-config-to 启动参数, 将配置值写入此文件并退出
 	if len(opts.WriteConfigTo) > 0 {
 		c := &schedulerserverconfig.Config{}
 		if err := opts.ApplyTo(c); err != nil {
@@ -122,6 +121,8 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.Options, regist
 		return nil
 	}
 
+	// 根据默认配置 KubeSchedulerConfiguration 和用户传入的配置,
+	// 生成最终 schedulerappconfig.Config 调度器配置结构体对象
 	c, err := opts.Config()
 	if err != nil {
 		return err
@@ -130,6 +131,9 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.Options, regist
 	// Get the completed config
 	cc := c.Complete()
 
+	// 加载默认的预选、优选调度算法.
+	// 不过重点不在 ApplyFeatureGates() 函数, 而在于导入的 default 包(init 函数)
+	//
 	// Apply algorithms based on feature gates.
 	// TODO: make configurable?
 	algorithmprovider.ApplyFeatureGates()
@@ -147,10 +151,15 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.Options, regist
 	return Run(ctx, cc, registryOptions...)
 }
 
+// Run()
+//
+// caller:
+// 	1. runCommand()
+//
 // Run executes the scheduler based on the given configuration.
 // It only returns on error or when context is done.
 func Run(
-	ctx context.Context, cc schedulerserverconfig.CompletedConfig, 
+	ctx context.Context, cc schedulerserverconfig.CompletedConfig,
 	outOfTreeRegistryOptions ...Option,
 ) error {
 	// To help debugging, immediately log version
@@ -183,11 +192,7 @@ func Run(
 
 	// Create the scheduler.
 	sched, err := scheduler.New(
-		cc.Client,
-		cc.InformerFactory,
-		cc.PodInformer,
-		cc.Recorder,
-		ctx.Done(),
+		cc.Client, cc.InformerFactory, cc.PodInformer, cc.Recorder, ctx.Done(),
 		scheduler.WithName(cc.ComponentConfig.SchedulerName),
 		scheduler.WithAlgorithmSource(cc.ComponentConfig.AlgorithmSource),
 		scheduler.WithHardPodAffinitySymmetricWeight(
@@ -239,7 +244,7 @@ func Run(
 	}
 	if cc.SecureServing != nil {
 		handler := buildHandlerChain(
-			newHealthzHandler(&cc.ComponentConfig, false, checks...), 
+			newHealthzHandler(&cc.ComponentConfig, false, checks...),
 			cc.Authentication.Authenticator, cc.Authorization.Authorizer,
 		)
 		// TODO: handle stoppedCh returned by c.SecureServing.Serve
@@ -256,6 +261,8 @@ func Run(
 	// Wait for all caches to sync before scheduling.
 	cc.InformerFactory.WaitForCacheSync(ctx.Done())
 
+	// 开启资源锁则进入该 if{}
+	//
 	// If leader election is enabled, runCommand via LeaderElector until done and exit.
 	if cc.LeaderElection != nil {
 		cc.LeaderElection.Callbacks = leaderelection.LeaderCallbacks{
@@ -274,13 +281,21 @@ func Run(
 		return fmt.Errorf("lost lease")
 	}
 
+	// 没有开启资源锁则直接 Run()
+	// 循环执行 Scheduler.scheduleOne() 方法(每次调度一个 Pod)
+	//
 	// Leader election is disabled, so runCommand inline until done.
 	sched.Run(ctx)
 	return fmt.Errorf("finished without leader elect")
 }
 
+// caller:
+// 	1. Run()
+//
 // buildHandlerChain wraps the given handler with the standard filters.
-func buildHandlerChain(handler http.Handler, authn authenticator.Request, authz authorizer.Authorizer) http.Handler {
+func buildHandlerChain(
+	handler http.Handler, authn authenticator.Request, authz authorizer.Authorizer,
+) http.Handler {
 	requestInfoResolver := &apirequest.RequestInfoFactory{}
 	failedHandler := genericapifilters.Unauthorized(legacyscheme.Codecs, false)
 
@@ -291,63 +306,4 @@ func buildHandlerChain(handler http.Handler, authn authenticator.Request, authz 
 	handler = genericfilters.WithPanicRecovery(handler)
 
 	return handler
-}
-
-func installMetricHandler(pathRecorderMux *mux.PathRecorderMux) {
-	configz.InstallHandler(pathRecorderMux)
-	//lint:ignore SA1019 See the Metrics Stability Migration KEP
-	defaultMetricsHandler := legacyregistry.Handler().ServeHTTP
-	pathRecorderMux.HandleFunc("/metrics", func(w http.ResponseWriter, req *http.Request) {
-		if req.Method == "DELETE" {
-			metrics.Reset()
-			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-			w.Header().Set("X-Content-Type-Options", "nosniff")
-			io.WriteString(w, "metrics reset\n")
-			return
-		}
-		defaultMetricsHandler(w, req)
-	})
-}
-
-// newMetricsHandler builds a metrics server from the config.
-func newMetricsHandler(config *kubeschedulerconfig.KubeSchedulerConfiguration) http.Handler {
-	pathRecorderMux := mux.NewPathRecorderMux("kube-scheduler")
-	installMetricHandler(pathRecorderMux)
-	if config.EnableProfiling {
-		routes.Profiling{}.Install(pathRecorderMux)
-		if config.EnableContentionProfiling {
-			goruntime.SetBlockProfileRate(1)
-		}
-		routes.DebugFlags{}.Install(pathRecorderMux, "v", routes.StringFlagPutHandler(logs.GlogSetter))
-	}
-	return pathRecorderMux
-}
-
-// newHealthzHandler creates a healthz server from the config, and will also
-// embed the metrics handler if the healthz and metrics address configurations
-// are the same.
-func newHealthzHandler(
-	config *kubeschedulerconfig.KubeSchedulerConfiguration, separateMetrics bool, 
-	checks ...healthz.HealthChecker,
-) http.Handler {
-	pathRecorderMux := mux.NewPathRecorderMux("kube-scheduler")
-	healthz.InstallHandler(pathRecorderMux, checks...)
-	if !separateMetrics {
-		installMetricHandler(pathRecorderMux)
-	}
-	if config.EnableProfiling {
-		routes.Profiling{}.Install(pathRecorderMux)
-		if config.EnableContentionProfiling {
-			goruntime.SetBlockProfileRate(1)
-		}
-		routes.DebugFlags{}.Install(pathRecorderMux, "v", routes.StringFlagPutHandler(logs.GlogSetter))
-	}
-	return pathRecorderMux
-}
-
-// WithPlugin creates an Option based on plugin name and factory.
-func WithPlugin(name string, factory framework.PluginFactory) Option {
-	return func(registry framework.Registry) error {
-		return registry.Register(name, factory)
-	}
 }

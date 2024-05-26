@@ -54,10 +54,21 @@ type PriorityConfigFactory struct {
 var (
 	schedulerFactoryMutex sync.RWMutex
 
+	// fitPredicateMap 包含几乎所有内置的预选算法, 在下面函数中初始化.
+	// pkg/scheduler/algorithmprovider/defaults/register_predicates.go -> init()
+	//
+	// 	@initAt: RegisterMandatoryFitPredicate()
+	// 	@initAt: RegisterFitPredicateFactory()
+	//
 	// maps that hold registered algorithm types
 	fitPredicateMap        = make(map[string]FitPredicateFactory)
+	// mandatoryFitPredicates 包含了必选的算法.
+	//
+	// 	@initAt: RegisterMandatoryFitPredicate()
 	mandatoryFitPredicates = sets.NewString()
 	priorityFunctionMap    = make(map[string]PriorityConfigFactory)
+	// 	@initAt: RegisterAlgorithmProvider()
+	// 初始化时只有一个值, key 为 DefaultProvider, val 中的成员分别为默认的预选和优选算法的名称集合.
 	algorithmProviderMap   = make(map[string]AlgorithmProviderConfig)
 
 	// Registered metadata producers
@@ -120,6 +131,10 @@ func RegisteredPredicatesAndPrioritiesSnapshot() *Snapshot {
 	return &copy
 }
 
+// caller:
+// 	1. pkg/scheduler/algorithmprovider/defaults/defaults.go -> ApplyFeatureGates()
+//  不过没有执行的机会.
+//
 // ApplyPredicatesAndPriorities sets state of predicates and priorities to `s`.
 func ApplyPredicatesAndPriorities(s *Snapshot) {
 	schedulerFactoryMutex.Lock()
@@ -130,6 +145,10 @@ func ApplyPredicatesAndPriorities(s *Snapshot) {
 	schedulerFactoryMutex.Unlock()
 }
 
+// caller:
+// 	1. pkg/scheduler/algorithmprovider/defaults/register_predicates.go -> init()
+//  加载内置的预选算法
+//
 // RegisterFitPredicate registers a fit predicate with the algorithm
 // registry. Returns the name with which the predicate was registered.
 func RegisterFitPredicate(name string, predicate predicates.FitPredicate) string {
@@ -204,9 +223,15 @@ func InsertPriorityKeyToAlgorithmProviderMap(key string) {
 	}
 }
 
-// RegisterMandatoryFitPredicate registers a fit predicate with the algorithm registry, the predicate is used by
-// kubelet, DaemonSet; it is always included in configuration. Returns the name with which the predicate was
-// registered.
+// Mandatory: 强制的, 必选的.
+//
+// caller:
+// 	1. pkg/scheduler/algorithmprovider/defaults/register_predicates.go -> init()
+//  加载内置的预选算法
+//
+// RegisterMandatoryFitPredicate registers a fit predicate with the algorithm registry,
+// the predicate is used by kubelet, DaemonSet; it is always included in configuration.
+// Returns the name with which the predicate was registered.
 func RegisterMandatoryFitPredicate(name string, predicate predicates.FitPredicate) string {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
@@ -216,6 +241,14 @@ func RegisterMandatoryFitPredicate(name string, predicate predicates.FitPredicat
 	return name
 }
 
+// Fit: 合适的
+//
+// caller:
+// 	1. pkg/scheduler/algorithmprovider/defaults/register_predicates.go -> init()
+//  加载内置的预选算法
+// 	2. RegisterFitPredicate() 同样是注册的函数, 注意两者的区别.
+// 	2. RegisterCustomFitPredicate()
+//
 // RegisterFitPredicateFactory registers a fit predicate factory with the
 // algorithm registry. Returns the name with which the predicate was registered.
 func RegisterFitPredicateFactory(name string, predicateFactory FitPredicateFactory) string {
@@ -319,8 +352,8 @@ func RegisterPredicateMetadataProducerFactory(f PredicateMetadataProducerFactory
 	predicateMetadataProducerFactory = f
 }
 
-// RegisterPriorityMapReduceFunction registers a priority function with the algorithm registry. Returns the name,
-// with which the function was registered.
+// RegisterPriorityMapReduceFunction registers a priority function with the algorithm registry.
+// Returns the name, with which the function was registered.
 func RegisterPriorityMapReduceFunction(
 	name string,
 	mapFunction priorities.PriorityMapFunction,
@@ -483,6 +516,9 @@ func IsPriorityFunctionRegistered(name string) bool {
 	return ok
 }
 
+// caller:
+// 	1. pkg/scheduler/algorithmprovider/defaults/defaults.go -> registerAlgorithmProvider()
+//
 // RegisterAlgorithmProvider registers a new algorithm provider with the algorithm registry.
 func RegisterAlgorithmProvider(name string, predicateKeys, priorityKeys sets.String) string {
 	schedulerFactoryMutex.Lock()
@@ -495,7 +531,8 @@ func RegisterAlgorithmProvider(name string, predicateKeys, priorityKeys sets.Str
 	return name
 }
 
-// GetAlgorithmProvider should not be used to modify providers. It is publicly visible for testing.
+// GetAlgorithmProvider should not be used to modify providers.
+// It is publicly visible for testing.
 func GetAlgorithmProvider(name string) (*AlgorithmProviderConfig, error) {
 	schedulerFactoryMutex.RLock()
 	defer schedulerFactoryMutex.RUnlock()

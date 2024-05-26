@@ -135,8 +135,24 @@ var defaultFrameworkOptions = frameworkOptions{
 
 var _ Framework = &framework{}
 
+// NewFramework ...
+//
+// 	@param r:
+// 	@param plugins: 所有类型的 plugin 列表.
+// 	以 scheduler-config.yaml -> plugins{} 字段为例,
+// 	这里声明了 3 种类型的插件: preFilter, filter, postBind, 每种插件可以有多个.
+//
+// 	@param args: plugins 中各插件所需的参数列表, 按 plugins 的名称进行区分.
+// 	通过 scheduler-config.yaml -> pluginConfig{} 字段配置,
+// 	比如 plugins.preFilter.FixNodes 插件, 就在 pluginConfig 字段中通过 FixNodes 名称指定了 etcd 配置
+//
+// caller:
+// 	1. pkg/scheduler/factory.go -> Configurator.CreateFromKeys() 只有这一处
+//
 // NewFramework initializes plugins given the configuration and the registry.
-func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfig, opts ...Option) (Framework, error) {
+func NewFramework(
+	r Registry, plugins *config.Plugins, args []config.PluginConfig, opts ...Option,
+) (Framework, error) {
 	options := defaultFrameworkOptions
 	for _, opt := range opts {
 		opt(&options)
@@ -172,7 +188,10 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 		if _, ok := pg[name]; !ok {
 			continue
 		}
-
+		// 这里 factory() 被调用的都是各插件(内置, 外置)的初始化函数, 如
+		// pkg/scheduler/framework/plugins/middleware/fixnodes/fixnodes.go -> New()
+		// pkg/scheduler/framework/plugins/middleware/redisbycache/redisbycache.go -> New()
+		// ...等
 		p, err := factory(pluginConfig[name], f)
 		if err != nil {
 			return nil, fmt.Errorf("error initializing plugin %q: %v", name, err)
@@ -197,7 +216,9 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 	// value from the one used in the configuration.
 	for _, scorePlugin := range f.scorePlugins {
 		if f.pluginNameToWeightMap[scorePlugin.Name()] == 0 {
-			return nil, fmt.Errorf("score plugin %q is not configured with weight", scorePlugin.Name())
+			return nil, fmt.Errorf(
+				"score plugin %q is not configured with weight", scorePlugin.Name(),
+			)
 		}
 	}
 
@@ -208,7 +229,9 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 	return f, nil
 }
 
-func updatePluginList(pluginList interface{}, pluginSet *config.PluginSet, pluginsMap map[string]Plugin) error {
+func updatePluginList(
+	pluginList interface{}, pluginSet *config.PluginSet, pluginsMap map[string]Plugin,
+) error {
 	if pluginSet == nil {
 		return nil
 	}
@@ -248,26 +271,38 @@ func (f *framework) QueueSortFunc() LessFunc {
 	return f.queueSortPlugins[0].Less
 }
 
+// caller:
+// 	1. pkg/scheduler/core/generic_scheduler.go -> genericScheduler.Schedule()
+//
 // RunPreFilterPlugins runs the set of configured PreFilter plugins. It returns
 // *Status and its code is set to non-success if any of the plugins returns
-// anything but Success. If a non-success status is returned, then the scheduling
-// cycle is aborted.
-func (f *framework) RunPreFilterPlugins(ctx context.Context, state *CycleState, pod *v1.Pod) (status *Status) {
+// anything but Success.
+// If a non-success status is returned, then the scheduling cycle is aborted.
+func (f *framework) RunPreFilterPlugins(
+	ctx context.Context, state *CycleState, pod *v1.Pod,
+) (status *Status) {
 	if state.ShouldRecordFrameworkMetrics() {
 		startTime := time.Now()
 		defer func() {
-			f.metricsRecorder.observeExtensionPointDurationAsync(preFilter, status, metrics.SinceInSeconds(startTime))
+			f.metricsRecorder.observeExtensionPointDurationAsync(
+				preFilter, status, metrics.SinceInSeconds(startTime),
+			)
 		}()
 	}
 	for _, pl := range f.preFilterPlugins {
 		status = f.runPreFilterPlugin(ctx, pl, state, pod)
 		if !status.IsSuccess() {
 			if status.IsUnschedulable() {
-				msg := fmt.Sprintf("rejected by %q at prefilter: %v", pl.Name(), status.Message())
+				msg := fmt.Sprintf(
+					"rejected by %q at prefilter: %v", pl.Name(), status.Message(),
+				)
 				klog.V(4).Infof(msg)
 				return NewStatus(status.Code(), msg)
 			}
-			msg := fmt.Sprintf("error while running %q prefilter plugin for pod %q: %v", pl.Name(), pod.Name, status.Message())
+			msg := fmt.Sprintf(
+				"error while running %q prefilter plugin for pod %q: %v", 
+				pl.Name(), pod.Name, status.Message(),
+			)
 			klog.Error(msg)
 			return NewStatus(Error, msg)
 		}
@@ -370,6 +405,11 @@ func (f *framework) runPreFilterExtensionRemovePod(ctx context.Context, pl PreFi
 	return status
 }
 
+// RunFilterPlugins 遍历并调用所有 Filter 插件.
+//
+// caller: 
+// 	1. pkg/scheduler/core/generic_scheduler.go -> genericScheduler.podFitsOnNode()
+//
 // RunFilterPlugins runs the set of configured Filter plugins for pod on
 // the given node. If any of these plugins doesn't return "Success", the
 // given node is not suitable for running pod.
@@ -383,7 +423,9 @@ func (f *framework) RunFilterPlugins(
 	if state.ShouldRecordFrameworkMetrics() {
 		startTime := time.Now()
 		defer func() {
-			f.metricsRecorder.observeExtensionPointDurationAsync(filter, status, metrics.SinceInSeconds(startTime))
+			f.metricsRecorder.observeExtensionPointDurationAsync(
+				filter, status, metrics.SinceInSeconds(startTime),
+			)
 		}()
 	}
 	for _, pl := range f.filterPlugins {
@@ -402,7 +444,12 @@ func (f *framework) RunFilterPlugins(
 	return nil
 }
 
-func (f *framework) runFilterPlugin(ctx context.Context, pl FilterPlugin, state *CycleState, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status {
+// caller:
+// 	1. framework.RunFilterPlugins()
+func (f *framework) runFilterPlugin(
+	ctx context.Context, pl FilterPlugin, state *CycleState, 
+	pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo,
+) *Status {
 	if !state.ShouldRecordFrameworkMetrics() {
 		return pl.Filter(ctx, state, pod, nodeInfo)
 	}

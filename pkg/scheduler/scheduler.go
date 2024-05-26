@@ -78,8 +78,9 @@ type Scheduler struct {
 	// Framework runs scheduler plugins at configured extension points.
 	Framework framework.Framework
 
-	// NextPod 实际为 pkg/scheduler/internal/queue/scheduling_queue.go 文件中的 MakeNextPodFunc() 函数.
-	// 从 Pod 队列中取一个 Pod 对象出来, 逻辑很简单.
+	// NextPod 从待调度队列(SchedulingQueue 成员变量)中取出一个 Pod(如没有则先阻塞).
+	//
+	// 	@assignAs: pkg/scheduler/internal/queue/scheduling_queue.go -> MakeNextPodFunc()
 	//
 	// NextPod should be a function that blocks until the next pod
 	// is available. We don't use a channel for this,
@@ -243,24 +244,36 @@ var defaultSchedulerOptions = schedulerOptions{
 	podInitialBackoffSeconds:        int64(internalqueue.DefaultPodInitialBackoffDuration.Seconds()),
 	podMaxBackoffSeconds:            int64(internalqueue.DefaultPodMaxBackoffDuration.Seconds()),
 	frameworkConfigProducerRegistry: frameworkplugins.NewDefaultConfigProducerRegistry(),
-	// The plugins and pluginConfig options are currently nil because we currently don't have
-	// "default" plugins. All plugins that we run through the framework currently come from two
-	// sources: 1) specified in component config, in which case those two options should be
-	// set using their corresponding With* functions, 2) predicate/priority-mapped plugins, which
-	// pluginConfigProducerRegistry contains a mapping for and produces their configurations.
-	// TODO(ahg-g) Once predicates and priorities are migrated to natively run as plugins, the
-	// below two parameters will be populated accordingly.
+	// The plugins and pluginConfig options are currently nil because we
+	// currently don't have "default" plugins.
+	// All plugins that we run through the framework currently come from two sources: 
+	// 1) specified in component config, in which case those two options should be
+	// set using their corresponding With* functions, 
+	// 2) predicate/priority-mapped plugins, which pluginConfigProducerRegistry
+	// contains a mapping for and produces their configurations.
+	//
+	// TODO(ahg-g) Once predicates and priorities are migrated to natively run
+	// as plugins, the below two parameters will be populated accordingly.
 	frameworkPlugins:      nil,
 	frameworkPluginConfig: nil,
 }
 
+// New 加载并初始化各外置插件
+//
+// @param opts: 包含外置插件集合.
+//
+// caller:
+// 	1. cmd/kube-scheduler/app/server.go -> Run() 刚开始启动时就被调用(在选主之前)
+//
 // New returns a Scheduler
-func New(client clientset.Interface,
+func New(
+	client clientset.Interface,
 	informerFactory informers.SharedInformerFactory,
 	podInformer coreinformers.PodInformer,
 	recorder events.EventRecorder,
 	stopCh <-chan struct{},
-	opts ...Option) (*Scheduler, error) {
+	opts ...Option,
+) (*Scheduler, error) {
 
 	stopEverything := stopCh
 	if stopEverything == nil {
@@ -328,7 +341,10 @@ func New(client clientset.Interface,
 		// Create the config from a named algorithm provider.
 		sc, err := configurator.CreateFromProvider(*source.Provider)
 		if err != nil {
-			return nil, fmt.Errorf("couldn't create scheduler using provider %q: %v", *source.Provider, err)
+			return nil, fmt.Errorf(
+				"couldn't create scheduler using provider %q: %v", 
+				*source.Provider, err,
+			)
 		}
 		sched = sc
 	case source.Policy != nil:
@@ -365,6 +381,11 @@ func New(client clientset.Interface,
 	return sched, nil
 }
 
+// initPolicyFromConfigMap 从 configMap 中获取 scheduler-policy.json 信息
+//
+// caller:
+// 	1. New() 只有这一处
+//
 // initPolicyFromFile initialize policy from file
 func initPolicyFromFile(policyFile string, policy *schedulerapi.Policy) error {
 	// Use a policy serialized in a file.
@@ -405,20 +426,33 @@ func initPolicyFromConfigMap(
 	return nil
 }
 
+// Run 阻塞函数.
+//
+// caller:
+// 	1. cmd/kube-scheduler/app/server.go -> Run()
+//
 // Run begins watching and scheduling. It waits for cache to be synced,
 // then starts scheduling and blocked until the context is done.
 func (sched *Scheduler) Run(ctx context.Context) {
 	if !cache.WaitForCacheSync(ctx.Done(), sched.scheduledPodsHasSynced) {
 		return
 	}
-	// Until() 可以说是一个循环了, 当 scheduleOne() 结束的时候就会立刻启动(间隔0秒)下一个 scheduleOne()
+	// Until() 当 scheduleOne() 结束的时候就会立刻启动(间隔0秒)下一个 scheduleOne()
 	wait.UntilWithContext(ctx, sched.scheduleOne, 0)
 }
 
+// recordSchedulingFailure Pod 调度失败时, 发送一条调度失败的 event, 并将失败原因更新到
+// pod.Status.Conditions 列表中.
+//
+// caller: 
+// 	1. Scheduler.scheduleOne()
+//
 // recordFailedSchedulingEvent records an event for the pod that indicates the
 // pod has failed to schedule.
 // NOTE: This function modifies "pod". "pod" should be copied before being passed.
-func (sched *Scheduler) recordSchedulingFailure(podInfo *framework.PodInfo, err error, reason string, message string) {
+func (sched *Scheduler) recordSchedulingFailure(
+	podInfo *framework.PodInfo, err error, reason string, message string,
+) {
 	sched.Error(podInfo, err)
 	pod := podInfo.Pod
 	sched.Recorder.Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", message)
@@ -428,13 +462,25 @@ func (sched *Scheduler) recordSchedulingFailure(podInfo *framework.PodInfo, err 
 		Reason:  reason,
 		Message: err.Error(),
 	}); err != nil {
-		klog.Errorf("Error updating the condition of the pod %s/%s: %v", pod.Namespace, pod.Name, err)
+		klog.Errorf(
+			"Error updating the condition of the pod %s/%s: %v", 
+			pod.Namespace, pod.Name, err,
+		)
 	}
 }
 
+// preempt 一个 Pod 调度失败后, 调用此方法尝试抢占.
+//
+// 	@param preemptor: 调度失败的 Pod
+// 	@param scheduleErr: 调度失败的原因
+//
+// caller:
+// 	1. Scheduler.scheduleOne()
+//
 // preempt tries to create room for a pod that has failed to schedule,
 // by preempting lower priority pods if possible.
-// If it succeeds, it adds the name of the node where preemption has happened to the pod spec.
+// If it succeeds, it adds the name of the node where preemption has happened
+// to the pod spec.
 // It returns the node name and an error if any.
 func (sched *Scheduler) preempt(
 	ctx context.Context, state *framework.CycleState, fwk framework.Framework, 
@@ -448,7 +494,10 @@ func (sched *Scheduler) preempt(
 
 	node, victims, nominatedPodsToClear, err := sched.Algorithm.Preempt(ctx, state, preemptor, scheduleErr)
 	if err != nil {
-		klog.Errorf("Error preempting victims to make room for %v/%v: %v", preemptor.Namespace, preemptor.Name, err)
+		klog.Errorf(
+			"Error preempting victims to make room for %v/%v: %v", 
+			preemptor.Namespace, preemptor.Name, err,
+		)
 		return "", err
 	}
 	var nodeName = ""
@@ -503,6 +552,9 @@ func (sched *Scheduler) preempt(
 	return nodeName, err
 }
 
+// caller:
+// 	1. Scheduler.scheduleOne()
+//
 // bindVolumes will make the API update with the assumed bindings and wait until
 // the PV controller has completely finished the binding operation.
 //
@@ -526,7 +578,11 @@ func (sched *Scheduler) bindVolumes(assumed *v1.Pod) error {
 	return nil
 }
 
-// assume signals to the cache that a pod is already in the cache, so that binding can be asynchronous.
+// caller:
+// 	1. Scheduler.scheduleOne()
+//
+// assume signals to the cache that a pod is already in the cache, so that
+// binding can be asynchronous.
 // assume modifies `assumed`.
 func (sched *Scheduler) assume(assumed *v1.Pod, host string) error {
 	// Optimistically assume that the binding will succeed and send it to apiserver
@@ -547,8 +603,11 @@ func (sched *Scheduler) assume(assumed *v1.Pod, host string) error {
 	return nil
 }
 
-// bind binds a pod to a given node defined in a binding object.  We expect this to run asynchronously, so we
-// handle binding metrics internally.
+// caller:
+// 	1. Scheduler.scheduleOne()
+//
+// bind binds a pod to a given node defined in a binding object. 
+// We expect this to run asynchronously, so we handle binding metrics internally.
 func (sched *Scheduler) bind(ctx context.Context, assumed *v1.Pod, targetNode string, state *framework.CycleState) error {
 	bindingStart := time.Now()
 	bindStatus := sched.Framework.RunBindPlugins(ctx, state, assumed, targetNode)
@@ -592,8 +651,16 @@ type podConditionUpdaterImpl struct {
 	Client clientset.Interface
 }
 
+// update 将目标 condition 更新到目标 pod.Status.Conditions[] 数组中.
+//
+// caller: 
+// 	1. Scheduler.recordSchedulingFailure()
+//
 func (p *podConditionUpdaterImpl) update(pod *v1.Pod, condition *v1.PodCondition) error {
-	klog.V(3).Infof("Updating pod condition for %s/%s to (%s==%s, Reason=%s)", pod.Namespace, pod.Name, condition.Type, condition.Status, condition.Reason)
+	klog.V(3).Infof(
+		"Updating pod condition for %s/%s to (%s==%s, Reason=%s)", 
+		pod.Namespace, pod.Name, condition.Type, condition.Status, condition.Reason,
+	)
 	if podutil.UpdatePodCondition(&pod.Status, condition) {
 		_, err := p.Client.CoreV1().Pods(pod.Namespace).UpdateStatus(pod)
 		return err
@@ -605,6 +672,10 @@ type podPreemptorImpl struct {
 	Client clientset.Interface
 }
 
+// getUpdatedPod 重新获取目标 pod 对象(只是简单地通过 kube client 获取同名 Pod).
+//
+// caller: 
+// 	1. Scheduler.preempt()
 func (p *podPreemptorImpl) getUpdatedPod(pod *v1.Pod) (*v1.Pod, error) {
 	return p.Client.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
 }
@@ -620,6 +691,10 @@ func (p *podPreemptorImpl) setNominatedNodeName(pod *v1.Pod, nominatedNodeName s
 	return err
 }
 
+// removeNominatedNodeName ...
+//
+// caller: 
+// 	1. Scheduler.preempt()
 func (p *podPreemptorImpl) removeNominatedNodeName(pod *v1.Pod) error {
 	if len(pod.Status.NominatedNodeName) == 0 {
 		return nil

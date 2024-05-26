@@ -119,6 +119,11 @@ func (c *Configurator) CreateFromProvider(providerName string) (*Scheduler, erro
 	return c.CreateFromKeys(provider.FitPredicateKeys, provider.PriorityFunctionKeys, []algorithm.SchedulerExtender{})
 }
 
+// CreateFromConfig 根据配置构造 Scheduler{} 对象.
+//
+// caller:
+// 	1. pkg/scheduler/scheduler.go -> New() 在选主之前被调用
+//
 // CreateFromConfig creates a scheduler from the configuration file
 func (c *Configurator) CreateFromConfig(policy schedulerapi.Policy) (*Scheduler, error) {
 	klog.V(2).Infof("Creating scheduler from configuration: %v", policy)
@@ -187,7 +192,8 @@ func (c *Configurator) CreateFromConfig(policy schedulerapi.Policy) (*Scheduler,
 		extenders = append(extenders, ignorableExtenders...)
 		predicates.RegisterPredicateMetadataProducerWithExtendedResourceOptions(ignoredExtendedResources)
 	}
-	// Providing HardPodAffinitySymmetricWeight in the policy config is the new and preferred way of providing the value.
+	// Providing HardPodAffinitySymmetricWeight in the policy config is the new
+	// and preferred way of providing the value.
 	// Give it higher precedence than scheduler CLI configuration when it is provided.
 	if policy.HardPodAffinitySymmetricWeight != 0 {
 		c.hardPodAffinitySymmetricWeight = policy.HardPodAffinitySymmetricWeight
@@ -201,9 +207,17 @@ func (c *Configurator) CreateFromConfig(policy schedulerapi.Policy) (*Scheduler,
 	return c.CreateFromKeys(predicateKeys, priorityKeys, extenders)
 }
 
+// caller:
+// 	1. Configurator.CreateFromConfig()
+//
 // CreateFromKeys creates a scheduler from a set of registered fit predicate keys and priority keys.
-func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, extenders []algorithm.SchedulerExtender) (*Scheduler, error) {
-	klog.V(2).Infof("Creating scheduler with fit predicates '%v' and priority functions '%v'", predicateKeys, priorityKeys)
+func (c *Configurator) CreateFromKeys(
+	predicateKeys, priorityKeys sets.String, extenders []algorithm.SchedulerExtender,
+) (*Scheduler, error) {
+	klog.V(2).Infof(
+		"Creating scheduler with fit predicates '%v' and priority functions '%v'", 
+		predicateKeys, priorityKeys,
+	)
 
 	if c.GetHardPodAffinitySymmetricWeight() < 1 || c.GetHardPodAffinitySymmetricWeight() > 100 {
 		return nil, fmt.Errorf("invalid hardPodAffinitySymmetricWeight: %d, must be in the range 1-100", c.GetHardPodAffinitySymmetricWeight())
@@ -515,7 +529,8 @@ func GetPodDisruptionBudgetLister(informerFactory informers.SharedInformerFactor
 	return nil
 }
 
-// GetCSINodeLister returns CSINode lister from the given informer factory. Returns nil if CSINodeInfo feature is disabled.
+// GetCSINodeLister returns CSINode lister from the given informer factory.
+// Returns nil if CSINodeInfo feature is disabled.
 func GetCSINodeLister(informerFactory informers.SharedInformerFactory) storagelisters.CSINodeLister {
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CSINodeInfo) {
 		return informerFactory.Storage().V1().CSINodes().Lister()

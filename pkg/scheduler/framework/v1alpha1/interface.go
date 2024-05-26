@@ -343,6 +343,8 @@ type BindPlugin interface {
 	Bind(ctx context.Context, state *CycleState, p *v1.Pod, nodeName string) *Status
 }
 
+// 	@implementBy: pkg/scheduler/framework/v1alpha1/framework.go -> framework{}
+//
 // Framework manages the set of plugins in use by the scheduling framework.
 // Configured plugins are called at specified points in a scheduling context.
 type Framework interface {
@@ -352,8 +354,8 @@ type Framework interface {
 
 	// RunPreFilterPlugins runs the set of configured prefilter plugins. It returns
 	// *Status and its code is set to non-success if any of the plugins returns
-	// anything but Success. If a non-success status is returned, then the scheduling
-	// cycle is aborted.
+	// anything but Success.
+	// If a non-success status is returned, then the scheduling cycle is aborted.
 	RunPreFilterPlugins(ctx context.Context, state *CycleState, pod *v1.Pod) *Status
 
 	// RunFilterPlugins runs the set of configured filter plugins for pod on

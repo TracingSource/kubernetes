@@ -95,6 +95,8 @@ func (f *FitError) Error() string {
 	return reasonMsg
 }
 
+// 	@implementBy: genericScheduler{}
+//
 // ScheduleAlgorithm is an interface implemented by things that know how to schedule pods
 // onto machines.
 // TODO: Rename this type.
@@ -131,21 +133,29 @@ type ScheduleResult struct {
 	FeasibleNodes int
 }
 
+// 	@implementOf: ScheduleAlgorithm
 type genericScheduler struct {
 	cache                    internalcache.Cache
 	schedulingQueue          internalqueue.SchedulingQueue
 	predicates               map[string]predicates.FitPredicate
 	priorityMetaProducer     priorities.MetadataProducer
+	// 	@assignAs: pkg/scheduler/algorithm/predicates/metadata.go -> MetadataProducerFactory.GetPredicateMetadata()
 	predicateMetaProducer    predicates.MetadataProducer
 	prioritizers             []priorities.PriorityConfig
 	framework                framework.Framework
 	extenders                []algorithm.SchedulerExtender
 	alwaysCheckAllPredicates bool
+	// nodeInfoSnapshot 每调度一个 Pod, 就从 cache 中拷贝一份副本到这里,
+	// 此变量中同时包含 list 与 map 格式的数据(cache 中不包含 list), 查询起来更方便.
+	//
+	// 由 genericScheduler.snapshot() 方法进行更新写入.
 	nodeInfoSnapshot         *nodeinfosnapshot.Snapshot
 	volumeBinder             *volumebinder.VolumeBinder
 	pvcLister                corelisters.PersistentVolumeClaimLister
 	pdbLister                policylisters.PodDisruptionBudgetLister
 	disablePreemption        bool
+	// percentageOfNodesToScore 默认为 0
+	// 取值为: pkg/scheduler/apis/config/types.go -> DefaultPercentageOfNodesToScore
 	percentageOfNodesToScore int32
 	enableNonPreempting      bool
 	nextStartNodeIndex       int
@@ -164,13 +174,28 @@ func (g *genericScheduler) PredicateMetadataProducer() predicates.MetadataProduc
 	return g.predicateMetaProducer
 }
 
+// Schedule 预选+优选, 调用各插件为目标 Pod 选择合适的 Node 节点并返回.
+//
+// 	@param state: 各阶段的插件在执行期间数据的暂存点(此时还是一个空的结构体)
+// 	@param pod: 待调度的目标 Pod.
+//
+// caller:
+// 	1. pkg/scheduler/scheduler__schedule_one.go -> Scheduler.scheduleOne()
+//
 // Schedule tries to schedule the given pod to one of the nodes in the node list.
 // If it succeeds, it will return the name of the node.
 // If it fails, it will return a FitError error with reasons.
-func (g *genericScheduler) Schedule(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (result ScheduleResult, err error) {
-	trace := utiltrace.New("Scheduling", utiltrace.Field{Key: "namespace", Value: pod.Namespace}, utiltrace.Field{Key: "name", Value: pod.Name})
+func (g *genericScheduler) Schedule(
+	ctx context.Context, state *framework.CycleState, pod *v1.Pod,
+) (result ScheduleResult, err error) {
+	trace := utiltrace.New(
+		"Scheduling", 
+		utiltrace.Field{Key: "namespace", Value: pod.Namespace}, 
+		utiltrace.Field{Key: "name", Value: pod.Name},
+	)
 	defer trace.LogIfLong(100 * time.Millisecond)
 
+	// 判断目标 Pod 所需的 PVC 资源对象是否存在.
 	if err := podPassesBasicChecks(pod, g.pvcLister); err != nil {
 		return result, err
 	}
@@ -185,6 +210,9 @@ func (g *genericScheduler) Schedule(ctx context.Context, state *framework.CycleS
 		return result, ErrNoNodesAvailable
 	}
 
+	// "预"预选阶段, 如果目标 pod 在 etcd中已经存在了绑定关系, 这里在运行 preFilter 插件时,
+	// 会把绑定关系存储到 state 变量中, 以便后面使用.
+	//
 	// Run "prefilter" plugins.
 	preFilterStatus := g.framework.RunPreFilterPlugins(ctx, state, pod)
 	if !preFilterStatus.IsSuccess() {
@@ -192,6 +220,7 @@ func (g *genericScheduler) Schedule(ctx context.Context, state *framework.CycleS
 	}
 	trace.Step("Running prefilter plugins done")
 
+	// 这里其实就是"预选"阶段了, 这里会调用各 Filter 插件.
 	startPredicateEvalTime := time.Now()
 	filteredNodes, failedPredicateMap, filteredNodesStatuses, err := g.findNodesThatFit(ctx, state, pod)
 	if err != nil {
@@ -200,11 +229,14 @@ func (g *genericScheduler) Schedule(ctx context.Context, state *framework.CycleS
 	trace.Step("Computing predicates done")
 
 	// Run "postfilter" plugins.
-	postfilterStatus := g.framework.RunPostFilterPlugins(ctx, state, pod, filteredNodes, filteredNodesStatuses)
+	postfilterStatus := g.framework.RunPostFilterPlugins(
+		ctx, state, pod, filteredNodes, filteredNodesStatuses,
+	)
 	if !postfilterStatus.IsSuccess() {
 		return result, postfilterStatus.AsError()
 	}
 
+	// 经过预选, 没有可供选择的主机, 就可以结束了.
 	if len(filteredNodes) == 0 {
 		return result, &FitError{
 			Pod:                   pod,
@@ -214,16 +246,28 @@ func (g *genericScheduler) Schedule(ctx context.Context, state *framework.CycleS
 		}
 	}
 	trace.Step("Running postfilter plugins done")
-	metrics.SchedulingAlgorithmPredicateEvaluationDuration.Observe(metrics.SinceInSeconds(startPredicateEvalTime))
-	metrics.DeprecatedSchedulingAlgorithmPredicateEvaluationDuration.Observe(metrics.SinceInMicroseconds(startPredicateEvalTime))
-	metrics.SchedulingLatency.WithLabelValues(metrics.PredicateEvaluation).Observe(metrics.SinceInSeconds(startPredicateEvalTime))
-	metrics.DeprecatedSchedulingLatency.WithLabelValues(metrics.PredicateEvaluation).Observe(metrics.SinceInSeconds(startPredicateEvalTime))
+	metrics.SchedulingAlgorithmPredicateEvaluationDuration.Observe(
+		metrics.SinceInSeconds(startPredicateEvalTime),
+	)
+	metrics.DeprecatedSchedulingAlgorithmPredicateEvaluationDuration.Observe(
+		metrics.SinceInMicroseconds(startPredicateEvalTime),
+	)
+	metrics.SchedulingLatency.WithLabelValues(metrics.PredicateEvaluation).Observe(
+		metrics.SinceInSeconds(startPredicateEvalTime),
+	)
+	metrics.DeprecatedSchedulingLatency.WithLabelValues(metrics.PredicateEvaluation).Observe(
+		metrics.SinceInSeconds(startPredicateEvalTime),
+	)
 
 	startPriorityEvalTime := time.Now()
 	// When only one node after predicate, just use it.
 	if len(filteredNodes) == 1 {
-		metrics.SchedulingAlgorithmPriorityEvaluationDuration.Observe(metrics.SinceInSeconds(startPriorityEvalTime))
-		metrics.DeprecatedSchedulingAlgorithmPriorityEvaluationDuration.Observe(metrics.SinceInMicroseconds(startPriorityEvalTime))
+		metrics.SchedulingAlgorithmPriorityEvaluationDuration.Observe(
+			metrics.SinceInSeconds(startPriorityEvalTime),
+		)
+		metrics.DeprecatedSchedulingAlgorithmPriorityEvaluationDuration.Observe(
+			metrics.SinceInMicroseconds(startPriorityEvalTime),
+		)
 		return ScheduleResult{
 			SuggestedHost:  filteredNodes[0].Name,
 			EvaluatedNodes: 1 + len(failedPredicateMap) + len(filteredNodesStatuses),
@@ -231,16 +275,29 @@ func (g *genericScheduler) Schedule(ctx context.Context, state *framework.CycleS
 		}, nil
 	}
 
+	////////////////////////////////////////////////////////////////////////////
+	// 优选
+
 	metaPrioritiesInterface := g.priorityMetaProducer(pod, filteredNodes, g.nodeInfoSnapshot)
-	priorityList, err := g.prioritizeNodes(ctx, state, pod, metaPrioritiesInterface, filteredNodes)
+	priorityList, err := g.prioritizeNodes(
+		ctx, state, pod, metaPrioritiesInterface, filteredNodes,
+	)
 	if err != nil {
 		return result, err
 	}
 
-	metrics.SchedulingAlgorithmPriorityEvaluationDuration.Observe(metrics.SinceInSeconds(startPriorityEvalTime))
-	metrics.DeprecatedSchedulingAlgorithmPriorityEvaluationDuration.Observe(metrics.SinceInMicroseconds(startPriorityEvalTime))
-	metrics.SchedulingLatency.WithLabelValues(metrics.PriorityEvaluation).Observe(metrics.SinceInSeconds(startPriorityEvalTime))
-	metrics.DeprecatedSchedulingLatency.WithLabelValues(metrics.PriorityEvaluation).Observe(metrics.SinceInSeconds(startPriorityEvalTime))
+	metrics.SchedulingAlgorithmPriorityEvaluationDuration.Observe(
+		metrics.SinceInSeconds(startPriorityEvalTime),
+	)
+	metrics.DeprecatedSchedulingAlgorithmPriorityEvaluationDuration.Observe(
+		metrics.SinceInMicroseconds(startPriorityEvalTime),
+	)
+	metrics.SchedulingLatency.WithLabelValues(metrics.PriorityEvaluation).Observe(
+		metrics.SinceInSeconds(startPriorityEvalTime),
+	)
+	metrics.DeprecatedSchedulingLatency.WithLabelValues(metrics.PriorityEvaluation).Observe(
+		metrics.SinceInSeconds(startPriorityEvalTime),
+	)
 
 	host, err := g.selectHost(priorityList)
 	trace.Step("Prioritizing done")
@@ -452,9 +509,16 @@ func (g *genericScheduler) numFeasibleNodesToFind(numAllNodes int32) (numNodes i
 	return numNodes
 }
 
+// findNodesThatFit 预选操作. 经过 preFilter(预选前置钩子)后被调用
+//
+// caller:
+// 	1. genericScheduler.Schedule() 只有这一处, 在完成 preFilter() 阶段后被调用.
+//
 // Filters the nodes to find the ones that fit based on the given predicate functions
 // Each node is passed through the predicate functions to determine if it is a fit
-func (g *genericScheduler) findNodesThatFit(ctx context.Context, state *framework.CycleState, pod *v1.Pod) ([]*v1.Node, FailedPredicateMap, framework.NodeToStatusMap, error) {
+func (g *genericScheduler) findNodesThatFit(
+	ctx context.Context, state *framework.CycleState, pod *v1.Pod,
+) ([]*v1.Node, FailedPredicateMap, framework.NodeToStatusMap, error) {
 	var filtered []*v1.Node
 	failedPredicateMap := FailedPredicateMap{}
 	filteredNodesStatuses := framework.NodeToStatusMap{}
@@ -485,12 +549,7 @@ func (g *genericScheduler) findNodesThatFit(ctx context.Context, state *framewor
 			// this is to make sure all nodes have the same chance of being examined across pods.
 			nodeInfo := g.nodeInfoSnapshot.NodeInfoList[(g.nextStartNodeIndex+i)%allNodes]
 			fits, failedPredicates, status, err := g.podFitsOnNode(
-				ctx,
-				state,
-				pod,
-				meta,
-				nodeInfo,
-				g.alwaysCheckAllPredicates,
+				ctx,state,pod,meta,nodeInfo,g.alwaysCheckAllPredicates,
 			)
 			if err != nil {
 				errCh.SendErrorWithCancel(err, cancel)
@@ -533,11 +592,15 @@ func (g *genericScheduler) findNodesThatFit(ctx context.Context, state *framewor
 			if !extender.IsInterested(pod) {
 				continue
 			}
-			filteredList, failedMap, err := extender.Filter(pod, filtered, g.nodeInfoSnapshot.NodeInfoMap)
+			filteredList, failedMap, err := extender.Filter(
+				pod, filtered, g.nodeInfoSnapshot.NodeInfoMap,
+			)
 			if err != nil {
 				if extender.IsIgnorable() {
-					klog.Warningf("Skipping extender %v as it returned error %v and has ignorable flag set",
-						extender, err)
+					klog.Warningf(
+						"Skipping extender %v as it returned error %v and has ignorable flag set",
+						extender, err,
+					)
 					continue
 				}
 
@@ -548,7 +611,9 @@ func (g *genericScheduler) findNodesThatFit(ctx context.Context, state *framewor
 				if _, found := failedPredicateMap[failedNodeName]; !found {
 					failedPredicateMap[failedNodeName] = []predicates.PredicateFailureReason{}
 				}
-				failedPredicateMap[failedNodeName] = append(failedPredicateMap[failedNodeName], predicates.NewFailureReason(failedMsg))
+				failedPredicateMap[failedNodeName] = append(
+					failedPredicateMap[failedNodeName], predicates.NewFailureReason(failedMsg),
+				)
 			}
 			filtered = filteredList
 			if len(filtered) == 0 {
@@ -599,6 +664,15 @@ func (g *genericScheduler) addNominatedPods(ctx context.Context, pod *v1.Pod, me
 	return podsAdded, metaOut, stateOut, nodeInfoOut, nil
 }
 
+// podFitsOnNode 依次执行各 Filter 插件.
+//
+// 	@param pod: 待调度的 Pod 对象
+// 	@param info: 目标 Node 节点的信息
+//
+// caller:
+// 	1. genericScheduler.findNodesThatFit() 普通调度
+// 	2. genericScheduler.selectVictimsOnNode() 抢占时被调用
+//
 // podFitsOnNode checks whether a node given by NodeInfo satisfies the given predicate functions.
 // For given pod, podFitsOnNode will check if any equivalent pod exists and try to reuse its cached
 // predicate results as possible.
