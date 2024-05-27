@@ -223,9 +223,10 @@ func determineRootDirsGOPATH(cfg *Config) map[string]string {
 	m := map[string]string{}
 	out, err := invokeGo(cfg, "env", "GOPATH")
 	if err != nil {
-		// Could not determine root dir mapping. Everything is best-effort, so just return an empty map.
-		// When we try to find the import path for a directory, there will be no root-dir match and
-		// we'll give up.
+		// Could not determine root dir mapping. Everything is best-effort,
+		// so just return an empty map.
+		// When we try to find the import path for a directory,
+		// there will be no root-dir match and we'll give up.
 		return m
 	}
 	for _, p := range filepath.SplitList(string(bytes.TrimSpace(out.Bytes()))) {

@@ -11,9 +11,12 @@ import (
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 )
 
+// 	@implementBy: fsLoader{}
+//
 // Loader loads configuration from a storage layer
 type Loader interface {
-	// Load loads and returns the KubeletConfiguration from the storage layer, or an error if a configuration could not be loaded
+	// Load loads and returns the KubeletConfiguration from the storage layer,
+	// or an error if a configuration could not be loaded
 	Load() (*kubeletconfig.KubeletConfiguration, error)
 }
 
@@ -41,10 +44,15 @@ func NewFsLoader(fs utilfs.Filesystem, kubeletFile string) (Loader, error) {
 	}, nil
 }
 
+// caller:
+// 	1. cmd/kubelet/app/server.go -> loadConfigFile()
 func (loader *fsLoader) Load() (*kubeletconfig.KubeletConfiguration, error) {
 	data, err := loader.fs.ReadFile(loader.kubeletFile)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read kubelet config file %q, error: %v", loader.kubeletFile, err)
+		return nil, fmt.Errorf(
+			"failed to read kubelet config file %q, error: %v", 
+			loader.kubeletFile, err,
+		)
 	}
 
 	// no configuration is an error, some parameters are required
@@ -58,7 +66,10 @@ func (loader *fsLoader) Load() (*kubeletconfig.KubeletConfiguration, error) {
 	}
 
 	// make all paths absolute
-	resolveRelativePaths(kubeletconfig.KubeletConfigurationPathRefs(kc), filepath.Dir(loader.kubeletFile))
+	resolveRelativePaths(
+		kubeletconfig.KubeletConfigurationPathRefs(kc), 
+		filepath.Dir(loader.kubeletFile),
+	)
 	return kc, nil
 }
 

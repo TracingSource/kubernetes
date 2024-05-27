@@ -30,12 +30,16 @@ type Config struct {
 	MaxPodGracePeriodSeconds int64
 	// Thresholds define the set of conditions monitored to trigger eviction.
 	Thresholds []evictionapi.Threshold
-	// KernelMemcgNotification if true will integrate with the kernel memcg notification to determine if memory thresholds are crossed.
+	// KernelMemcgNotification 默认为 false
+	// KernelMemcgNotification if true will integrate with
+	// the kernel memcg notification to determine if memory thresholds are crossed.
 	KernelMemcgNotification bool
 	// PodCgroupRoot is the cgroup which contains all pods.
 	PodCgroupRoot string
 }
 
+// 	@implementBy: pkg/kubelet/eviction/eviction_manager.go -> managerImpl{}
+//
 // Manager evaluates when an eviction threshold for node stability has been met on the node.
 type Manager interface {
 	// Start starts the control loop to monitor eviction thresholds at specified interval.

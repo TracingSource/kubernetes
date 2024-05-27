@@ -37,6 +37,8 @@ type managerImpl struct {
 	clock clock.Clock
 	// config is how the manager is configured
 	config Config
+	// 	@assignAs: pkg/kubelet/pod_workers.go -> killPodNow()
+	//
 	// the function to invoke to kill a pod
 	killPodFunc KillPodFunc
 	// the function to get the mirror pod by a given statid pod
@@ -63,7 +65,8 @@ type managerImpl struct {
 	thresholdsMet []evictionapi.Threshold
 	// signalToRankFunc maps a resource to ranking function for that resource.
 	signalToRankFunc map[evictionapi.Signal]rankFunc
-	// signalToNodeReclaimFuncs maps a resource to an ordered list of functions that know how to reclaim that resource.
+	// signalToNodeReclaimFuncs maps a resource to an ordered list of functions
+	// that know how to reclaim that resource.
 	signalToNodeReclaimFuncs map[evictionapi.Signal]nodeReclaimFuncs
 	// last observations from synchronize
 	lastObservations signalObservations
@@ -78,7 +81,13 @@ type managerImpl struct {
 // ensure it implements the required interface
 var _ Manager = &managerImpl{}
 
-// NewManager returns a configured Manager and an associated admission handler to enforce eviction configuration.
+// 	@param killPodFunc: pkg/kubelet/pod_workers.go -> killPodNow()
+//
+// caller:
+// 	1. pkg/kubelet/kubelet__new.go -> NewMainKubelet()
+//
+// NewManager returns a configured Manager and an associated admission handler
+// to enforce eviction configuration.
 func NewManager(
 	summaryProvider stats.SummaryProvider,
 	config Config,
@@ -148,16 +157,32 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 	}
 }
 
+// 	@param diskInfoProvider: pkg/kubelet/stats/stats_provider.go -> StatsProvider{}
+// 	@param podFunc: pkg/kubelet/kubelet_pods.go -> Kubelet.GetActivePods()
+//  返回非 terminating 状态的 pod 列表.
+//
+// caller:
+// 	1. pkg/kubelet/kubelet__init.go -> Kubelet.initializeRuntimeDependentModules()
+//  在 kubelet 进程启动时被调用.
+//
 // Start starts the control loop to observe and response to low compute resources.
-func (m *managerImpl) Start(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, podCleanedUpFunc PodCleanedUpFunc, monitoringInterval time.Duration) {
+func (m *managerImpl) Start(
+	diskInfoProvider DiskInfoProvider,
+	podFunc ActivePodsFunc,
+	podCleanedUpFunc PodCleanedUpFunc,
+	monitoringInterval time.Duration,
+) {
 	thresholdHandler := func(message string) {
 		klog.Infof(message)
 		m.synchronize(diskInfoProvider, podFunc)
 	}
+	// 一般不会进入该 if{}
 	if m.config.KernelMemcgNotification {
 		for _, threshold := range m.config.Thresholds {
 			if threshold.Signal == evictionapi.SignalMemoryAvailable || threshold.Signal == evictionapi.SignalAllocatableMemoryAvailable {
-				notifier, err := NewMemoryThresholdNotifier(threshold, m.config.PodCgroupRoot, &CgroupNotifierFactory{}, thresholdHandler)
+				notifier, err := NewMemoryThresholdNotifier(
+					threshold, m.config.PodCgroupRoot, &CgroupNotifierFactory{}, thresholdHandler,
+				)
 				if err != nil {
 					klog.Warningf("eviction manager: failed to create memory threshold notifier: %v", err)
 				} else {
@@ -171,7 +196,10 @@ func (m *managerImpl) Start(diskInfoProvider DiskInfoProvider, podFunc ActivePod
 	go func() {
 		for {
 			if evictedPods := m.synchronize(diskInfoProvider, podFunc); evictedPods != nil {
-				klog.Infof("eviction manager: pods %s evicted, waiting for pod to be cleaned up", format.Pods(evictedPods))
+				klog.Infof(
+					"eviction manager: pods %s evicted, waiting for pod to be cleaned up",
+					format.Pods(evictedPods),
+				)
 				m.waitForPodsCleanup(podCleanedUpFunc, evictedPods)
 			} else {
 				time.Sleep(monitoringInterval)
@@ -201,9 +229,18 @@ func (m *managerImpl) IsUnderPIDPressure() bool {
 	return hasNodeCondition(m.nodeConditions, v1.NodePIDPressure)
 }
 
+// 	@param diskInfoProvider: pkg/kubelet/stats/stats_provider.go -> StatsProvider{}
+// 	@param podFunc: pkg/kubelet/kubelet_pods.go -> Kubelet.GetActivePods()
+//  返回非 terminating 状态的 pod 列表.
+//
+// caller:
+// 	1. managerImpl.Start() 只有这一处
+//
 // synchronize is the main control loop that enforces eviction thresholds.
 // Returns the pod that was killed, or nil if no pod was killed.
-func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc) []*v1.Pod {
+func (m *managerImpl) synchronize(
+	diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc,
+) []*v1.Pod {
 	// if we have nothing to do, just return
 	thresholds := m.config.Thresholds
 	if len(thresholds) == 0 && !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
@@ -220,11 +257,15 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		}
 		m.dedicatedImageFs = &hasImageFs
 		m.signalToRankFunc = buildSignalToRankFunc(hasImageFs)
-		m.signalToNodeReclaimFuncs = buildSignalToNodeReclaimFuncs(m.imageGC, m.containerGC, hasImageFs)
+		m.signalToNodeReclaimFuncs = buildSignalToNodeReclaimFuncs(
+			m.imageGC, m.containerGC, hasImageFs,
+		)
 	}
 
+	// 获取非 terminating 状态的 pod 列表.
 	activePods := podFunc()
 	updateStats := true
+	// 获取 kubelet 所在主机的 CPU, 内存, 磁盘等信息.
 	summary, err := m.summaryProvider.Get(updateStats)
 	if err != nil {
 		klog.Errorf("eviction manager: failed to get summary stats: %v", err)
@@ -235,29 +276,40 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		m.thresholdsLastUpdated = m.clock.Now()
 		for _, notifier := range m.thresholdNotifiers {
 			if err := notifier.UpdateThreshold(summary); err != nil {
-				klog.Warningf("eviction manager: failed to update %s: %v", notifier.Description(), err)
+				klog.Warningf(
+					"eviction manager: failed to update %s: %v",
+					notifier.Description(), err,
+				)
 			}
 		}
 	}
 
-	// make observations and get a function to derive pod usage stats relative to those observations.
+	// make observations and get a function to derive pod usage stats relative
+	// to those observations.
 	observations, statsFunc := makeSignalObservations(summary)
 	debugLogObservations("observations", observations)
 
 	// determine the set of thresholds met independent of grace period
 	thresholds = thresholdsMet(thresholds, observations, false)
-	debugLogThresholdsWithObservation("thresholds - ignoring grace period", thresholds, observations)
+	debugLogThresholdsWithObservation(
+		"thresholds - ignoring grace period", thresholds, observations,
+	)
 
-	// determine the set of thresholds previously met that have not yet satisfied the associated min-reclaim
+	// determine the set of thresholds previously met that have not yet
+	// satisfied the associated min-reclaim
 	if len(m.thresholdsMet) > 0 {
 		thresholdsNotYetResolved := thresholdsMet(m.thresholdsMet, observations, true)
 		thresholds = mergeThresholds(thresholds, thresholdsNotYetResolved)
 	}
-	debugLogThresholdsWithObservation("thresholds - reclaim not satisfied", thresholds, observations)
+	debugLogThresholdsWithObservation(
+		"thresholds - reclaim not satisfied", thresholds, observations,
+	)
 
 	// track when a threshold was first observed
 	now := m.clock.Now()
-	thresholdsFirstObservedAt := thresholdsFirstObservedAt(thresholds, m.thresholdsFirstObservedAt, now)
+	thresholdsFirstObservedAt := thresholdsFirstObservedAt(
+		thresholds, m.thresholdsFirstObservedAt, now,
+	)
 
 	// the set of node conditions that are triggered by currently observed thresholds
 	nodeConditions := nodeConditions(thresholds)
@@ -266,17 +318,27 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	}
 
 	// track when a node condition was last observed
-	nodeConditionsLastObservedAt := nodeConditionsLastObservedAt(nodeConditions, m.nodeConditionsLastObservedAt, now)
+	nodeConditionsLastObservedAt := nodeConditionsLastObservedAt(
+		nodeConditions, m.nodeConditionsLastObservedAt, now,
+	)
 
 	// node conditions report true if it has been observed within the transition period window
-	nodeConditions = nodeConditionsObservedSince(nodeConditionsLastObservedAt, m.config.PressureTransitionPeriod, now)
+	nodeConditions = nodeConditionsObservedSince(
+		nodeConditionsLastObservedAt, m.config.PressureTransitionPeriod, now,
+	)
 	if len(nodeConditions) > 0 {
-		klog.V(3).Infof("eviction manager: node conditions - transition period not met: %v", nodeConditions)
+		klog.V(3).Infof(
+			"eviction manager: node conditions - transition period not met: %v", 
+			nodeConditions,
+		)
 	}
 
-	// determine the set of thresholds we need to drive eviction behavior (i.e. all grace periods are met)
+	// determine the set of thresholds we need to drive eviction behavior
+	// (i.e. all grace periods are met)
 	thresholds = thresholdsMetGracePeriod(thresholdsFirstObservedAt, now)
-	debugLogThresholdsWithObservation("thresholds - grace periods satisfied", thresholds, observations)
+	debugLogThresholdsWithObservation(
+		"thresholds - grace periods satisfied", thresholds, observations,
+	)
 
 	// update internal state
 	m.Lock()
@@ -314,9 +376,13 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	klog.Warningf("eviction manager: attempting to reclaim %v", resourceToReclaim)
 
 	// record an event about the resources we are now attempting to reclaim via eviction
-	m.recorder.Eventf(m.nodeRef, v1.EventTypeWarning, "EvictionThresholdMet", "Attempting to reclaim %s", resourceToReclaim)
+	m.recorder.Eventf(
+		m.nodeRef, v1.EventTypeWarning, "EvictionThresholdMet",
+		"Attempting to reclaim %s", resourceToReclaim,
+	)
 
-	// check if there are node-level resources we can reclaim to reduce pressure before evicting end-user pods.
+	// check if there are node-level resources we can reclaim to reduce pressure
+	// before evicting end-user pods.
 	if m.reclaimNodeLevelResources(thresholdToReclaim.Signal, resourceToReclaim) {
 		klog.Infof("eviction manager: able to reduce %v pressure without evicting pods.", resourceToReclaim)
 		return nil
@@ -327,7 +393,10 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	// rank the pods for eviction
 	rank, ok := m.signalToRankFunc[thresholdToReclaim.Signal]
 	if !ok {
-		klog.Errorf("eviction manager: no ranking function for signal %s", thresholdToReclaim.Signal)
+		klog.Errorf(
+			"eviction manager: no ranking function for signal %s",
+			thresholdToReclaim.Signal,
+		)
 		return nil
 	}
 
@@ -346,11 +415,16 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	for _, t := range thresholds {
 		timeObserved := observations[t.Signal].time
 		if !timeObserved.IsZero() {
-			metrics.EvictionStatsAge.WithLabelValues(string(t.Signal)).Observe(metrics.SinceInSeconds(timeObserved.Time))
-			metrics.DeprecatedEvictionStatsAge.WithLabelValues(string(t.Signal)).Observe(metrics.SinceInMicroseconds(timeObserved.Time))
+			metrics.EvictionStatsAge.WithLabelValues(string(t.Signal)).Observe(
+				metrics.SinceInSeconds(timeObserved.Time),
+			)
+			metrics.DeprecatedEvictionStatsAge.WithLabelValues(string(t.Signal)).Observe(
+				metrics.SinceInMicroseconds(timeObserved.Time),
+			)
 		}
 	}
 
+	// 每次最多只 kill 一个 Pod
 	// we kill at most a single pod during each eviction interval
 	for i := range activePods {
 		pod := activePods[i]
@@ -368,7 +442,9 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	return nil
 }
 
-func (m *managerImpl) waitForPodsCleanup(podCleanedUpFunc PodCleanedUpFunc, pods []*v1.Pod) {
+func (m *managerImpl) waitForPodsCleanup(
+	podCleanedUpFunc PodCleanedUpFunc, pods []*v1.Pod,
+) {
 	timeout := m.clock.NewTimer(podCleanupTimeout)
 	defer timeout.Stop()
 	ticker := m.clock.NewTicker(podCleanupPollFreq)
@@ -376,7 +452,10 @@ func (m *managerImpl) waitForPodsCleanup(podCleanedUpFunc PodCleanedUpFunc, pods
 	for {
 		select {
 		case <-timeout.C():
-			klog.Warningf("eviction manager: timed out waiting for pods %s to be cleaned up", format.Pods(pods))
+			klog.Warningf(
+				"eviction manager: timed out waiting for pods %s to be cleaned up",
+				format.Pods(pods),
+			)
 			return
 		case <-ticker.C():
 			for i, pod := range pods {
@@ -384,7 +463,10 @@ func (m *managerImpl) waitForPodsCleanup(podCleanedUpFunc PodCleanedUpFunc, pods
 					break
 				}
 				if i == len(pods)-1 {
-					klog.Infof("eviction manager: pods %s successfully cleaned up", format.Pods(pods))
+					klog.Infof(
+						"eviction manager: pods %s successfully cleaned up",
+						format.Pods(pods),
+					)
 					return
 				}
 			}
@@ -392,13 +474,19 @@ func (m *managerImpl) waitForPodsCleanup(podCleanedUpFunc PodCleanedUpFunc, pods
 	}
 }
 
-// reclaimNodeLevelResources attempts to reclaim node level resources.  returns true if thresholds were satisfied and no pod eviction is required.
-func (m *managerImpl) reclaimNodeLevelResources(signalToReclaim evictionapi.Signal, resourceToReclaim v1.ResourceName) bool {
+// reclaimNodeLevelResources attempts to reclaim node level resources.
+// returns true if thresholds were satisfied and no pod eviction is required.
+func (m *managerImpl) reclaimNodeLevelResources(
+	signalToReclaim evictionapi.Signal, resourceToReclaim v1.ResourceName,
+) bool {
 	nodeReclaimFuncs := m.signalToNodeReclaimFuncs[signalToReclaim]
 	for _, nodeReclaimFunc := range nodeReclaimFuncs {
 		// attempt to reclaim the pressured resource.
 		if err := nodeReclaimFunc(); err != nil {
-			klog.Warningf("eviction manager: unexpected error when attempting to reduce %v pressure: %v", resourceToReclaim, err)
+			klog.Warningf(
+				"eviction manager: unexpected error when attempting to reduce %v pressure: %v",
+				resourceToReclaim, err,
+			)
 		}
 
 	}
@@ -527,9 +615,19 @@ func (m *managerImpl) containerEphemeralStorageLimitEviction(podStats statsapi.P
 	return false
 }
 
-func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg string, annotations map[string]string) bool {
-	// If the pod is marked as critical and static, and support for critical pod annotations is enabled,
-	// do not evict such pods. Static pods are not re-admitted after evictions.
+// 	@param evictMsg: 目标 Pod 被驱逐的原因(将被写到 .status.conditions 中).
+//
+// caller:
+// 	1. managerImpl.synchronize()
+// 	2. managerImpl.emptyDirLimitEviction()
+// 	3. managerImpl.podEphemeralStorageLimitEviction()
+// 	4. managerImpl.containerEphemeralStorageLimitEviction()
+func (m *managerImpl) evictPod(
+	pod *v1.Pod, gracePeriodOverride int64, evictMsg string, annotations map[string]string,
+) bool {
+	// If the pod is marked as critical and static, and support for critical pod
+	// annotations is enabled, do not evict such pods.
+	// Static pods are not re-admitted after evictions.
 	// https://github.com/kubernetes/kubernetes/issues/40573 has more details.
 	if kubelettypes.IsCriticalPod(pod) {
 		klog.Errorf("eviction manager: cannot evict a critical pod %s", format.Pod(pod))
@@ -542,6 +640,7 @@ func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg 
 	}
 	// record that we are evicting the pod
 	m.recorder.AnnotatedEventf(pod, annotations, v1.EventTypeWarning, Reason, evictMsg)
+	// 阻塞直到 pod 及其 container 被 kill 掉之后.
 	// this is a blocking call and should only return when the pod and its containers are killed.
 	err := m.killPodFunc(pod, status, &gracePeriodOverride)
 	if err != nil {

@@ -103,16 +103,16 @@ type KubeletConfiguration struct {
 	// TLSMinVersion is the minimum TLS version supported.
 	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
 	TLSMinVersion string
-	// rotateCertificates enables client certificate rotation. The Kubelet will request a
-	// new certificate from the certificates.k8s.io API. This requires an approver to approve the
-	// certificate signing requests. The RotateKubeletClientCertificate feature
-	// must be enabled.
+	// rotateCertificates enables client certificate rotation.
+	// The Kubelet will request a new certificate from the certificates.k8s.io API.
+	// This requires an approver to approve the certificate signing requests.
+	// The RotateKubeletClientCertificate feature must be enabled.
 	RotateCertificates bool
-	// serverTLSBootstrap enables server certificate bootstrap. Instead of self
-	// signing a serving certificate, the Kubelet will request a certificate from
-	// the certificates.k8s.io API. This requires an approver to approve the
-	// certificate signing requests. The RotateKubeletServerCertificate feature
-	// must be enabled.
+	// serverTLSBootstrap enables server certificate bootstrap.
+	// Instead of self signing a serving certificate, the Kubelet will request
+	// a certificate from the certificates.k8s.io API.
+	// This requires an approver to approve the certificate signing requests.
+	// The RotateKubeletServerCertificate feature must be enabled.
 	ServerTLSBootstrap bool
 	// authentication specifies how requests to the Kubelet's server are authenticated
 	Authentication KubeletAuthentication
@@ -125,8 +125,8 @@ type KubeletConfiguration struct {
 	// pulls to burst to this number, while still not exceeding registryPullQPS.
 	// Only used if registryPullQPS > 0.
 	RegistryBurst int32
-	// eventRecordQPS is the maximum event creations per second. If 0, there
-	// is no limit enforced.
+	// eventRecordQPS is the maximum event creations per second.
+	// If 0, there is no limit enforced.
 	EventRecordQPS int32
 	// eventBurst is the maximum size of a burst of event creations, temporarily
 	// allows event creations to burst to this number, while still not exceeding
@@ -234,7 +234,8 @@ type KubeletConfiguration struct {
 	// The CIDR to use for pod IP addresses, only used in standalone mode.
 	// In cluster mode, this is obtained from the master.
 	PodCIDR string
-	// The maximum number of processes per pod.  If -1, the kubelet defaults to the node allocatable pid capacity.
+	// The maximum number of processes per pod. 
+	// If -1, the kubelet defaults to the node allocatable pid capacity.
 	PodPidsLimit int64
 	// ResolverConfig is the resolver configuration file used as the basis
 	// for the container DNS resolution configuration.
@@ -242,7 +243,8 @@ type KubeletConfiguration struct {
 	// cpuCFSQuota enables CPU CFS quota enforcement for containers that
 	// specify CPU limits
 	CPUCFSQuota bool
-	// CPUCFSQuotaPeriod sets the CPU CFS quota period value, cpu.cfs_period_us, defaults to 100ms
+	// CPUCFSQuotaPeriod sets the CPU CFS quota period value, cpu.cfs_period_us,
+	// defaults to 100ms
 	CPUCFSQuotaPeriod metav1.Duration
 	// maxOpenFiles is Number of files that can be opened by Kubelet process.
 	MaxOpenFiles int64
@@ -303,15 +305,18 @@ type KubeletConfiguration struct {
 	FeatureGates map[string]bool
 	// Tells the Kubelet to fail to start if swap is enabled on the node.
 	FailSwapOn bool
-	// A quantity defines the maximum size of the container log file before it is rotated. For example: "5Mi" or "256Ki".
+	// A quantity defines the maximum size of the container log file before it is rotated.
+	// For example: "5Mi" or "256Ki".
 	ContainerLogMaxSize string
 	// Maximum number of container log files that can be present for a container.
 	ContainerLogMaxFiles int32
-	// ConfigMapAndSecretChangeDetectionStrategy is a mode in which config map and secret managers are running.
+	// ConfigMapAndSecretChangeDetectionStrategy is a mode in which config map
+	// and secret managers are running.
 	ConfigMapAndSecretChangeDetectionStrategy ResourceChangeDetectionStrategy
 	// A comma separated whitelist of unsafe sysctls or sysctl patterns (ending in *).
 	// Unsafe sysctl groups are kernel.shm*, kernel.msg*, kernel.sem, fs.mqueue.*, and net.*.
-	// These sysctls are namespaced but not allowed by default.  For example: "kernel.msg*,net.ipv4.route.min_pmtu"
+	// These sysctls are namespaced but not allowed by default. 
+	// For example: "kernel.msg*,net.ipv4.route.min_pmtu"
 	// +optional
 	AllowedUnsafeSysctls []string
 
@@ -379,8 +384,9 @@ type KubeletAuthentication struct {
 }
 
 type KubeletX509Authentication struct {
-	// clientCAFile is the path to a PEM-encoded certificate bundle. If set, any request presenting a client certificate
-	// signed by one of the authorities in the bundle is authenticated with a username corresponding to the CommonName,
+	// clientCAFile is the path to a PEM-encoded certificate bundle.
+	// If set, any request presenting a client certificate signed by one of the
+	// authorities in the bundle is authenticated with a username corresponding to the CommonName,
 	// and groups corresponding to the Organization in the client certificate.
 	ClientCAFile string
 }

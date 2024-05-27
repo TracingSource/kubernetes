@@ -215,8 +215,8 @@ type Kubelet struct {
 	//           struct. For example, by adding a getter to generic runtime.
 	runtimeService internalapi.RuntimeService
 
-	// reasonCache caches the failure reason of the last creation of all containers, which is
-	// used for generating ContainerStatus.
+	// reasonCache caches the failure reason of the last creation of all containers,
+	// which is used for generating ContainerStatus.
 	reasonCache *ReasonCache
 
 	// nodeStatusUpdateFrequency specifies how often kubelet computes node status. If node lease
@@ -386,6 +386,8 @@ type Kubelet struct {
 	// It should be set only when docker is using non json-file logging driver.
 	dockerLegacyService dockershim.DockerLegacyService
 
+	// 	@assignAs: pkg/kubelet/stats/stats_provider.go -> StatsProvider{}
+	//
 	// StatsProvider provides the node and the container stats.
 	*stats.StatsProvider
 

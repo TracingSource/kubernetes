@@ -91,21 +91,27 @@ type KubeletFlags struct {
 	// +optional
 	CloudConfigFile string
 
-	// rootDirectory 默认为 /var/lib/kubelet 
+	// rootDirectory --root-dir 参数, 默认为 /var/lib/kubelet 
 	//
-	// rootDirectory is the directory path to place kubelet files (volume
-	// mounts,etc).
+	// rootDirectory is the directory path to place kubelet files
+	// (volume mounts,etc).
 	RootDirectory string
 
-	// The Kubelet will use this directory for checkpointing downloaded configurations and tracking configuration health.
+	// DynamicConfigDir dynamic-config-dir 参数, 默认为空, 已废弃.
+	//
+	// The Kubelet will use this directory for checkpointing downloaded
+	// configurations and tracking configuration health.
 	// The Kubelet will create this directory if it does not already exist.
-	// The path may be absolute or relative; relative paths are under the Kubelet's current working directory.
+	// The path may be absolute or relative; relative paths are under
+	// the Kubelet's current working directory.
 	// Providing this flag enables dynamic kubelet configuration.
 	// To use this flag, the DynamicKubeletConfig feature gate must be enabled.
 	DynamicConfigDir cliflag.StringFlag
 
+	// KubeletConfigFile --config 参数指定的配置文件路径, 一般为 /var/lib/kubelet/config.yaml
 	// The Kubelet will load its initial configuration from this file.
-	// The path may be absolute or relative; relative paths are under the Kubelet's current working directory.
+	// The path may be absolute or relative;
+	// relative paths are under the Kubelet's current working directory.
 	// Omit this flag to use the combination of built-in default configuration values and flags.
 	KubeletConfigFile string
 

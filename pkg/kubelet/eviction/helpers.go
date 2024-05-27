@@ -1003,8 +1003,19 @@ func buildSignalToNodeReclaimFuncs(imageGC ImageGC, containerGC ContainerGC, wit
 	return signalToReclaimFunc
 }
 
-// evictionMessage constructs a useful message about why an eviction occurred, and annotations to provide metadata about the eviction
-func evictionMessage(resourceToReclaim v1.ResourceName, pod *v1.Pod, stats statsFunc) (message string, annotations map[string]string) {
+// evictionMessage 为 Pod .status.conditions 构造其被驱逐的原因并返回.
+//
+// 	@param resourceToReclaim: 资源名称, 由于这种资源不足而发生的驱逐行为, 比如 storage.
+//
+// caller:
+// 	1. pkg/kubelet/eviction/eviction_manager.go -> managerImpl.synchronize()
+//  只有这一处
+//
+// evictionMessage constructs a useful message about why an eviction occurred,
+// and annotations to provide metadata about the eviction
+func evictionMessage(
+	resourceToReclaim v1.ResourceName, pod *v1.Pod, stats statsFunc,
+) (message string, annotations map[string]string) {
 	annotations = make(map[string]string)
 	message = fmt.Sprintf(nodeLowMessageFmt, resourceToReclaim)
 	containers := []string{}
@@ -1021,15 +1032,23 @@ func evictionMessage(resourceToReclaim v1.ResourceName, pod *v1.Pod, stats stats
 				switch resourceToReclaim {
 				case v1.ResourceEphemeralStorage:
 					if containerStats.Rootfs != nil && containerStats.Rootfs.UsedBytes != nil && containerStats.Logs != nil && containerStats.Logs.UsedBytes != nil {
-						usage = resource.NewQuantity(int64(*containerStats.Rootfs.UsedBytes+*containerStats.Logs.UsedBytes), resource.BinarySI)
+						usage = resource.NewQuantity(
+							int64(*containerStats.Rootfs.UsedBytes+*containerStats.Logs.UsedBytes), 
+							resource.BinarySI,
+						)
 					}
 				case v1.ResourceMemory:
 					if containerStats.Memory != nil && containerStats.Memory.WorkingSetBytes != nil {
-						usage = resource.NewQuantity(int64(*containerStats.Memory.WorkingSetBytes), resource.BinarySI)
+						usage = resource.NewQuantity(
+							int64(*containerStats.Memory.WorkingSetBytes), 
+							resource.BinarySI,
+						)
 					}
 				}
 				if usage != nil && usage.Cmp(requests) > 0 {
-					message += fmt.Sprintf(containerMessageFmt, container.Name, usage.String(), requests.String())
+					message += fmt.Sprintf(
+						containerMessageFmt, container.Name, usage.String(), requests.String(),
+					)
 					containers = append(containers, container.Name)
 					containerUsage = append(containerUsage, usage.String())
 				}

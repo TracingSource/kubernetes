@@ -16,6 +16,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/status"
 )
 
+// caller:
+// 	1. pkg/kubelet/kubelet__new.go -> NewMainKubelet()
+//
 // NewCRIStatsProvider returns a StatsProvider that provides the node stats
 // from cAdvisor and the container stats from CRI.
 func NewCRIStatsProvider(
@@ -28,10 +31,18 @@ func NewCRIStatsProvider(
 	logMetricsService LogMetricsService,
 	osInterface kubecontainer.OSInterface,
 ) *StatsProvider {
-	return newStatsProvider(cadvisor, podManager, runtimeCache, newCRIStatsProvider(cadvisor, resourceAnalyzer,
-		runtimeService, imageService, logMetricsService, osInterface))
+	return newStatsProvider(
+		cadvisor, podManager, runtimeCache, 
+		newCRIStatsProvider(
+			cadvisor, resourceAnalyzer, runtimeService, imageService, 
+			logMetricsService, osInterface,
+		),
+	)
 }
 
+// caller:
+// 	1. pkg/kubelet/kubelet__new.go -> NewMainKubelet()
+//
 // NewCadvisorStatsProvider returns a containerStatsProvider that provides both
 // the node and the container stats from cAdvisor.
 func NewCadvisorStatsProvider(
@@ -42,7 +53,10 @@ func NewCadvisorStatsProvider(
 	imageService kubecontainer.ImageService,
 	statusProvider status.PodStatusProvider,
 ) *StatsProvider {
-	return newStatsProvider(cadvisor, podManager, runtimeCache, newCadvisorStatsProvider(cadvisor, resourceAnalyzer, imageService, statusProvider))
+	return newStatsProvider(
+		cadvisor, podManager, runtimeCache, 
+		newCadvisorStatsProvider(cadvisor, resourceAnalyzer, imageService, statusProvider),
+	)
 }
 
 // newStatsProvider returns a new StatsProvider that provides node stats from
@@ -102,8 +116,9 @@ func (p *StatsProvider) GetCgroupStats(cgroupName string, updateStats bool) (*st
 	return s, n, nil
 }
 
-// GetCgroupCPUAndMemoryStats returns the CPU and memory stats of the cgroup with the cgroupName. Note that
-// this function doesn't generate filesystem stats.
+// GetCgroupCPUAndMemoryStats returns the CPU and memory stats of the cgroup
+// with the cgroupName.
+// Note that this function doesn't generate filesystem stats.
 func (p *StatsProvider) GetCgroupCPUAndMemoryStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, error) {
 	info, err := getCgroupInfo(p.cadvisor, cgroupName, updateStats)
 	if err != nil {
@@ -146,7 +161,10 @@ func (p *StatsProvider) RootFsStats() (*statsapi.FsStats, error) {
 }
 
 // GetContainerInfo returns stats (from cAdvisor) for a container.
-func (p *StatsProvider) GetContainerInfo(podFullName string, podUID types.UID, containerName string, req *cadvisorapiv1.ContainerInfoRequest) (*cadvisorapiv1.ContainerInfo, error) {
+func (p *StatsProvider) GetContainerInfo(
+	podFullName string, podUID types.UID, containerName string, 
+	req *cadvisorapiv1.ContainerInfoRequest,
+) (*cadvisorapiv1.ContainerInfo, error) {
 	// Resolve and type convert back again.
 	// We need the static pod UID but the kubecontainer API works with types.UID.
 	podUID = types.UID(p.podManager.TranslatePodUID(podUID))
@@ -170,7 +188,9 @@ func (p *StatsProvider) GetContainerInfo(podFullName string, podUID types.UID, c
 
 // GetRawContainerInfo returns the stats (from cadvisor) for a non-Kubernetes
 // container.
-func (p *StatsProvider) GetRawContainerInfo(containerName string, req *cadvisorapiv1.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorapiv1.ContainerInfo, error) {
+func (p *StatsProvider) GetRawContainerInfo(
+	containerName string, req *cadvisorapiv1.ContainerInfoRequest, subcontainers bool,
+) (map[string]*cadvisorapiv1.ContainerInfo, error) {
 	if subcontainers {
 		return p.cadvisor.SubcontainerInfo(containerName, req)
 	}
@@ -183,6 +203,8 @@ func (p *StatsProvider) GetRawContainerInfo(containerName string, req *cadvisora
 	}, nil
 }
 
+// caller:
+// 	1. pkg/kubelet/eviction/eviction_manager.go -> managerImpl.synchronize()
 // HasDedicatedImageFs returns true if a dedicated image filesystem exists for storing images.
 func (p *StatsProvider) HasDedicatedImageFs() (bool, error) {
 	device, err := p.containerStatsProvider.ImageFsDevice()

@@ -235,13 +235,21 @@ func makePodSourceConfig(
 	// define file config source
 	if kubeCfg.StaticPodPath != "" {
 		klog.Infof("Adding pod path: %v", kubeCfg.StaticPodPath)
-		config.NewSourceFile(kubeCfg.StaticPodPath, nodeName, kubeCfg.FileCheckFrequency.Duration, cfg.Channel(kubetypes.FileSource))
+		config.NewSourceFile(
+			kubeCfg.StaticPodPath, nodeName, kubeCfg.FileCheckFrequency.Duration, 
+			cfg.Channel(kubetypes.FileSource),
+		)
 	}
 
 	// define url config source
 	if kubeCfg.StaticPodURL != "" {
-		klog.Infof("Adding pod url %q with HTTP header %v", kubeCfg.StaticPodURL, manifestURLHeader)
-		config.NewSourceURL(kubeCfg.StaticPodURL, manifestURLHeader, nodeName, kubeCfg.HTTPCheckFrequency.Duration, cfg.Channel(kubetypes.HTTPSource))
+		klog.Infof(
+			"Adding pod url %q with HTTP header %v", kubeCfg.StaticPodURL, manifestURLHeader,
+		)
+		config.NewSourceURL(
+			kubeCfg.StaticPodURL, manifestURLHeader, nodeName, 
+			kubeCfg.HTTPCheckFrequency.Duration, cfg.Channel(kubetypes.HTTPSource),
+		)
 	}
 
 	// Restore from the checkpoint path
@@ -277,11 +285,15 @@ func getRuntimeAndImageServices(
 	remoteRuntimeEndpoint string, remoteImageEndpoint string, 
 	runtimeRequestTimeout metav1.Duration,
 ) (internalapi.RuntimeService, internalapi.ImageManagerService, error) {
-	rs, err := remote.NewRemoteRuntimeService(remoteRuntimeEndpoint, runtimeRequestTimeout.Duration)
+	rs, err := remote.NewRemoteRuntimeService(
+		remoteRuntimeEndpoint, runtimeRequestTimeout.Duration,
+	)
 	if err != nil {
 		return nil, nil, err
 	}
-	is, err := remote.NewRemoteImageService(remoteImageEndpoint, runtimeRequestTimeout.Duration)
+	is, err := remote.NewRemoteImageService(
+		remoteImageEndpoint, runtimeRequestTimeout.Duration,
+	)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -307,7 +319,9 @@ func (kl *Kubelet) StartGarbageCollection() {
 	go wait.Until(func() {
 		if err := kl.containerGC.GarbageCollect(); err != nil {
 			klog.Errorf("Container garbage collection failed: %v", err)
-			kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.ContainerGCFailed, err.Error())
+			kl.recorder.Eventf(
+				kl.nodeRef, v1.EventTypeWarning, events.ContainerGCFailed, err.Error(),
+			)
 			loggedContainerGCFailure = true
 		} else {
 			var vLevel klog.Level = 4
@@ -332,7 +346,9 @@ func (kl *Kubelet) StartGarbageCollection() {
 			if prevImageGCFailed {
 				klog.Errorf("Image garbage collection failed multiple times in a row: %v", err)
 				// Only create an event for repeated failures
-				kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.ImageGCFailed, err.Error())
+				kl.recorder.Eventf(
+					kl.nodeRef, v1.EventTypeWarning, events.ImageGCFailed, err.Error(),
+				)
 			} else {
 				klog.Errorf("Image garbage collection failed once. Stats initialization may not have completed yet: %v", err)
 			}
@@ -373,7 +389,9 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	}
 
 	if err := kl.initializeModules(); err != nil {
-		kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.KubeletSetupFailed, err.Error())
+		kl.recorder.Eventf(
+			kl.nodeRef, v1.EventTypeWarning, events.KubeletSetupFailed, err.Error(),
+		)
 		klog.Fatal(err)
 	}
 
@@ -942,7 +960,9 @@ func (kl *Kubelet) updateRuntimeUp() {
 	networkReady := s.GetRuntimeCondition(kubecontainer.NetworkReady)
 	if networkReady == nil || !networkReady.Status {
 		klog.Errorf("Container runtime network not ready: %v", networkReady)
-		kl.runtimeState.setNetworkState(fmt.Errorf("runtime network not ready: %v", networkReady))
+		kl.runtimeState.setNetworkState(
+			fmt.Errorf("runtime network not ready: %v", networkReady),
+		)
 	} else {
 		// Set nil if the container runtime network is ready.
 		kl.runtimeState.setNetworkState(nil)
@@ -992,11 +1012,17 @@ func (kl *Kubelet) ListenAndServe(
 	auth server.AuthInterface,
 	enableCAdvisorJSONEndpoints, enableDebuggingHandlers, enableContentionProfiling bool,
 ) {
-	server.ListenAndServeKubeletServer(kl, kl.resourceAnalyzer, address, port, tlsOptions, auth, enableCAdvisorJSONEndpoints, enableDebuggingHandlers, enableContentionProfiling, kl.redirectContainerStreaming, kl.criHandler)
+	server.ListenAndServeKubeletServer(
+		kl, kl.resourceAnalyzer, address, port, tlsOptions, auth, 
+		enableCAdvisorJSONEndpoints, enableDebuggingHandlers, 
+		enableContentionProfiling, kl.redirectContainerStreaming, kl.criHandler,
+	)
 }
 
 // ListenAndServeReadOnly runs the kubelet HTTP server in read-only mode.
-func (kl *Kubelet) ListenAndServeReadOnly(address net.IP, port uint, enableCAdvisorJSONEndpoints bool) {
+func (kl *Kubelet) ListenAndServeReadOnly(
+	address net.IP, port uint, enableCAdvisorJSONEndpoints bool,
+) {
 	server.ListenAndServeKubeletReadOnlyServer(kl, kl.resourceAnalyzer, address, port, enableCAdvisorJSONEndpoints)
 }
 
@@ -1010,7 +1036,8 @@ func (kl *Kubelet) ListenAndServePodResources() {
 	server.ListenAndServePodResources(socket, kl.podManager, kl.containerManager)
 }
 
-// Delete the eligible dead container instances in a pod. Depending on the configuration, the latest dead containers may be kept around.
+// Delete the eligible dead container instances in a pod.
+// Depending on the configuration, the latest dead containers may be kept around.
 func (kl *Kubelet) cleanUpContainersInPod(podID types.UID, exitedContainerID string) {
 	if podStatus, err := kl.podCache.Get(podID); err == nil {
 		removeAll := false
@@ -1026,7 +1053,8 @@ func (kl *Kubelet) cleanUpContainersInPod(podID types.UID, exitedContainerID str
 
 // fastStatusUpdateOnce starts a loop that checks the internal node indexer cache for when a CIDR
 // is applied  and tries to update pod CIDR immediately. After pod CIDR is updated it fires off
-// a runtime update and a node status update. Function returns after one successful node status update.
+// a runtime update and a node status update.
+// Function returns after one successful node status update.
 // Function is executed only during Kubelet start which improves latency to ready node by updating
 // pod CIDR, runtime status and node statuses ASAP.
 func (kl *Kubelet) fastStatusUpdateOnce() {

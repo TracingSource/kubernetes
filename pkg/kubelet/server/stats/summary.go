@@ -10,6 +10,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util"
 )
 
+// 	@implementBy: summaryProviderImpl{}
 // SummaryProvider provides summaries of the stats from Kubelet.
 type SummaryProvider interface {
 	// Get provides a new Summary with the stats from Kubelet,
@@ -48,6 +49,8 @@ func NewSummaryProvider(statsProvider Provider) SummaryProvider {
 	}
 }
 
+// caller:
+// 	1. pkg/kubelet/eviction/eviction_manager.go -> managerImpl.synchronize()
 func (sp *summaryProviderImpl) Get(updateStats bool) (*statsapi.Summary, error) {
 	// TODO(timstclair): Consider returning a best-effort response if any of
 	// the following errors occur.

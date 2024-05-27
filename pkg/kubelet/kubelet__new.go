@@ -75,7 +75,8 @@ import (
 //        每个 docker 容器在启动时都会创建一个新的 containerd-shim 进程, 
 //        并指定 dockershim.sock 路径
 //
-// caller: cmd/kubelet/app/server.go -> createAndInitKubelet()
+// caller: 
+// 	1. cmd/kubelet/app/server.go -> createAndInitKubelet()
 //
 // NewMainKubelet instantiates a new Kubelet object along with all the required internal modules.
 // No initialization of Kubelet and its modules should happen here.
@@ -300,7 +301,9 @@ func NewMainKubelet(
 	}
 
 	if klet.cloud != nil {
-		klet.cloudResourceSyncManager = cloudresource.NewSyncManager(klet.cloud, nodeName, klet.nodeStatusUpdateFrequency)
+		klet.cloudResourceSyncManager = cloudresource.NewSyncManager(
+			klet.cloud, nodeName, klet.nodeStatusUpdateFrequency,
+		)
 	}
 
 	var secretManager secret.Manager
@@ -318,7 +321,10 @@ func NewMainKubelet(
 		secretManager = secret.NewSimpleSecretManager(kubeDeps.KubeClient)
 		configMapManager = configmap.NewSimpleConfigMapManager(kubeDeps.KubeClient)
 	default:
-		return nil, fmt.Errorf("unknown configmap and secret manager mode: %v", kubeCfg.ConfigMapAndSecretChangeDetectionStrategy)
+		return nil, fmt.Errorf(
+			"unknown configmap and secret manager mode: %v", 
+			kubeCfg.ConfigMapAndSecretChangeDetectionStrategy,
+		)
 	}
 
 	klet.secretManager = secretManager
@@ -348,8 +354,12 @@ func NewMainKubelet(
 		}
 	}
 	// podManager is also responsible for keeping secretManager and configMapManager contents up-to-date.
-	mirrorPodClient := kubepod.NewBasicMirrorClient(klet.kubeClient, string(nodeName), nodeLister)
-	klet.podManager = kubepod.NewBasicPodManager(mirrorPodClient, secretManager, configMapManager, checkpointManager)
+	mirrorPodClient := kubepod.NewBasicMirrorClient(
+		klet.kubeClient, string(nodeName), nodeLister,
+	)
+	klet.podManager = kubepod.NewBasicPodManager(
+		mirrorPodClient, secretManager, configMapManager, checkpointManager,
+	)
 
 	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet)
 
@@ -374,7 +384,9 @@ func NewMainKubelet(
 		MTU:                int(crOptions.NetworkPluginMTU),
 	}
 
-	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(klet, kubeCfg.VolumeStatsAggPeriod.Duration)
+	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(
+		klet, kubeCfg.VolumeStatsAggPeriod.Duration,
+	)
 
 	// if left at nil, that means it is unneeded
 	var legacyLogProvider kuberuntime.LegacyLogProvider
@@ -398,9 +410,10 @@ func NewMainKubelet(
 		}
 
 		// The unix socket for kubelet <-> dockershim communication.
-		klog.V(5).Infof("RemoteRuntimeEndpoint: %q, RemoteImageEndpoint: %q",
-			remoteRuntimeEndpoint,
-			remoteImageEndpoint)
+		klog.V(5).Infof(
+			"RemoteRuntimeEndpoint: %q, RemoteImageEndpoint: %q",
+			remoteRuntimeEndpoint, remoteImageEndpoint,
+		)
 		klog.V(2).Infof("Starting the GRPC server for the docker CRI shim.")
 		server := dockerremote.NewDockerServer(remoteRuntimeEndpoint, ds)
 		if err := server.Start(); err != nil {
@@ -478,7 +491,8 @@ func NewMainKubelet(
 			klet.podManager,
 			klet.runtimeCache,
 			klet.containerRuntime,
-			klet.statusManager)
+			klet.statusManager,
+		)
 	} else {
 		klet.StatsProvider = stats.NewCRIStatsProvider(
 			klet.cadvisor,
@@ -488,10 +502,14 @@ func NewMainKubelet(
 			runtimeService,
 			imageService,
 			stats.NewLogMetricsService(),
-			kubecontainer.RealOS{})
+			kubecontainer.RealOS{},
+		)
 	}
 
-	klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod, klet.podCache, clock.RealClock{})
+	klet.pleg = pleg.NewGenericPLEG(
+		klet.containerRuntime, plegChannelCapacity, plegRelistPeriod, 
+		klet.podCache, clock.RealClock{},
+	)
 	klet.runtimeState = newRuntimeState(maxWaitForContainerRuntime)
 	klet.runtimeState.addHealthCheck("PLEG", klet.pleg.Healthy)
 	if _, err := klet.updatePodCIDR(kubeCfg.PodCIDR); err != nil {
@@ -499,15 +517,23 @@ func NewMainKubelet(
 	}
 
 	// setup containerGC
-	containerGC, err := kubecontainer.NewContainerGC(klet.containerRuntime, containerGCPolicy, klet.sourcesReady)
+	containerGC, err := kubecontainer.NewContainerGC(
+		klet.containerRuntime, containerGCPolicy, klet.sourcesReady,
+	)
 	if err != nil {
 		return nil, err
 	}
 	klet.containerGC = containerGC
-	klet.containerDeletor = newPodContainerDeletor(klet.containerRuntime, integer.IntMax(containerGCPolicy.MaxPerPodContainer, minDeadContainerInPod))
+	klet.containerDeletor = newPodContainerDeletor(
+		klet.containerRuntime, 
+		integer.IntMax(containerGCPolicy.MaxPerPodContainer, minDeadContainerInPod),
+	)
 
 	// setup imageManager
-	imageManager, err := images.NewImageGCManager(klet.containerRuntime, klet.StatsProvider, kubeDeps.Recorder, nodeRef, imageGCPolicy, crOptions.PodSandboxImage)
+	imageManager, err := images.NewImageGCManager(
+		klet.containerRuntime, klet.StatsProvider, kubeDeps.Recorder, nodeRef, 
+		imageGCPolicy, crOptions.PodSandboxImage,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize image manager: %v", err)
 	}
@@ -548,15 +574,19 @@ func NewMainKubelet(
 		klet.startupManager,
 		klet.runner,
 		containerRefManager,
-		kubeDeps.Recorder)
+		kubeDeps.Recorder,
+	)
 
 	tokenManager := token.NewManager(kubeDeps.KubeClient)
 
-	// NewInitializedVolumePluginMgr initializes some storageErrors on the Kubelet runtimeState (in csi_plugin.go init)
-	// which affects node ready status. This function must be called before Kubelet is initialized so that the Node
+	// NewInitializedVolumePluginMgr initializes some storageErrors on the
+	// Kubelet runtimeState (in csi_plugin.go init) which affects node ready status.
+	// This function must be called before Kubelet is initialized so that the Node
 	// ReadyState is accurate with the storage state.
-	klet.volumePluginMgr, err =
-		NewInitializedVolumePluginMgr(klet, secretManager, configMapManager, tokenManager, kubeDeps.VolumePlugins, kubeDeps.DynamicPluginProber)
+	klet.volumePluginMgr, err = NewInitializedVolumePluginMgr(
+		klet, secretManager, configMapManager, tokenManager, 
+		kubeDeps.VolumePlugins, kubeDeps.DynamicPluginProber,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -589,17 +619,26 @@ func NewMainKubelet(
 		kubeDeps.Recorder,
 		experimentalCheckNodeCapabilitiesBeforeMount,
 		keepTerminatedPodVolumes,
-		volumepathhandler.NewBlockVolumePathHandler())
+		volumepathhandler.NewBlockVolumePathHandler(),
+	)
 
 	klet.reasonCache = NewReasonCache()
 	klet.workQueue = queue.NewBasicWorkQueue(klet.clock)
-	klet.podWorkers = newPodWorkers(klet.syncPod, kubeDeps.Recorder, klet.workQueue, klet.resyncInterval, backOffPeriod, klet.podCache)
+	klet.podWorkers = newPodWorkers(
+		klet.syncPod, kubeDeps.Recorder, klet.workQueue, klet.resyncInterval, 
+		backOffPeriod, klet.podCache,
+	)
 
 	klet.backOff = flowcontrol.NewBackOff(backOffPeriod, MaxContainerBackOff)
 	klet.podKillingCh = make(chan *kubecontainer.PodPair, podKillingChannelCapacity)
 
 	// setup eviction manager
-	evictionManager, evictionAdmitHandler := eviction.NewManager(klet.resourceAnalyzer, evictionConfig, killPodNow(klet.podWorkers, kubeDeps.Recorder), klet.podManager.GetMirrorPodByPod, klet.imageManager, klet.containerGC, kubeDeps.Recorder, nodeRef, klet.clock)
+	evictionManager, evictionAdmitHandler := eviction.NewManager(
+		klet.resourceAnalyzer, evictionConfig, 
+		killPodNow(klet.podWorkers, kubeDeps.Recorder), 
+		klet.podManager.GetMirrorPodByPod, klet.imageManager, klet.containerGC, 
+		kubeDeps.Recorder, nodeRef, klet.clock,
+	)
 
 	klet.evictionManager = evictionManager
 	klet.admitHandlers.AddPodAdmitHandler(evictionAdmitHandler)

@@ -307,9 +307,15 @@ func (p *podWorkers) checkForUpdates(uid types.UID) {
 	}
 }
 
+// caller:
+// 	1. pkg/kubelet/kubelet__new.go -> NewMainKubelet()
+//
 // killPodNow returns a KillPodFunc that can be used to kill a pod.
 // It is intended to be injected into other modules that need to kill a pod.
 func killPodNow(podWorkers PodWorkers, recorder record.EventRecorder) eviction.KillPodFunc {
+	// caller:
+	// 	1. pkg/kubelet/eviction/eviction_manager.go -> managerImpl.evictPod()
+	//  作为 killPodFunc() 函数被调用.
 	return func(pod *v1.Pod, status v1.PodStatus, gracePeriodOverride *int64) error {
 		// determine the grace period to use when killing the pod
 		gracePeriod := int64(0)
@@ -320,7 +326,8 @@ func killPodNow(podWorkers PodWorkers, recorder record.EventRecorder) eviction.K
 		}
 
 		// we timeout and return an error if we don't get a callback within a reasonable time.
-		// the default timeout is relative to the grace period (we settle on 10s to wait for kubelet->runtime traffic to complete in sigkill)
+		// the default timeout is relative to the grace period
+		// (we settle on 10s to wait for kubelet->runtime traffic to complete in sigkill)
 		timeout := int64(gracePeriod + (gracePeriod / 2))
 		minTimeout := int64(10)
 		if timeout < minTimeout {

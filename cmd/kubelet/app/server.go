@@ -175,12 +175,12 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 
 			if kubeletFlags.ContainerRuntime == "remote" && cleanFlagSet.Changed("pod-infra-container-image") {
 				klog.Warning(
-					"Warning: For remote container runtime, --pod-infra-container-image is ignored in kubelet, "+
-					"which should be set in that remote runtime instead",
+					"Warning: For remote container runtime, --pod-infra-container-image is ignored in kubelet, " +
+						"which should be set in that remote runtime instead",
 				)
 			}
 
-			// configFile 命令行通过 --config 参数指定的配置文件路径, 一般为 /var/lib/kubelet/config.yaml
+			// configFile 一般为 /var/lib/kubelet/config.yaml
 			// load kubelet config file, if provided
 			if configFile := kubeletFlags.KubeletConfigFile; len(configFile) > 0 {
 				kubeletConfig, err = loadConfigFile(configFile)
@@ -207,23 +207,23 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 				klog.Fatal(err)
 			}
 
-			// dynamic kubelet config 默认为 false
+			// DynamicConfigDir 默认不会进入该 if{}
 			// use dynamic kubelet config, if enabled
 			var kubeletConfigController *dynamickubeletconfig.Controller
 			if dynamicConfigDir := kubeletFlags.DynamicConfigDir.Value(); len(dynamicConfigDir) > 0 {
 				var dynamicKubeletConfig *kubeletconfiginternal.KubeletConfiguration
 				dynamicKubeletConfig, kubeletConfigController, err = BootstrapKubeletConfigController(
 					dynamicConfigDir,
-						func(kc *kubeletconfiginternal.KubeletConfiguration) error {
-							// Here, we enforce flag precedence inside the controller,
-							// prior to the controller's validation sequence,
-							// so that we get a complete validation at the same point
-							// where we can decide to reject dynamic config.
-							// This fixes the flag-precedence component of issue #63305.
-							// See issue #56171 for general details on flag precedence.
-							return kubeletConfigFlagPrecedence(kc, args)
-						},
-					)
+					func(kc *kubeletconfiginternal.KubeletConfiguration) error {
+						// Here, we enforce flag precedence inside the controller,
+						// prior to the controller's validation sequence,
+						// so that we get a complete validation at the same point
+						// where we can decide to reject dynamic config.
+						// This fixes the flag-precedence component of issue #63305.
+						// See issue #56171 for general details on flag precedence.
+						return kubeletConfigFlagPrecedence(kc, args)
+					},
+				)
 				if err != nil {
 					klog.Fatal(err)
 				}
@@ -342,6 +342,12 @@ func kubeletConfigFlagPrecedence(kc *kubeletconfiginternal.KubeletConfiguration,
 	return nil
 }
 
+// loadConfigFile 加载 kubelet 配置文件.
+//
+// 	@param name: 一般为 /var/lib/kubelet/config.yaml
+//
+// caller:
+// 	1. NewKubeletCommand()
 func loadConfigFile(name string) (*kubeletconfiginternal.KubeletConfiguration, error) {
 	const errFmt = "failed to load Kubelet config file %s, error %v"
 	// compute absolute path based on current working dir
@@ -360,10 +366,10 @@ func loadConfigFile(name string) (*kubeletconfiginternal.KubeletConfiguration, e
 	return kc, err
 }
 
-// UnsecuredDependencies 返回一个 Dependencies 对象, 
+// UnsecuredDependencies 返回一个 Dependencies 对象,
 // 包含 docker 客户端配置对象, oomadjuster, volume 插件列表等对象.
 //
-// caller: 
+// caller:
 // 	1. NewKubeletCommand.Run()
 // 	2. run() 基本没机会被调用到
 //
@@ -400,12 +406,12 @@ func UnsecuredDependencies(
 	}
 	return &kubelet.Dependencies{
 		// default does not enforce auth[nz]
-		Auth:                nil, 
-		// cadvisor.New launches background processes 
+		Auth: nil,
+		// cadvisor.New launches background processes
 		// (bg http.ListenAndServe, and some bg cleaners), not set here
-		CAdvisorInterface:   nil, 
+		CAdvisorInterface: nil,
 		// cloud provider might start background processes
-		Cloud:               nil, 
+		Cloud:               nil,
 		ContainerManager:    nil,
 		DockerClientConfig:  dockerClientConfig,
 		KubeClient:          nil,
@@ -421,15 +427,16 @@ func UnsecuredDependencies(
 		TLSOptions:          tlsOptions}, nil
 }
 
-// caller: 
+// caller:
 // 	1. NewKubeletCommand()
 //
-// Run runs the specified KubeletServer with the given Dependencies. This should never exit.
+// Run runs the specified KubeletServer with the given Dependencies.
+// This should never exit.
 // The kubeDeps argument may be nil - if so, it is initialized from the settings on KubeletServer.
-// Otherwise, the caller is assumed to have set up the Dependencies object and a default one will
-// not be generated.
+// Otherwise, the caller is assumed to have set up the Dependencies object
+// and a default one will not be generated.
 func Run(
-	s *options.KubeletServer, kubeDeps *kubelet.Dependencies, 
+	s *options.KubeletServer, kubeDeps *kubelet.Dependencies,
 	featureGate featuregate.FeatureGate, stopCh <-chan struct{},
 ) error {
 	// To help debugging, immediately log version
@@ -445,7 +452,8 @@ func Run(
 }
 
 // checkPermissions kubelet 需要以 root 身份启动, 检测进程 uid 是否为 0;
-// caller: 
+//
+// caller:
 // 	1. run()
 func checkPermissions() error {
 	if uid := os.Getuid(); uid != 0 {
@@ -493,7 +501,7 @@ func makeEventRecorder(kubeDeps *kubelet.Dependencies, nodeName types.NodeName) 
 	}
 	eventBroadcaster := record.NewBroadcaster()
 	kubeDeps.Recorder = eventBroadcaster.NewRecorder(
-		legacyscheme.Scheme, 
+		legacyscheme.Scheme,
 		v1.EventSource{Component: componentKubelet, Host: string(nodeName)},
 	)
 	eventBroadcaster.StartLogging(klog.V(3).Infof)
@@ -506,9 +514,10 @@ func makeEventRecorder(kubeDeps *kubelet.Dependencies, nodeName types.NodeName) 
 }
 
 // run 初始化 kube client
-// caller: Run()
+// caller:
+// 	1. Run()
 func run(
-	kubeletServer *options.KubeletServer, kubeDeps *kubelet.Dependencies, 
+	kubeletServer *options.KubeletServer, kubeDeps *kubelet.Dependencies,
 	featureGate featuregate.FeatureGate, stopCh <-chan struct{},
 ) (err error) {
 	// Set global feature gates based on the value on the initial KubeletServer
@@ -516,7 +525,7 @@ func run(
 	if err != nil {
 		return err
 	}
-	// validate the initial KubeletServer 
+	// validate the initial KubeletServer
 	// (we set feature gates first, because this validation depends on feature gates)
 	if err := options.ValidateKubeletServer(kubeletServer); err != nil {
 		return err
@@ -568,12 +577,12 @@ func run(
 			}
 			if cloud == nil {
 				klog.V(2).Infof(
-					"No cloud provider specified: %q from the config file: %q\n", 
+					"No cloud provider specified: %q from the config file: %q\n",
 					kubeletServer.CloudProvider, kubeletServer.CloudConfigFile,
 				)
 			} else {
 				klog.V(2).Infof(
-					"Successfully initialized cloud provider: %q from the config file: %q\n", 
+					"Successfully initialized cloud provider: %q from the config file: %q\n",
 					kubeletServer.CloudProvider, kubeletServer.CloudConfigFile,
 				)
 			}
@@ -654,7 +663,7 @@ func run(
 
 	// cgroupRoots 获取当前kubelet进程及系统中 dockerd 进程的 cgroup 名称, 并添加到该数组中.
 	// 只有在 cadvisor.New() 中有使用过.
-	// cadvisor 会读取这些目录下存在的, 不同 Pod 的资源上限, 
+	// cadvisor 会读取这些目录下存在的, 不同 Pod 的资源上限,
 	cgroupRoots = append(cgroupRoots, cm.NodeAllocatableRoot(
 		kubeletServer.CgroupRoot, kubeletServer.CgroupDriver),
 	)
@@ -662,7 +671,7 @@ func run(
 	if err != nil {
 		klog.Warningf(
 			"failed to get the kubelet's cgroup: %v. "+
-			"Kubelet system container metrics may be missing.", 
+				"Kubelet system container metrics may be missing.",
 			err,
 		)
 	} else if kubeletCgroup != "" {
@@ -677,7 +686,7 @@ func run(
 	if err != nil {
 		klog.Warningf(
 			"failed to get the container runtime's cgroup: %v. "+
-			"Runtime system container metrics may be missing.", 
+				"Runtime system container metrics may be missing.",
 			err,
 		)
 	} else if runtimeCgroup != "" {
@@ -695,7 +704,7 @@ func run(
 			kubeletServer.ContainerRuntime, kubeletServer.RemoteRuntimeEndpoint,
 		)
 		kubeDeps.CAdvisorInterface, err = cadvisor.New(
-			imageFsInfoProvider, kubeletServer.RootDirectory, cgroupRoots, 
+			imageFsInfoProvider, kubeletServer.RootDirectory, cgroupRoots,
 			cadvisor.UsingLegacyCadvisorStats(
 				kubeletServer.ContainerRuntime, kubeletServer.RemoteRuntimeEndpoint,
 			),
@@ -739,7 +748,7 @@ func run(
 					// the specified cpuset is outside of the range of what the machine has
 					klog.Infof("Invalid cpuset specified by --reserved-cpus")
 					return fmt.Errorf(
-						"Invalid cpuset %q specified by --reserved-cpus", 
+						"Invalid cpuset %q specified by --reserved-cpus",
 						kubeletServer.ReservedSystemCPUs,
 					)
 				}
@@ -752,7 +761,7 @@ func run(
 			// at cmd option valication phase it is tested either --system-reserved-cgroup
 			// or --kube-reserved-cgroup is specified, so overwrite should be ok
 			klog.Infof(
-				"Option --reserved-cpus is specified, it will overwrite the cpu setting in KubeReserved=\"%v\", SystemReserved=\"%v\".", 
+				"Option --reserved-cpus is specified, it will overwrite the cpu setting in KubeReserved=\"%v\", SystemReserved=\"%v\".",
 				kubeletServer.KubeReserved, kubeletServer.SystemReserved,
 			)
 			if kubeletServer.KubeReserved != nil {
@@ -846,10 +855,12 @@ func run(
 	//
 	// If the kubelet config controller is available, and dynamic config is enabled,
 	// start the config and status sync loops
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) && 
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) &&
 		len(kubeletServer.DynamicConfigDir.Value()) > 0 &&
 		kubeDeps.KubeletConfigController != nil && !standaloneMode && !kubeletServer.RunOnce {
-		err := kubeDeps.KubeletConfigController.StartSync(kubeDeps.KubeClient, kubeDeps.EventClient, string(nodeName))
+		err := kubeDeps.KubeletConfigController.StartSync(
+			kubeDeps.KubeClient, kubeDeps.EventClient, string(nodeName),
+		)
 		if err != nil {
 			return err
 		}
@@ -861,9 +872,9 @@ func run(
 		go wait.Until(func() {
 			err := http.ListenAndServe(
 				net.JoinHostPort(
-					kubeletServer.HealthzBindAddress, 
+					kubeletServer.HealthzBindAddress,
 					strconv.Itoa(int(kubeletServer.HealthzPort)),
-				), 
+				),
 				mux,
 			)
 			if err != nil {
@@ -941,9 +952,9 @@ func buildKubeletClientConfig(
 		transportConfig := restclient.AnonymousClientConfig(clientConfig)
 
 		// closeAllConns 是一个可执行的函数.
-		// we set exitAfter to five minutes because 
-		// we use this client configuration to request new certs - 
-		// if we are unable to request new certs, 
+		// we set exitAfter to five minutes because
+		// we use this client configuration to request new certs -
+		// if we are unable to request new certs,
 		// we will be unable to continue normal operation.
 		// Exiting the process allows a wrapper
 		// or the bootstrapping credentials to potentially lay down new initial config.
@@ -997,7 +1008,7 @@ func updateDialer(clientConfig *restclient.Config) (func(), error) {
 //
 // 	@param nodeName: 当前 kubelet 进程所在的主机名.
 //
-// caller: 
+// caller:
 // 	1. buildKubeletClientConfig()
 //
 // buildClientCertificateManager creates a certificate manager that
@@ -1009,7 +1020,7 @@ func buildClientCertificateManager(
 ) (certificate.Manager, error) {
 	newClientFn := func(current *tls.Certificate) (certificatesclient.CertificateSigningRequestInterface, error) {
 		// If we have a valid certificate, use that to fetch CSRs.
-		// Otherwise use the bootstrap credentials. 
+		// Otherwise use the bootstrap credentials.
 		// In the future it would be desirable to change the behavior of bootstrap
 		// to always fall back to the external bootstrap credentials when such credentials are
 		// provided by a fundamental trust system like cloud VM identity or an HSM module.
@@ -1043,7 +1054,7 @@ func buildClientCertificateManager(
 // kubeClientConfigOverrides 将 KubeletServer 中的配置写入 client config 对象中.
 // 包括 rest client 的 content type, qps, burst 等信息.
 //
-// caller: 
+// caller:
 // 	1. buildKubeletClientConfig()
 func kubeClientConfigOverrides(s *options.KubeletServer, clientConfig *restclient.Config) {
 	setContentTypeForClient(clientConfig, s.ContentType)
@@ -1074,11 +1085,11 @@ func getNodeName(cloud cloudprovider.Interface, hostname string) (types.NodeName
 	return nodeName, nil
 }
 
-// caller: 
+// caller:
 // 	1. UnsecuredDependencies()
 //
 // InitializeTLS checks for a configured TLSCertFile and TLSPrivateKeyFile:
-// if unspecified a new self-signed certificate and key file are generated. 
+// if unspecified a new self-signed certificate and key file are generated.
 // Returns a configured server.TLSOptions object.
 func InitializeTLS(
 	kf *options.KubeletFlags, kc *kubeletconfiginternal.KubeletConfiguration,
@@ -1171,12 +1182,13 @@ func setContentTypeForClient(cfg *restclient.Config, contentType string) {
 
 // RunKubelet ...
 //
-// @param runOnce: 对应kubelet的 --runonce 选项, 拉取apiserver的信息, 
+// @param runOnce: 对应kubelet的 --runonce 选项, 拉取apiserver的信息,
 // 同步资源并检测static pod状态, 然后直接退出.
 //
-// caller: run()
+// caller:
+// 	1. run()
 //
-// RunKubelet is responsible for setting up and running a kubelet. 
+// RunKubelet is responsible for setting up and running a kubelet.
 // It is used in three different applications:
 //   1 Integration tests
 //   2 Kubelet binary
@@ -1189,7 +1201,7 @@ func RunKubelet(
 	if err != nil {
 		return err
 	}
-	// Query the cloud provider for our node name, 
+	// Query the cloud provider for our node name,
 	// default to hostname if kubeDeps.Cloud == nil
 	nodeName, err := getNodeName(kubeDeps.Cloud, hostname)
 	if err != nil {
@@ -1264,7 +1276,7 @@ func RunKubelet(
 		klog.Info("Started kubelet as runonce")
 	} else {
 		startKubelet(
-			k, podCfg, &kubeServer.KubeletConfiguration, kubeDeps, 
+			k, podCfg, &kubeServer.KubeletConfiguration, kubeDeps,
 			kubeServer.EnableCAdvisorJSONEndpoints, kubeServer.EnableServer,
 		)
 		klog.Info("Started kubelet")
@@ -1275,11 +1287,11 @@ func RunKubelet(
 // startKubelet 启动kubelet(k.Run())和启动kubelet server(k.ListenAndServe())
 // 话说, 在 k.Run() 之前就在 createAndInitKubelet() 函数里调用 StartGarbageCollection() 了...
 //
-// caller: 
+// caller:
 // 	1. RunKubelet()
 func startKubelet(
-	k kubelet.Bootstrap, podCfg *config.PodConfig, 
-	kubeCfg *kubeletconfiginternal.KubeletConfiguration, 
+	k kubelet.Bootstrap, podCfg *config.PodConfig,
+	kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	kubeDeps *kubelet.Dependencies, enableCAdvisorJSONEndpoints, enableServer bool,
 ) {
 	// start the kubelet
@@ -1290,8 +1302,8 @@ func startKubelet(
 	// start the kubelet server
 	if enableServer {
 		go k.ListenAndServe(
-			net.ParseIP(kubeCfg.Address), uint(kubeCfg.Port), kubeDeps.TLSOptions, 
-			kubeDeps.Auth, enableCAdvisorJSONEndpoints, 
+			net.ParseIP(kubeCfg.Address), uint(kubeCfg.Port), kubeDeps.TLSOptions,
+			kubeDeps.Auth, enableCAdvisorJSONEndpoints,
 			kubeCfg.EnableDebuggingHandlers, kubeCfg.EnableContentionProfiling,
 		)
 
@@ -1306,10 +1318,11 @@ func startKubelet(
 	}
 }
 
-// createAndInitKubelet 这么多参数, 全传给 kubelet.NewMainKubelet()了, 
+// createAndInitKubelet 这么多参数, 全传给 kubelet.NewMainKubelet()了,
 // 然后开始用新建的 kubelet 对象执行 gc() 流程.
 //
-// caller: RunKubelet()
+// caller:
+// 	1. RunKubelet()
 func createAndInitKubelet(
 	kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	kubeDeps *kubelet.Dependencies,
@@ -1392,7 +1405,7 @@ func createAndInitKubelet(
 
 // parseResourceList ...
 //
-// caller: 
+// caller:
 // 	1. run()
 //
 // parseResourceList parses the given configuration map into an API
@@ -1423,8 +1436,13 @@ func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 	return rl, nil
 }
 
+// caller:
+// 	1. NewKubeletCommand()
+//
 // BootstrapKubeletConfigController constructs and bootstrap a configuration controller
-func BootstrapKubeletConfigController(dynamicConfigDir string, transform dynamickubeletconfig.TransformFunc) (*kubeletconfiginternal.KubeletConfiguration, *dynamickubeletconfig.Controller, error) {
+func BootstrapKubeletConfigController(
+	dynamicConfigDir string, transform dynamickubeletconfig.TransformFunc,
+) (*kubeletconfiginternal.KubeletConfiguration, *dynamickubeletconfig.Controller, error) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
 		return nil, nil, fmt.Errorf("failed to bootstrap Kubelet config controller, you must enable the DynamicKubeletConfig feature gate")
 	}
@@ -1437,7 +1455,8 @@ func BootstrapKubeletConfigController(dynamicConfigDir string, transform dynamic
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get absolute path for --dynamic-config-dir=%s", dynamicConfigDir)
 	}
-	// get the latest KubeletConfiguration checkpoint from disk, or return the default config if no valid checkpoints exist
+	// get the latest KubeletConfiguration checkpoint from disk,
+	// or return the default config if no valid checkpoints exist
 	c := dynamickubeletconfig.NewController(dir, transform)
 	kc, err := c.Bootstrap()
 	if err != nil {
@@ -1450,7 +1469,7 @@ func BootstrapKubeletConfigController(dynamicConfigDir string, transform dynamic
 // This is only used for cri validate testing purpose
 // TODO(random-liu): Move this to a separate binary.
 func RunDockershim(
-	f *options.KubeletFlags, c *kubeletconfiginternal.KubeletConfiguration, 
+	f *options.KubeletFlags, c *kubeletconfiginternal.KubeletConfiguration,
 	stopCh <-chan struct{},
 ) error {
 	r := &f.ContainerRuntimeOptions

@@ -121,11 +121,13 @@ func (kl *Kubelet) initializeModules() error {
 }
 
 // caller: 
-// 	1. kl.updateRuntimeUp(), 其实也是在kl.Run()中调用的.
+// 	1. pkg/kubelet/kubelet.go -> kl.updateRuntimeUp()
+//  其实也是在 Kubelet.Run() 中调用的.
 //
 // initializeRuntimeDependentModules will initialize internal modules
 // that require the container runtime to be up.
 func (kl *Kubelet) initializeRuntimeDependentModules() {
+	var err error
 	if err := kl.cadvisor.Start(); err != nil {
 		// Fail kubelet and rely on the babysitter to retry starting kubelet.
 		// TODO(random-liu): Add backoff logic in the babysitter
@@ -133,7 +135,8 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 	}
 
 	// trigger on-demand stats collection once so that we have capacity information for ephemeral storage.
-	// ignore any errors, since if stats collection is not successful, the container manager will fail to start below.
+	// ignore any errors, since if stats collection is not successful,
+	// the container manager will fail to start below.
 	kl.StatsProvider.GetCgroupStats("/", true)
 	// Start container manager.
 	node, err := kl.getNodeAnyWay()
@@ -142,20 +145,32 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 		klog.Fatalf("Kubelet failed to get node info: %v", err)
 	}
 	// containerManager must start after cAdvisor because it needs filesystem capacity information
-	if err := kl.containerManager.Start(node, kl.GetActivePods, kl.sourcesReady, kl.statusManager, kl.runtimeService); err != nil {
+	err = kl.containerManager.Start(
+		node, kl.GetActivePods, kl.sourcesReady, kl.statusManager, kl.runtimeService,
+	)
+	if err != nil {
 		// Fail kubelet and rely on the babysitter to retry starting kubelet.
 		klog.Fatalf("Failed to start ContainerManager %v", err)
 	}
-	// eviction manager must start after cadvisor because it needs to know if the container runtime has a dedicated imagefs
-	kl.evictionManager.Start(kl.StatsProvider, kl.GetActivePods, kl.podResourcesAreReclaimed, evictionMonitoringPeriod)
+	// eviction manager must start after cadvisor because it needs to know
+	// if the container runtime has a dedicated imagefs
+	kl.evictionManager.Start(
+		kl.StatsProvider, kl.GetActivePods, kl.podResourcesAreReclaimed, 
+		evictionMonitoringPeriod,
+	)
 
-	// container log manager must start after container runtime is up to retrieve information from container runtime
+	// container log manager must start after container runtime is up to
+	// retrieve information from container runtime
 	// and inform container to reopen log file after log rotation.
 	kl.containerLogManager.Start()
 	// Adding Registration Callback function for CSI Driver
-	kl.pluginManager.AddHandler(pluginwatcherapi.CSIPlugin, plugincache.PluginHandler(csi.PluginHandler))
+	kl.pluginManager.AddHandler(
+		pluginwatcherapi.CSIPlugin, plugincache.PluginHandler(csi.PluginHandler),
+	)
 	// Adding Registration Callback function for Device Manager
-	kl.pluginManager.AddHandler(pluginwatcherapi.DevicePlugin, kl.containerManager.GetPluginRegistrationHandler())
+	kl.pluginManager.AddHandler(
+		pluginwatcherapi.DevicePlugin, kl.containerManager.GetPluginRegistrationHandler(),
+	)
 	// Start the plugin manager
 	klog.V(4).Infof("starting plugin manager")
 	go kl.pluginManager.Run(kl.sourcesReady, wait.NeverStop)
