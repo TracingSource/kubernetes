@@ -134,6 +134,7 @@ type ScheduleResult struct {
 }
 
 // 	@implementOf: ScheduleAlgorithm
+// 	@initAt: NewGenericScheduler()
 type genericScheduler struct {
 	cache                    internalcache.Cache
 	schedulingQueue          internalqueue.SchedulingQueue
@@ -142,6 +143,7 @@ type genericScheduler struct {
 	// 	@assignAs: pkg/scheduler/algorithm/predicates/metadata.go -> MetadataProducerFactory.GetPredicateMetadata()
 	predicateMetaProducer    predicates.MetadataProducer
 	prioritizers             []priorities.PriorityConfig
+	// 	@initAt: pkg/scheduler/framework/v1alpha1/framework.go -> NewFramework()
 	framework                framework.Framework
 	extenders                []algorithm.SchedulerExtender
 	alwaysCheckAllPredicates bool
@@ -210,8 +212,7 @@ func (g *genericScheduler) Schedule(
 		return result, ErrNoNodesAvailable
 	}
 
-	// "预"预选阶段, 如果目标 pod 在 etcd中已经存在了绑定关系, 这里在运行 preFilter 插件时,
-	// 会把绑定关系存储到 state 变量中, 以便后面使用.
+	// "预"预选阶段, 插件钩子
 	//
 	// Run "prefilter" plugins.
 	preFilterStatus := g.framework.RunPreFilterPlugins(ctx, state, pod)
@@ -1321,6 +1322,11 @@ func podPassesBasicChecks(pod *v1.Pod, pvcLister corelisters.PersistentVolumeCla
 	return nil
 }
 
+// NewGenericScheduler 单纯根据参数创建并返回 genericScheduler{} 结构体.
+//
+// caller:
+// 	1. pkg/scheduler/factory.go -> Configurator.CreateFromKeys()
+//
 // NewGenericScheduler creates a genericScheduler object.
 func NewGenericScheduler(
 	cache internalcache.Cache,

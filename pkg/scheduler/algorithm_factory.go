@@ -24,8 +24,11 @@ import (
 	"k8s.io/klog"
 )
 
+// 	@initAt: pkg/scheduler/scheduler.go -> New()
+//
 // AlgorithmFactoryArgs are passed to all factory functions.
 type AlgorithmFactoryArgs struct {
+	// pkg/scheduler/nodeinfo/snapshot/snapshot.go -> NewEmptySnapshot()
 	SharedLister                   schedulerlisters.SharedLister
 	InformerFactory                informers.SharedInformerFactory
 	VolumeBinder                   *volumebinder.VolumeBinder
@@ -60,11 +63,17 @@ var (
 	// 	@initAt: RegisterMandatoryFitPredicate()
 	// 	@initAt: RegisterFitPredicateFactory()
 	//
+	// 	@usedAt: getFitPredicateFunctions()
+	//
 	// maps that hold registered algorithm types
 	fitPredicateMap        = make(map[string]FitPredicateFactory)
 	// mandatoryFitPredicates 包含了必选的算法.
+	// 管理员可以在 policy.json 文件中选配预选、优选等算法, 但是在初始化时,
+	// 必选算法是会被默认加载的.
 	//
 	// 	@initAt: RegisterMandatoryFitPredicate()
+	//
+	// 	@usedAt: getFitPredicateFunctions()
 	mandatoryFitPredicates = sets.NewString()
 	priorityFunctionMap    = make(map[string]PriorityConfigFactory)
 	// 	@initAt: RegisterAlgorithmProvider()
@@ -378,7 +387,9 @@ func RegisterPriorityConfigFactory(name string, pcf PriorityConfigFactory) strin
 
 // RegisterCustomPriorityFunction registers a custom priority function with the algorithm registry.
 // Returns the name, with which the priority function was registered.
-func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy, configProducerArgs *plugins.ConfigProducerArgs) string {
+func RegisterCustomPriorityFunction(
+	policy schedulerapi.PriorityPolicy, configProducerArgs *plugins.ConfigProducerArgs,
+) string {
 	var pcf *PriorityConfigFactory
 	name := policy.Name
 
@@ -396,7 +407,10 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy, configPr
 			if configProducerArgs.ServiceAffinityArgs == nil {
 				configProducerArgs.ServiceAffinityArgs = &serviceaffinity.Args{}
 			}
-			configProducerArgs.ServiceAffinityArgs.AntiAffinityLabelsPreference = append(configProducerArgs.ServiceAffinityArgs.AntiAffinityLabelsPreference, policy.Argument.ServiceAntiAffinity.Label)
+			configProducerArgs.ServiceAffinityArgs.AntiAffinityLabelsPreference = append(
+				configProducerArgs.ServiceAffinityArgs.AntiAffinityLabelsPreference, 
+				policy.Argument.ServiceAntiAffinity.Label,
+			)
 
 			weight := policy.Weight
 			schedulerFactoryMutex.RLock()
@@ -545,7 +559,14 @@ func GetAlgorithmProvider(name string) (*AlgorithmProviderConfig, error) {
 	return &provider, nil
 }
 
-func getFitPredicateFunctions(names sets.String, args AlgorithmFactoryArgs) (map[string]predicates.FitPredicate, error) {
+// 	@param predicateKeys: 配置文件中选配的预选插件名称列表.
+//
+// caller:
+// 	1. pkg/scheduler/factory.go -> Configurator.getPredicateConfigs()
+// 	在调度器启动时被调用.
+func getFitPredicateFunctions(
+	names sets.String, args AlgorithmFactoryArgs,
+) (map[string]predicates.FitPredicate, error) {
 	schedulerFactoryMutex.RLock()
 	defer schedulerFactoryMutex.RUnlock()
 
@@ -553,7 +574,9 @@ func getFitPredicateFunctions(names sets.String, args AlgorithmFactoryArgs) (map
 	for _, name := range names.List() {
 		factory, ok := fitPredicateMap[name]
 		if !ok {
-			return nil, fmt.Errorf("invalid predicate name %q specified - no corresponding function found", name)
+			return nil, fmt.Errorf(
+				"invalid predicate name %q specified - no corresponding function found", name,
+			)
 		}
 		fitPredicates[name] = factory(args)
 	}

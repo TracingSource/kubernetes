@@ -6,6 +6,8 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 )
 
+// caller:
+// 	1. pkg/scheduler/algorithmprovider/plugins.go 在 import() 被调用
 func init() {
 	// Register functions that extract metadata used by priorities computations.
 	scheduler.RegisterPriorityMetadataProducerFactory(

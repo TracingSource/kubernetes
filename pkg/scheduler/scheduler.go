@@ -296,6 +296,7 @@ func New(
 		time.Duration(options.bindTimeoutSeconds)*time.Second,
 	)
 
+	// registry: framework 插件工厂, 包含了所有 framework 插件的初始化函数.
 	registry := options.frameworkDefaultRegistry
 	if registry == nil {
 		registry = frameworkplugins.NewDefaultRegistry(&frameworkplugins.RegistryArgs{

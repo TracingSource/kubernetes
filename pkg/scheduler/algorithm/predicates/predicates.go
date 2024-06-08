@@ -117,15 +117,27 @@ const (
 // The order is based on the restrictiveness & complexity of predicates.
 // Design doc: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/scheduling/predicates-ordering.md
 var (
-	predicatesOrdering = []string{CheckNodeUnschedulablePred,
+	predicatesOrdering = []string{
+		CheckNodeUnschedulablePred,
 		GeneralPred, HostNamePred, PodFitsHostPortsPred,
 		MatchNodeSelectorPred, PodFitsResourcesPred, NoDiskConflictPred,
-		PodToleratesNodeTaintsPred, PodToleratesNodeNoExecuteTaintsPred, CheckNodeLabelPresencePred,
-		CheckServiceAffinityPred, MaxEBSVolumeCountPred, MaxGCEPDVolumeCountPred, MaxCSIVolumeCountPred,
-		MaxAzureDiskVolumeCountPred, MaxCinderVolumeCountPred, CheckVolumeBindingPred, NoVolumeZoneConflictPred,
-		EvenPodsSpreadPred, MatchInterPodAffinityPred}
+		PodToleratesNodeTaintsPred, PodToleratesNodeNoExecuteTaintsPred, 
+		CheckNodeLabelPresencePred,
+		CheckServiceAffinityPred, MaxEBSVolumeCountPred, 
+		MaxGCEPDVolumeCountPred, 
+		MaxCSIVolumeCountPred,
+		MaxAzureDiskVolumeCountPred, MaxCinderVolumeCountPred, 
+		CheckVolumeBindingPred, NoVolumeZoneConflictPred,
+		EvenPodsSpreadPred, MatchInterPodAffinityPred,
+	}
 )
 
+// Ordering 预选算法的执行是有顺序的, 即使管理员选配了部分算法, ta们之前也需要按顺序执行,
+// 这里返回了全部内置算法的总体顺序.
+//
+// caller:
+// 	1. pkg/scheduler/factory.go -> Configurator.getPredicateConfigs()
+//
 // Ordering returns the ordering of predicates.
 func Ordering() []string {
 	return predicatesOrdering

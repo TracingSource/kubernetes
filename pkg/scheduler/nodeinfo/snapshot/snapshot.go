@@ -10,14 +10,18 @@ import (
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
-// Snapshot is a snapshot of cache NodeInfo and NodeTree order. The scheduler takes a
-// snapshot at the beginning of each scheduling cycle and uses it for its operations in that cycle.
+// 	@implementOf: pkg/scheduler/listers/listers.go -> SharedLister
+//
+// Snapshot is a snapshot of cache NodeInfo and NodeTree order.
+// The scheduler takes a snapshot at the beginning of each scheduling cycle
+// and uses it for its operations in that cycle.
 type Snapshot struct {
 	// NodeInfoMap a map of node name to a snapshot of its NodeInfo.
 	NodeInfoMap map[string]*schedulernodeinfo.NodeInfo
 	// NodeInfoList is the list of nodes as ordered in the cache's nodeTree.
 	NodeInfoList []*schedulernodeinfo.NodeInfo
-	// HavePodsWithAffinityNodeInfoList is the list of nodes with at least one pod declaring affinity terms.
+	// HavePodsWithAffinityNodeInfoList is the list of nodes with at least one
+	// pod declaring affinity terms.
 	HavePodsWithAffinityNodeInfoList []*schedulernodeinfo.NodeInfo
 	Generation                       int64
 }
@@ -89,7 +93,8 @@ func getNodeImageStates(node *v1.Node, imageExistenceMap map[string]sets.String)
 	return imageStates
 }
 
-// createImageExistenceMap returns a map recording on which nodes the images exist, keyed by the images' names.
+// createImageExistenceMap returns a map recording on which nodes the images exist,
+// keyed by the images' names.
 func createImageExistenceMap(nodes []*v1.Node) map[string]sets.String {
 	imageExistenceMap := make(map[string]sets.String)
 	for _, node := range nodes {
@@ -139,8 +144,8 @@ func (p *podLister) List(selector labels.Selector) ([]*v1.Pod, error) {
 
 // FilteredList returns a filtered list of pods in the snapshot.
 func (p *podLister) FilteredList(podFilter schedulerlisters.PodFilter, selector labels.Selector) ([]*v1.Pod, error) {
-	// podFilter is expected to return true for most or all of the pods. We
-	// can avoid expensive array growth without wasting too much memory by
+	// podFilter is expected to return true for most or all of the pods.
+	// We can avoid expensive array growth without wasting too much memory by
 	// pre-allocating capacity.
 	maxSize := 0
 	for _, n := range p.snapshot.NodeInfoMap {

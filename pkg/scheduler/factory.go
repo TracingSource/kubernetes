@@ -46,6 +46,8 @@ type Binder interface {
 	Bind(binding *v1.Binding) error
 }
 
+// 	@initAt: pkg/scheduler/scheduler.go -> New()
+//
 // Configurator defines I/O, caching, and other functionality needed to
 // construct a new scheduler.
 type Configurator struct {
@@ -85,7 +87,7 @@ type Configurator struct {
 
 	enableNonPreempting bool
 
-	// framework configuration arguments.
+	// registry: framework 插件工厂, 包含了所有 framework 插件的初始化函数.
 	registry                     framework.Registry
 	plugins                      *schedulerapi.Plugins
 	pluginConfig                 []schedulerapi.PluginConfig
@@ -106,8 +108,8 @@ func (c *Configurator) Create() (*Scheduler, error) {
 	return c.CreateFromProvider(DefaultProvider)
 }
 
-// caller: 
-// 	1. pkg/scheduler/scheduler.go -> New() 
+// caller:
+// 	1. pkg/scheduler/scheduler.go -> New()
 //
 // CreateFromProvider creates a scheduler from the name of a registered algorithm provider.
 func (c *Configurator) CreateFromProvider(providerName string) (*Scheduler, error) {
@@ -116,10 +118,14 @@ func (c *Configurator) CreateFromProvider(providerName string) (*Scheduler, erro
 	if err != nil {
 		return nil, err
 	}
-	return c.CreateFromKeys(provider.FitPredicateKeys, provider.PriorityFunctionKeys, []algorithm.SchedulerExtender{})
+	return c.CreateFromKeys(
+		provider.FitPredicateKeys, 
+		provider.PriorityFunctionKeys, 
+		[]algorithm.SchedulerExtender{},
+	)
 }
 
-// CreateFromConfig 根据配置构造 Scheduler{} 对象.
+// CreateFromConfig 根据 policy.json 配置文件中选配的预选、优选、调度插件, 构建 Scheduler{} 结构体
 //
 // caller:
 // 	1. pkg/scheduler/scheduler.go -> New() 在选主之前被调用
@@ -207,20 +213,26 @@ func (c *Configurator) CreateFromConfig(policy schedulerapi.Policy) (*Scheduler,
 	return c.CreateFromKeys(predicateKeys, priorityKeys, extenders)
 }
 
+// 	@param: 配置文件中指定(选配)的预选、优选、调度插件的名称列表.
+//
 // caller:
 // 	1. Configurator.CreateFromConfig()
 //
-// CreateFromKeys creates a scheduler from a set of registered fit predicate keys and priority keys.
+// CreateFromKeys creates a scheduler from a set of registered fit predicate keys
+// and priority keys.
 func (c *Configurator) CreateFromKeys(
 	predicateKeys, priorityKeys sets.String, extenders []algorithm.SchedulerExtender,
 ) (*Scheduler, error) {
 	klog.V(2).Infof(
-		"Creating scheduler with fit predicates '%v' and priority functions '%v'", 
+		"Creating scheduler with fit predicates '%v' and priority functions '%v'",
 		predicateKeys, priorityKeys,
 	)
 
 	if c.GetHardPodAffinitySymmetricWeight() < 1 || c.GetHardPodAffinitySymmetricWeight() > 100 {
-		return nil, fmt.Errorf("invalid hardPodAffinitySymmetricWeight: %d, must be in the range 1-100", c.GetHardPodAffinitySymmetricWeight())
+		return nil, fmt.Errorf(
+			"invalid hardPodAffinitySymmetricWeight: %d, must be in the range 1-100",
+			c.GetHardPodAffinitySymmetricWeight(),
+		)
 	}
 
 	predicateFuncs, pluginsForPredicates, pluginConfigForPredicates, err := c.getPredicateConfigs(predicateKeys)
@@ -243,8 +255,8 @@ func (c *Configurator) CreateFromKeys(
 		return nil, err
 	}
 
-	// Combine all framework configurations. If this results in any duplication, framework
-	// instantiation should fail.
+	// Combine all framework configurations.
+	// If this results in any duplication, framework instantiation should fail.
 	var plugins schedulerapi.Plugins
 	plugins.Append(pluginsForPredicates)
 	plugins.Append(pluginsForPriorities)
@@ -365,12 +377,28 @@ func (c *Configurator) getPriorityConfigs(priorityKeys sets.String) ([]prioritie
 	return priorityConfigs, &plugins, pluginConfig, nil
 }
 
-// getPredicateConfigs returns predicates configuration: ones that will run as fitPredicates and ones that will run
-// as framework plugins. Specifically, a predicate will run as a framework plugin if a plugin config producer was
-// registered for that predicate.
-// Note that the framework executes plugins according to their order in the Plugins list, and so predicates run as plugins
-// are added to the Plugins list according to the order specified in predicates.Ordering().
-func (c *Configurator) getPredicateConfigs(predicateKeys sets.String) (map[string]predicates.FitPredicate, *schedulerapi.Plugins, []schedulerapi.PluginConfig, error) {
+// getPredicateConfigs ...
+//
+// 	@param predicateKeys: 配置文件中选配的预选插件名称列表.
+//
+// caller:
+// 	1. Configurator.CreateFromKeys()
+//
+// getPredicateConfigs returns predicates configuration:
+// ones that will run as fitPredicates and ones that will run as framework plugins.
+// Specifically, a predicate will run as a framework plugin if a plugin config
+// producer was registered for that predicate.
+// Note that the framework executes plugins according to their order in the
+// Plugins list, and so predicates run as plugins are added to the Plugins list
+// according to the order specified in predicates.Ordering().
+func (c *Configurator) getPredicateConfigs(
+	predicateKeys sets.String,
+) (
+	map[string]predicates.FitPredicate,
+	*schedulerapi.Plugins,
+	[]schedulerapi.PluginConfig,
+	error,
+) {
 	allFitPredicates, err := getFitPredicateFunctions(predicateKeys, c.algorithmFactoryArgs)
 	if err != nil {
 		return nil, nil, nil, err
@@ -384,9 +412,12 @@ func (c *Configurator) getPredicateConfigs(predicateKeys sets.String) (map[strin
 	asFitPredicates := make(map[string]predicates.FitPredicate)
 	frameworkConfigProducers := c.pluginConfigProducerRegistry.PredicateToConfigProducer
 
-	// First, identify the predicates that will run as actual fit predicates, and ones
-	// that will run as framework plugins.
-	for predicateKey := range allFitPredicates {
+	// 1. 确认所有选配的预选算法中, 有哪些属于内置算法, 哪些属于 framework 插件.
+	// 这其中包含必选的算法, 当然, 这些一定不是外部插件.
+	//
+	// First, identify the predicates that will run as actual fit predicates,
+	// and ones that will run as framework plugins.
+	for predicateKey, _ := range allFitPredicates {
 		if _, exist := frameworkConfigProducers[predicateKey]; exist {
 			asPlugins.Insert(predicateKey)
 		} else {
@@ -394,11 +425,13 @@ func (c *Configurator) getPredicateConfigs(predicateKeys sets.String) (map[strin
 		}
 	}
 
-	// Second, create the framework plugin configurations, and place them in the order
-	// that the corresponding predicates were supposed to run.
+	// Ordering 预选算法的执行是有顺序的, 即使管理员选配了部分算法, ta们之前也需要按顺序执行.
+	// Ordering() 返回了所有内置算法的的顺序.
+	//
+	// Second, create the framework plugin configurations, and place them
+	// in the order that the corresponding predicates were supposed to run.
 	var plugins schedulerapi.Plugins
 	var pluginConfig []schedulerapi.PluginConfig
-
 	for _, predicateKey := range predicates.Ordering() {
 		if asPlugins.Has(predicateKey) {
 			producer := frameworkConfigProducers[predicateKey]
@@ -433,13 +466,22 @@ func (i *podInformer) Lister() corelisters.PodLister {
 }
 
 // NewPodInformer creates a shared index informer that returns only non-terminal pods.
-func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) coreinformers.PodInformer {
+func NewPodInformer(
+	client clientset.Interface, resyncPeriod time.Duration,
+) coreinformers.PodInformer {
 	selector := fields.ParseSelectorOrDie(
 		"status.phase!=" + string(v1.PodSucceeded) +
 			",status.phase!=" + string(v1.PodFailed))
-	lw := cache.NewListWatchFromClient(client.CoreV1().RESTClient(), string(v1.ResourcePods), metav1.NamespaceAll, selector)
+	lw := cache.NewListWatchFromClient(
+		client.CoreV1().RESTClient(), string(v1.ResourcePods), metav1.NamespaceAll, selector,
+	)
 	return &podInformer{
-		informer: cache.NewSharedIndexInformer(lw, &v1.Pod{}, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}),
+		informer: cache.NewSharedIndexInformer(
+			lw, &v1.Pod{}, resyncPeriod, 
+			cache.Indexers{
+				cache.NamespaceIndex: cache.MetaNamespaceIndexFunc,
+			},
+		),
 	}
 }
 

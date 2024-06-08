@@ -39,9 +39,12 @@ const (
 	permit                                    = "Permit"
 )
 
+// 	@implementOf: pkg/scheduler/framework/v1alpha1/interface.go -> Framework
+//
 // framework is the component responsible for initializing and running scheduler
 // plugins.
 type framework struct {
+	// registry: framework 插件工厂, 包含了所有 framework 插件的初始化函数.
 	registry              Registry
 	snapshotSharedLister  schedulerlisters.SharedLister
 	waitingPods           *waitingPodsMap
@@ -191,7 +194,6 @@ func NewFramework(
 		// 这里 factory() 被调用的都是各插件(内置, 外置)的初始化函数, 如
 		// pkg/scheduler/framework/plugins/middleware/fixnodes/fixnodes.go -> New()
 		// pkg/scheduler/framework/plugins/middleware/redisbycache/redisbycache.go -> New()
-		// ...等
 		p, err := factory(pluginConfig[name], f)
 		if err != nil {
 			return nil, fmt.Errorf("error initializing plugin %q: %v", name, err)
@@ -271,6 +273,8 @@ func (f *framework) QueueSortFunc() LessFunc {
 	return f.queueSortPlugins[0].Less
 }
 
+// RunPreFilterPlugins 调度 Pod 时, 预选操作前, 执行"预预选"插件.
+//
 // caller:
 // 	1. pkg/scheduler/core/generic_scheduler.go -> genericScheduler.Schedule()
 //
@@ -311,19 +315,23 @@ func (f *framework) RunPreFilterPlugins(
 	return nil
 }
 
-func (f *framework) runPreFilterPlugin(ctx context.Context, pl PreFilterPlugin, state *CycleState, pod *v1.Pod) *Status {
+func (f *framework) runPreFilterPlugin(
+	ctx context.Context, pl PreFilterPlugin, state *CycleState, pod *v1.Pod,
+) *Status {
 	if !state.ShouldRecordFrameworkMetrics() {
 		return pl.PreFilter(ctx, state, pod)
 	}
 	startTime := time.Now()
 	status := pl.PreFilter(ctx, state, pod)
-	f.metricsRecorder.observePluginDurationAsync(preFilter, pl.Name(), status, metrics.SinceInSeconds(startTime))
+	f.metricsRecorder.observePluginDurationAsync(
+		preFilter, pl.Name(), status, metrics.SinceInSeconds(startTime),
+	)
 	return status
 }
 
 // RunPreFilterExtensionAddPod calls the AddPod interface for the set of configured
-// PreFilter plugins. It returns directly if any of the plugins return any
-// status other than Success.
+// PreFilter plugins.
+// It returns directly if any of the plugins return any status other than Success.
 func (f *framework) RunPreFilterExtensionAddPod(
 	ctx context.Context,
 	state *CycleState,

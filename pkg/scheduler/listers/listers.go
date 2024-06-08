@@ -28,6 +28,8 @@ type NodeInfoLister interface {
 	Get(nodeName string) (*schedulernodeinfo.NodeInfo, error)
 }
 
+// 	@implementBy: pkg/scheduler/nodeinfo/snapshot/snapshot.go -> Snapshot{}
+//
 // SharedLister groups scheduler-specific listers.
 type SharedLister interface {
 	Pods() PodLister

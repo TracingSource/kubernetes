@@ -36,9 +36,13 @@ type RegistryArgs struct {
 	VolumeBinder *volumebinder.VolumeBinder
 }
 
+// caller:
+// 	1. pkg/scheduler/scheduler.go -> New() 调度器启动时被调用.
+//
 // NewDefaultRegistry builds the default registry with all the in-tree plugins.
-// This is the registry that Kubernetes default scheduler uses. A scheduler that runs out of tree
-// plugins can register additional plugins through the WithFrameworkOutOfTreeRegistry option.
+// This is the registry that Kubernetes default scheduler uses.
+// A scheduler that runs out of tree plugins can register additional plugins
+// through the WithFrameworkOutOfTreeRegistry option.
 func NewDefaultRegistry(args *RegistryArgs) framework.Registry {
 	return framework.Registry{
 		defaultpodtopologyspread.Name:        defaultpodtopologyspread.New,

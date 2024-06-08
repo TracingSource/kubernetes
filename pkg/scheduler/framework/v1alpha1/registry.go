@@ -33,8 +33,8 @@ func DecodeInto(configuration *runtime.Unknown, into interface{}) error {
 // All plugins must be in the registry before initializing the framework.
 type Registry map[string]PluginFactory
 
-// Register adds a new plugin to the registry. If a plugin with the same name
-// exists, it returns an error.
+// Register adds a new plugin to the registry.
+// If a plugin with the same name exists, it returns an error.
 func (r Registry) Register(name string, factory PluginFactory) error {
 	if _, ok := r[name]; ok {
 		return fmt.Errorf("a plugin named %v already exists", name)
