@@ -29,9 +29,9 @@ import (
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
-// registerWithAPIServer registers the node with the cluster master. It is safe
-// to call multiple times, but not concurrently (kl.registrationCompleted is
-// not locked).
+// registerWithAPIServer registers the node with the cluster master.
+// It is safe to call multiple times, but not concurrently
+// (kl.registrationCompleted is not locked).
 func (kl *Kubelet) registerWithAPIServer() {
 	if kl.registrationCompleted {
 		return
@@ -198,6 +198,9 @@ func (kl *Kubelet) reconcileCMADAnnotationWithExistingNode(node, existingNode *v
 	return true
 }
 
+// caller:
+// 	1. Kubelet.registerWithAPIServer()
+//
 // initialNode constructs the initial v1.Node for this Kubelet, incorporating node
 // labels, information from the cloud provider, and Kubelet configuration.
 func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
@@ -355,6 +358,12 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 	return node, nil
 }
 
+// syncNodeStatus 向 apiserver 同步 node 节点的信息.
+// 由主调函数通过 wait 定时重复调用.
+//
+// caller:
+// 	1. pkg/kubelet/kubelet.go -> Kubelet.Run()
+//
 // syncNodeStatus should be called periodically from a goroutine.
 // It synchronizes node status to master if there is any change or enough time
 // passed from the last sync, registering the kubelet first if necessary.
@@ -500,11 +509,15 @@ func (kl *Kubelet) recordNodeSchedulableEvent(node *v1.Node) error {
 	return nil
 }
 
+// caller:
+// 	1. Kubelet.initialNode()
+//
 // setNodeStatus fills in the Status fields of the given Node, overwriting
 // any fields that are currently set.
 // TODO(madhusudancs): Simplify the logic for setting node conditions and
 // refactor the node status condition code out to a different file.
 func (kl *Kubelet) setNodeStatus(node *v1.Node) {
+	// 这里遍历的是 Kubelet.defaultNodeStatusFuncs() 的返回值.
 	for i, f := range kl.setNodeStatusFuncs {
 		klog.V(5).Infof("Setting node status at position %v", i)
 		if err := f(node); err != nil {
@@ -524,6 +537,13 @@ func (kl *Kubelet) getLastObservedNodeAddresses() []v1.NodeAddress {
 	return kl.lastObservedNodeAddresses
 }
 
+// defaultNodeStatusFuncs 设置 node 节点的各种 conditions 信息.
+// 尤其重要的是告知 apiserver 自身处于 Ready 状态.
+//
+// caller:
+// 	1. pkg/kubelet/kubelet__new.go -> NewMainKubelet()
+//  被赋值为 Kubelet.setNodeStatusFuncs 成员
+//
 // defaultNodeStatusFuncs is a factory that generates the default set of
 // setNodeStatus funcs
 func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
@@ -538,27 +558,65 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
 	}
 	var setters []func(n *v1.Node) error
 	setters = append(setters,
-		nodestatus.NodeAddress(kl.nodeIP, kl.nodeIPValidator, kl.hostname, kl.hostnameOverridden, kl.externalCloudProvider, kl.cloud, nodeAddressesFunc),
-		nodestatus.MachineInfo(string(kl.nodeName), kl.maxPods, kl.podsPerCore, kl.GetCachedMachineInfo, kl.containerManager.GetCapacity,
-			kl.containerManager.GetDevicePluginResourceCapacity, kl.containerManager.GetNodeAllocatableReservation, kl.recordEvent),
-		nodestatus.VersionInfo(kl.cadvisor.VersionInfo, kl.containerRuntime.Type, kl.containerRuntime.Version),
+		nodestatus.NodeAddress(
+			kl.nodeIP, kl.nodeIPValidator, kl.hostname, kl.hostnameOverridden, 
+			kl.externalCloudProvider, kl.cloud, nodeAddressesFunc,
+		),
+		nodestatus.MachineInfo(
+			string(kl.nodeName), kl.maxPods, kl.podsPerCore, 
+			kl.GetCachedMachineInfo, kl.containerManager.GetCapacity,
+			kl.containerManager.GetDevicePluginResourceCapacity, 
+			kl.containerManager.GetNodeAllocatableReservation, kl.recordEvent,
+		),
+		nodestatus.VersionInfo(
+			kl.cadvisor.VersionInfo, kl.containerRuntime.Type, 
+			kl.containerRuntime.Version,
+		),
 		nodestatus.DaemonEndpoints(kl.daemonEndpoints),
 		nodestatus.Images(kl.nodeStatusMaxImages, kl.imageManager.GetImageList),
 		nodestatus.GoRuntime(),
 	)
 	// Volume limits
-	setters = append(setters, nodestatus.VolumeLimits(kl.volumePluginMgr.ListVolumePluginWithLimits))
+	setters = append(
+		setters, 
+		nodestatus.VolumeLimits(
+			kl.volumePluginMgr.ListVolumePluginWithLimits,
+		),
+	)
 
 	setters = append(setters,
-		nodestatus.MemoryPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderMemoryPressure, kl.recordNodeStatusEvent),
-		nodestatus.DiskPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderDiskPressure, kl.recordNodeStatusEvent),
-		nodestatus.PIDPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderPIDPressure, kl.recordNodeStatusEvent),
-		nodestatus.ReadyCondition(kl.clock.Now, kl.runtimeState.runtimeErrors, kl.runtimeState.networkErrors, kl.runtimeState.storageErrors, validateHostFunc, kl.containerManager.Status, kl.recordNodeStatusEvent),
-		nodestatus.VolumesInUse(kl.volumeManager.ReconcilerStatesHasBeenSynced, kl.volumeManager.GetVolumesInUse),
-		// TODO(mtaufen): I decided not to move this setter for now, since all it does is send an event
-		// and record state back to the Kubelet runtime object. In the future, I'd like to isolate
-		// these side-effects by decoupling the decisions to send events and partial status recording
-		// from the Node setters.
+		nodestatus.MemoryPressureCondition(
+			kl.clock.Now, kl.evictionManager.IsUnderMemoryPressure, 
+			kl.recordNodeStatusEvent,
+		),
+		nodestatus.DiskPressureCondition(
+			kl.clock.Now, kl.evictionManager.IsUnderDiskPressure, 
+			kl.recordNodeStatusEvent,
+		),
+		nodestatus.PIDPressureCondition(
+			kl.clock.Now, kl.evictionManager.IsUnderPIDPressure, 
+			kl.recordNodeStatusEvent,
+		),
+		// 告知 apiserver 自身处于 Ready 状态
+		nodestatus.ReadyCondition(
+			kl.clock.Now, 
+			kl.runtimeState.runtimeErrors, 
+			kl.runtimeState.networkErrors, 
+			kl.runtimeState.storageErrors, 
+			validateHostFunc, 
+			kl.containerManager.Status, 
+			kl.recordNodeStatusEvent,
+		),
+		nodestatus.VolumesInUse(
+			kl.volumeManager.ReconcilerStatesHasBeenSynced, 
+			kl.volumeManager.GetVolumesInUse,
+		),
+		// TODO(mtaufen): I decided not to move this setter for now,
+		// since all it does is send an event and record state back to the
+		// Kubelet runtime object.
+		// In the future, I'd like to isolate these side-effects by decoupling
+		// the decisions to send events and partial status recording from
+		// the Node setters.
 		kl.recordNodeSchedulableEvent,
 	)
 	return setters

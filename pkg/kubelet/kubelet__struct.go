@@ -54,6 +54,8 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 )
 
+// 	@initAt: pkg/kubelet/kubelet__new.go -> NewMainKubelet()
+//
 // Kubelet is the main kubelet implementation.
 type Kubelet struct {
 	kubeletConfiguration kubeletconfiginternal.KubeletConfiguration
@@ -76,7 +78,8 @@ type Kubelet struct {
 	lastObservedNodeAddressesMux sync.RWMutex
 	lastObservedNodeAddresses    []v1.NodeAddress
 
-	// onRepeatedHeartbeatFailure is called when a heartbeat operation fails more than once. optional.
+	// onRepeatedHeartbeatFailure is called when a heartbeat operation fails
+	// more than once. optional.
 	onRepeatedHeartbeatFailure func()
 
 	// 在 NewMainKubelet() 函数中被初始化, 主要调用 Kubelet.syncPod() 方法
@@ -326,6 +329,8 @@ type Kubelet struct {
 	// easy to test the code.
 	clock clock.Clock
 
+	// 	@assignAs: pkg/kubelet/kubelet_node_status.go -> Kubelet.defaultNodeStatusFuncs()
+	//
 	// handlers called during the tryUpdateNodeStatus cycle
 	setNodeStatusFuncs []func(*v1.Node) error
 

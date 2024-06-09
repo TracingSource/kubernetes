@@ -10,7 +10,7 @@ import (
 
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
@@ -433,18 +433,31 @@ func GoRuntime() Setter {
 	}
 }
 
+// 	@param nowFunc: Kubelet.clock.Now()
+// 	@param runtimeErrorsFunc: Kubelet.runtimeState.runtimeErrors()
+// 	@param networkErrorsFunc: Kubelet.runtimeState.networkErrors()
+// 	@param storageErrorsFunc: Kubelet.runtimeState.storageErrors()
+// 	@param appArmorValidateHostFunc: Kubelet.appArmorValidator.ValidateHost()
+//  might be nil depending on whether there was an appArmorValidator
+// 	@param cmStatusFunc: Kubelet.containerManager.Status()
+// 	@param recordEventFunc: Kubelet.recordNodeStatusEvent()
+//
+// caller:
+// 	1. pkg/kubelet/kubelet_node_status.go -> Kubelet.defaultNodeStatusFuncs()
+//
 // ReadyCondition returns a Setter that updates the v1.NodeReady condition on the node.
 func ReadyCondition(
-	nowFunc func() time.Time, // typically Kubelet.clock.Now
-	runtimeErrorsFunc func() error, // typically Kubelet.runtimeState.runtimeErrors
-	networkErrorsFunc func() error, // typically Kubelet.runtimeState.networkErrors
-	storageErrorsFunc func() error, // typically Kubelet.runtimeState.storageErrors
-	appArmorValidateHostFunc func() error, // typically Kubelet.appArmorValidator.ValidateHost, might be nil depending on whether there was an appArmorValidator
-	cmStatusFunc func() cm.Status, // typically Kubelet.containerManager.Status
-	recordEventFunc func(eventType, event string), // typically Kubelet.recordNodeStatusEvent
+	nowFunc func() time.Time,
+	runtimeErrorsFunc func() error,
+	networkErrorsFunc func() error,
+	storageErrorsFunc func() error,
+	appArmorValidateHostFunc func() error,
+	cmStatusFunc func() cm.Status,
+	recordEventFunc func(eventType, event string),
 ) Setter {
 	return func(node *v1.Node) error {
-		// NOTE(aaronlevy): NodeReady condition needs to be the last in the list of node conditions.
+		// NOTE(aaronlevy): NodeReady condition needs to be the last in the list
+		// of node conditions.
 		// This is due to an issue with version skewed kubelet and master components.
 		// ref: https://github.com/kubernetes/kubernetes/issues/16961
 		currentTime := metav1.NewTime(nowFunc())
@@ -455,8 +468,12 @@ func ReadyCondition(
 			Message:           "kubelet is posting ready status",
 			LastHeartbeatTime: currentTime,
 		}
-		errs := []error{runtimeErrorsFunc(), networkErrorsFunc(), storageErrorsFunc()}
-		requiredCapacities := []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory, v1.ResourcePods}
+		errs := []error{
+			runtimeErrorsFunc(), networkErrorsFunc(), storageErrorsFunc(),
+		}
+		requiredCapacities := []v1.ResourceName{
+			v1.ResourceCPU, v1.ResourceMemory, v1.ResourcePods,
+		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
 			requiredCapacities = append(requiredCapacities, v1.ResourceEphemeralStorage)
 		}
@@ -467,7 +484,10 @@ func ReadyCondition(
 			}
 		}
 		if len(missingCapacities) > 0 {
-			errs = append(errs, fmt.Errorf("missing node capacity for resources: %s", strings.Join(missingCapacities, ", ")))
+			errs = append(errs, fmt.Errorf(
+				"missing node capacity for resources: %s",
+				strings.Join(missingCapacities, ", "),
+			))
 		}
 		if aggregatedErr := errors.NewAggregate(errs); aggregatedErr != nil {
 			newNodeReadyCondition = v1.NodeCondition{
@@ -489,7 +509,11 @@ func ReadyCondition(
 		// Record any soft requirements that were not met in the container manager.
 		status := cmStatusFunc()
 		if status.SoftRequirements != nil {
-			newNodeReadyCondition.Message = fmt.Sprintf("%s. WARNING: %s", newNodeReadyCondition.Message, status.SoftRequirements.Error())
+			newNodeReadyCondition.Message = fmt.Sprintf(
+				"%s. WARNING: %s", 
+				newNodeReadyCondition.Message, 
+				status.SoftRequirements.Error(),
+			)
 		}
 
 		readyConditionUpdated := false
