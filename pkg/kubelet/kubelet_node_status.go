@@ -29,6 +29,11 @@ import (
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
+// registerWithAPIServer 向 apiserver 注册自己(重复注册也不会报错).
+//
+// caller:
+// 	1. Kubelet.syncNodeStatus()
+//
 // registerWithAPIServer registers the node with the cluster master.
 // It is safe to call multiple times, but not concurrently
 // (kl.registrationCompleted is not locked).
@@ -61,6 +66,9 @@ func (kl *Kubelet) registerWithAPIServer() {
 	}
 }
 
+// caller:
+// 	1. Kubelet.registerWithAPIServer()
+//
 // tryRegisterWithAPIServer makes an attempt to register the given node with
 // the API server, returning a boolean indicating whether the attempt was
 // successful.  If a node with the same name already exists, it reconciles the
@@ -79,11 +87,17 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 
 	existingNode, err := kl.kubeClient.CoreV1().Nodes().Get(string(kl.nodeName), metav1.GetOptions{})
 	if err != nil {
-		klog.Errorf("Unable to register node %q with API server: error getting existing node: %v", kl.nodeName, err)
+		klog.Errorf(
+			"Unable to register node %q with API server: error getting existing node: %v", 
+			kl.nodeName, err,
+		)
 		return false
 	}
 	if existingNode == nil {
-		klog.Errorf("Unable to register node %q with API server: no node instance returned", kl.nodeName)
+		klog.Errorf(
+			"Unable to register node %q with API server: no node instance returned", 
+			kl.nodeName,
+		)
 		return false
 	}
 
@@ -103,7 +117,10 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 	requiresUpdate = kl.reconcileExtendedResource(node, existingNode) || requiresUpdate
 	if requiresUpdate {
 		if _, _, err := nodeutil.PatchNodeStatus(kl.kubeClient.CoreV1(), types.NodeName(kl.nodeName), originalNode, existingNode); err != nil {
-			klog.Errorf("Unable to reconcile node %q with API server: error updating node: %v", kl.nodeName, err)
+			klog.Errorf(
+				"Unable to reconcile node %q with API server: error updating node: %v", 
+				kl.nodeName, err,
+			)
 			return false
 		}
 	}
@@ -198,6 +215,8 @@ func (kl *Kubelet) reconcileCMADAnnotationWithExistingNode(node, existingNode *v
 	return true
 }
 
+// initialNode 根据当前主机节点信息, 构造并返回 Node{} 对象.
+//
 // caller:
 // 	1. Kubelet.registerWithAPIServer()
 //
@@ -231,7 +250,10 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 	if len(kl.registerWithTaints) > 0 {
 		taints := make([]v1.Taint, len(kl.registerWithTaints))
 		for i := range kl.registerWithTaints {
-			if err := k8s_api_v1.Convert_core_Taint_To_v1_Taint(&kl.registerWithTaints[i], &taints[i], nil); err != nil {
+			err := k8s_api_v1.Convert_core_Taint_To_v1_Taint(
+				&kl.registerWithTaints[i], &taints[i], nil,
+			)
+			if err != nil {
 				return nil, err
 			}
 		}
@@ -292,7 +314,8 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 		node.Annotations[volutil.KeepTerminatedPodVolumesAnnotation] = "true"
 	}
 
-	// @question: should this be place after the call to the cloud provider? which also applies labels
+	// @question: should this be place after the call to the cloud provider?
+	// which also applies labels
 	for k, v := range kl.nodeLabels {
 		if cv, found := node.ObjectMeta.Labels[k]; found {
 			klog.Warningf("the node label %s=%s will overwrite default setting %s", k, v, cv)
@@ -353,16 +376,18 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 		}
 	}
 
+	// 设置当前 node 的 status.conditions 信息, 如是否 ready, 内存、磁盘、PID等是否存在压力.
 	kl.setNodeStatus(node)
 
 	return node, nil
 }
 
 // syncNodeStatus 向 apiserver 同步 node 节点的信息.
-// 由主调函数通过 wait 定时重复调用.
 //
 // caller:
 // 	1. pkg/kubelet/kubelet.go -> Kubelet.Run()
+//  主调函数通过 wait 定时重复调用, 定时更新 node 状态
+// 	2. pkg/kubelet/kubelet.go -> Kubelet.fastStatusUpdateOnce()
 //
 // syncNodeStatus should be called periodically from a goroutine.
 // It synchronizes node status to master if there is any change or enough time
@@ -375,6 +400,8 @@ func (kl *Kubelet) syncNodeStatus() {
 		return
 	}
 	if kl.registerNode {
+		// 根据当前服务器状态构造 Node 信息并调用 Create() 方法注册自己.
+		//
 		// This will exit immediately if it doesn't need to do anything.
 		kl.registerWithAPIServer()
 	}
@@ -383,6 +410,9 @@ func (kl *Kubelet) syncNodeStatus() {
 	}
 }
 
+// caller:
+// 	1. Kubelet.syncNodeStatus() 只有这一处
+//
 // updateNodeStatus updates node status to master with retries if there is any
 // change or enough time passed from the last sync.
 func (kl *Kubelet) updateNodeStatus() error {
@@ -400,12 +430,19 @@ func (kl *Kubelet) updateNodeStatus() error {
 	return fmt.Errorf("update node status exceeds retry count")
 }
 
+// 	@param tryNumber: 第几次重试.
+//
+// caller:
+// 	1. Kubelet.updateNodeStatus()
+//
 // tryUpdateNodeStatus tries to update node status to master if there is any
 // change or enough time passed from the last sync.
 func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
-	// 大型集群中, node 向 apiserver 上报节点状态将是 apiserver 与 etcd 的
-	// 主要压力来源.
-	// 
+	// 大型集群中, node 向 apiserver 上报节点状态是 apiserver & etcd 的主要压力来源.
+	//
+	// 为了减轻 etcd 的压力, 在下面 Get() 操作时告诉 apiserver 直接从缓存中获取信息并返回即可.
+	// ...嗯, 这样只减轻了 etcd 压力, apiserver 还是一样的.
+	//
 	// In large clusters, GET and PUT operations on Node objects coming
 	// from here are the majority of load on apiserver and etcd.
 	// To reduce the load on etcd, we are serving GET operations from
@@ -414,6 +451,7 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 	// If it result in a conflict, all retries are served directly from etcd.
 	opts := metav1.GetOptions{}
 	if tryNumber == 0 {
+		// Get 请求中 ResourceVersion 设置为 0 就是告诉 apiserver 直接从缓存中查询.
 		util.FromApiserverCache(&opts)
 	}
 	node, err := kl.heartbeatClient.CoreV1().Nodes().Get(string(kl.nodeName), opts)
@@ -439,12 +477,15 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 		}
 	}
 
+	// kubelet 默认每隔 10s 计算一次 nodeStatus, 但并不一定上报,
+	// 只有发生了有意义的变化或者上报时间间隔超过 nodeStatusReportFrequency 值才会上报.
 	kl.setNodeStatus(node)
 
 	now := kl.clock.Now()
 	// 1.16.2 版本中, NodeLease 特性是默认开启的, 当前为 1.17.2, 已经不再是 feature 了.
 	// 如果此时还没到下次更新的时间点, 判断一下直接返回.
 	if now.Before(kl.lastStatusReportTime.Add(kl.nodeStatusReportFrequency)) {
+		// 没发生什么有意义的变动.
 		if !podCIDRChanged && !nodeStatusHasChanged(&originalNode.Status, &node.Status) {
 			// We must mark the volumes as ReportedInUse in volume manager's dsw even
 			// if no changes were made to the node status (no volumes were added or removed
@@ -467,8 +508,12 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 		}
 	}
 
+	// 运行到这里, 说明 nodeStatus 发生了有意义的变动.
+	//
 	// Patch the current status on the API server
-	updatedNode, _, err := nodeutil.PatchNodeStatus(kl.heartbeatClient.CoreV1(), types.NodeName(kl.nodeName), originalNode, node)
+	updatedNode, _, err := nodeutil.PatchNodeStatus(
+		kl.heartbeatClient.CoreV1(), types.NodeName(kl.nodeName), originalNode, node,
+	)
 	if err != nil {
 		return err
 	}
@@ -537,7 +582,7 @@ func (kl *Kubelet) getLastObservedNodeAddresses() []v1.NodeAddress {
 	return kl.lastObservedNodeAddresses
 }
 
-// defaultNodeStatusFuncs 设置 node 节点的各种 conditions 信息.
+// defaultNodeStatusFuncs 设置 node 节点的各种 conditions 信息, 如内存, 磁盘, PID数量等是否存在压力.
 // 尤其重要的是告知 apiserver 自身处于 Ready 状态.
 //
 // caller:

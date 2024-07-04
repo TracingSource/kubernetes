@@ -37,7 +37,9 @@ type controller struct {
 	client                     clientset.Interface
 	leaseClient                coordclientset.LeaseInterface
 	holderIdentity             string
+	// leaseDurationSeconds 每次 lease 租约的有效时间, 默认 40s
 	leaseDurationSeconds       int32
+	// 上报心跳 apiserver lease 的间隔, 默认 40s * 0.25(总不能等到要过期了才更新吧)
 	renewInterval              time.Duration
 	clock                      clock.Clock
 	onRepeatedHeartbeatFailure func()
@@ -46,8 +48,16 @@ type controller struct {
 	latestLease *coordinationv1.Lease
 }
 
+// 	@param leaseDurationSeconds: 每次 lease 租约的有效时间, 默认 40s
+//
+// caller:
+// 	1. pkg/kubelet/kubelet__new.go -> NewMainKubelet()
+//
 // NewController constructs and returns a controller
-func NewController(clock clock.Clock, client clientset.Interface, holderIdentity string, leaseDurationSeconds int32, onRepeatedHeartbeatFailure func()) Controller {
+func NewController(
+	clock clock.Clock, client clientset.Interface, holderIdentity string, 
+	leaseDurationSeconds int32, onRepeatedHeartbeatFailure func(),
+) Controller {
 	var leaseClient coordclientset.LeaseInterface
 	if client != nil {
 		leaseClient = client.CoordinationV1().Leases(corev1.NamespaceNodeLease)
@@ -73,12 +83,22 @@ func (c *controller) Run(stopCh <-chan struct{}) {
 	wait.Until(c.sync, c.renewInterval, stopCh)
 }
 
+// 无论是 NodeStatus 还是 NodeLease 对象的更新, NodeController 都视为 kubelet 在上报心跳. 
+// NodeLease 比 NodeStatus 对象小很多, 大幅降低了 NodeStatus 的更新频率, 显著降低 etcd存储压力. 
+//
 func (c *controller) sync() {
 	if c.latestLease != nil {
-		// As long as node lease is not (or very rarely) updated by any other agent than Kubelet,
-		// we can optimistically assume it didn't change since our last update and try updating
-		// based on the version from that time. Thanks to it we avoid GET call and reduce load
-		// on etcd and kube-apiserver.
+		// 除了 kubelet, 没人会变更 node lease 对象, 因此可以直接用缓存在本地的上一次的值,
+		// 不用在更新前先 Get 一次了, 也减轻了 apiserver & etcd 的压力.
+		// 
+		// 同样是上报给 apiserver, NodeLease 比 NodeStatus 对象小很多, 压力会小很多.
+		// 
+		// As long as node lease is not (or very rarely) updated by any other
+		// agent than Kubelet,
+		// we can optimistically assume it didn't change since our last update
+		// and try updating based on the version from that time.
+		//
+		// Thanks to it we avoid GET call and reduce load on etcd and kube-apiserver.
 		// If at some point other agents will also be frequently updating the Lease object, this
 		// can result in performance degradation, because we will end up with calling additional
 		// GET/PUT - at this point this whole "if" should be removed.
@@ -208,7 +228,10 @@ func (c *controller) newLease(base *coordinationv1.Lease) *coordinationv1.Lease 
 				},
 			}
 		} else {
-			klog.Errorf("failed to get node %q when trying to set owner ref to the node lease: %v", c.holderIdentity, err)
+			klog.Errorf(
+				"failed to get node %q when trying to set owner ref to the node lease: %v", 
+				c.holderIdentity, err,
+			)
 		}
 	}
 

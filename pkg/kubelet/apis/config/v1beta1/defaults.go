@@ -91,6 +91,9 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.StreamingConnectionIdleTimeout == zeroDuration {
 		obj.StreamingConnectionIdleTimeout = metav1.Duration{Duration: 4 * time.Hour}
 	}
+	// NodeStatusUpdateFrequency 每隔10s计算一次本地 nodeStatus 状态,
+	// 但如果 nodeStaus 没发生什么有意义的变动的话, 要根据 NodeStatusReportFrequency 
+	// 每隔 5m 才会上报到 apiserver 一次.
 	if obj.NodeStatusReportFrequency == zeroDuration {
 		// For backward compatibility, NodeStatusReportFrequency's default value is
 		// set to NodeStatusUpdateFrequency if NodeStatusUpdateFrequency is set

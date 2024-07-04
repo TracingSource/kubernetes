@@ -54,6 +54,10 @@ const (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// kubelet 配置文件 /var/lib/kubelet/config.yaml 的结构体
+//
+// 默认值配置见 pkg/kubelet/apis/config/v1beta1/defaults.go -> SetDefaults_KubeletConfiguration()
+//
 // KubeletConfiguration contains the configuration for the Kubelet
 type KubeletConfiguration struct {
 	metav1.TypeMeta
@@ -168,6 +172,8 @@ type KubeletConfiguration struct {
 	// frequency and post node status immediately if any change is detected. It is
 	// only used when node lease feature is enabled.
 	NodeStatusReportFrequency metav1.Duration
+	// 默认 40s
+	//
 	// nodeLeaseDurationSeconds is the duration the Kubelet will set on its corresponding Lease.
 	NodeLeaseDurationSeconds int32
 	// imageMinimumGCAge is the minimum age for an unused image before it is

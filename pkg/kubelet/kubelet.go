@@ -399,7 +399,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	go kl.volumeManager.Run(kl.sourcesReady, wait.NeverStop)
 
 	if kl.kubeClient != nil {
-		// 同步 node 节点的信息, 这其中会设置一些 docker 运行必要的东西.
+		// 同步心跳, 上报 node 节点的信息, 这其中会设置一些 docker 运行必要的东西.
 		// 注意, 这里是通过定时器定时调用的, 永不停止, 这也是这个函数要求的.
 		//
 		// Start syncing node status immediately,

@@ -203,9 +203,10 @@ type Kubelet struct {
 	// redirectContainerStreaming enables container streaming redirect.
 	redirectContainerStreaming bool
 	// containerRuntime 有 docker, remote 两种
-	// 在 pkg/kubelet/kubelet__new.go -> NewMainKubelet() 中, 通过调用
-	// pkg/kubelet/kuberuntime/kuberuntime_manager.go -> NewKubeGenericRuntimeManager()
-	// 进行初始化
+	//
+	// 	@initAt: pkg/kubelet/kubelet__new.go -> NewMainKubelet() {
+	//	pkg/kubelet/kuberuntime/kuberuntime_manager.go -> NewKubeGenericRuntimeManager()
+	// }
 	//
 	// Container runtime.
 	containerRuntime kubecontainer.Runtime
@@ -222,10 +223,18 @@ type Kubelet struct {
 	// which is used for generating ContainerStatus.
 	reasonCache *ReasonCache
 
-	// nodeStatusUpdateFrequency specifies how often kubelet computes node status. If node lease
-	// feature is not enabled, it is also the frequency that kubelet posts node status to master.
-	// In that case, be cautious when changing the constant, it must work with nodeMonitorGracePeriod
-	// in nodecontroller. There are several constraints:
+	// nodeStatusUpdateFrequency 计算本地 nodeStatus 变动的时间间隔.
+	// 默认 10s, 见 pkg/kubelet/apis/config/v1beta1/defaults.go -> SetDefaults_KubeletConfiguration()
+	//
+	// 注意, 由于 node lease 的存在, 计算 node status 是独立的, 只有发生有意义的变化,
+	// 或者超过上报间隔时, 才会真正上报.
+	//
+	// nodeStatusUpdateFrequency specifies how often kubelet computes node status.
+	// If node lease feature is not enabled, it is also the frequency that
+	// kubelet posts node status to master.
+	//
+	// In that case, be cautious when changing the constant, it must work with
+	// nodeMonitorGracePeriod in nodecontroller. There are several constraints:
 	// 1. nodeMonitorGracePeriod must be N times more than nodeStatusUpdateFrequency, where
 	//    N means number of retries allowed for kubelet to post node status. It is pointless
 	//    to make nodeMonitorGracePeriod be less than nodeStatusUpdateFrequency, since there
@@ -236,6 +245,10 @@ type Kubelet struct {
 	//    as it takes time to gather all necessary node information.
 	nodeStatusUpdateFrequency time.Duration
 
+	// nodeStatusReportFrequency 上报 apiserver 的时间间隔.
+	//
+	// 默认 5m, 见 pkg/kubelet/apis/config/v1beta1/defaults.go -> SetDefaults_KubeletConfiguration()
+	// 
 	// nodeStatusReportFrequency is the frequency that kubelet posts node
 	// status to master. It is only used when node lease feature is enabled.
 	nodeStatusReportFrequency time.Duration

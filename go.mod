@@ -562,12 +562,12 @@ replace (
 )
 
 replace (
-	k8s.io/api => /root/k8s.io/kube-api
-	k8s.io/apiextensions-apiserver => /root/k8s.io/apiextensions-apiserver
-	k8s.io/apimachinery => /root/k8s.io/apimachinery
-	k8s.io/apiserver => /root/k8s.io/apiserver
-	k8s.io/client-go => /root/k8s.io/client-go
-	k8s.io/kube-aggregator => /root/k8s.io/kube-aggregator
-	k8s.io/kubectl => /root/k8s.io/kubectl
-	k8s.io/utils => /root/k8s.io/kube-utils
+	k8s.io/api => ../kube-api
+	k8s.io/apiextensions-apiserver => ../apiextensions-apiserver
+	k8s.io/apimachinery => ../apimachinery
+	k8s.io/apiserver => ../apiserver
+	k8s.io/client-go => ../client-go
+	k8s.io/kube-aggregator => ../kube-aggregator
+	k8s.io/kubectl => ../kubectl
+	k8s.io/utils => ../kube-utils
 )

@@ -18,6 +18,8 @@ type LeastAllocated struct {
 
 var _ = framework.ScorePlugin(&LeastAllocated{})
 
+// NodeResourcesLeastAllocated 调度 Pod 时, 选择资源分配较少的节点
+//
 // LeastAllocatedName is the name of the plugin used in the plugin registry and configurations.
 const LeastAllocatedName = "NodeResourcesLeastAllocated"
 

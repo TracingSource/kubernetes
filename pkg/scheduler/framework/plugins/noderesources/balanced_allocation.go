@@ -19,6 +19,8 @@ type BalancedAllocation struct {
 
 var _ = framework.ScorePlugin(&BalancedAllocation{})
 
+// BalancedAllocationName 调度 Pod 时, 选择资源使用更为均衡的节点
+//
 // BalancedAllocationName is the name of the plugin used in the plugin registry and configurations.
 const BalancedAllocationName = "NodeResourcesBalancedAllocation"
 
