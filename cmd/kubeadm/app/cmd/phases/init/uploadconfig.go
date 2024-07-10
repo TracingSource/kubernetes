@@ -82,6 +82,9 @@ func getUploadConfigPhaseFlags() []string {
 	}
 }
 
+// runUploadKubeadmConfig 在 kubeadm init 3大件启动完成后, 将 kubeadm 的 config.yaml 配置,
+// 存放到 kube-system/kubeadm-config 的 ConfigMap 对象中.
+//
 // runUploadKubeadmConfig uploads the kubeadm configuration to a ConfigMap
 func runUploadKubeadmConfig(c workflow.RunData) error {
 	cfg, client, err := getUploadConfigData(c)
@@ -96,6 +99,9 @@ func runUploadKubeadmConfig(c workflow.RunData) error {
 	return nil
 }
 
+// UploadConfiguration 在 kubeadm init 3大件启动完成后, 将 kubelet 的 config.yaml 配置,
+// 存放到 kube-system 下, 名为 kubelet-config-${k8s-version} 的 ConfigMap 对象中.
+//
 // runUploadKubeletConfig uploads the kubelet configuration to a ConfigMap
 func runUploadKubeletConfig(c workflow.RunData) error {
 	cfg, client, err := getUploadConfigData(c)
@@ -104,7 +110,12 @@ func runUploadKubeletConfig(c workflow.RunData) error {
 	}
 
 	klog.V(1).Infoln("[upload-config] Uploading the kubelet component config to a ConfigMap")
-	if err = kubeletphase.CreateConfigMap(cfg.ClusterConfiguration.ComponentConfigs.Kubelet, cfg.KubernetesVersion, client); err != nil {
+	err = kubeletphase.CreateConfigMap(
+		cfg.ClusterConfiguration.ComponentConfigs.Kubelet,
+		cfg.KubernetesVersion,
+		client,
+	)
+	if err != nil {
 		return errors.Wrap(err, "error creating kubelet configuration ConfigMap")
 	}
 

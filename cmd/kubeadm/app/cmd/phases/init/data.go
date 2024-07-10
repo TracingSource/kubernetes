@@ -8,6 +8,8 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
+// 	@implementBy: cmd/kubeadm/app/cmd/init.go -> initData{}
+//
 // InitData is the interface to use for init phases.
 // The "initData" type from "cmd/init.go" must satisfy this interface.
 type InitData interface {

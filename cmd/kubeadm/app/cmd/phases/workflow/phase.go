@@ -37,9 +37,15 @@ type Phase struct {
 	// Nb. phase marked as RunAllSiblings can not have Run functions
 	RunAllSiblings bool
 
+	// Run 各个阶段的入口函数, 如
+	// 1. cmd/kubeadm/app/cmd/phases/init/preflight.go -> runPreflight()
+	// 2. cmd/kubeadm/app/cmd/phases/init/kubelet.go -> runKubeletStart()
+	// 3. cmd/kubeadm/app/cmd/phases/init/controlplane.go -> runControlPlanePhase()
+	// ...
+	//
 	// Run defines a function implementing the phase action.
-	// It is recommended to implent type assertion, e.g. using golang type switch,
-	// for validating the RunData type.
+	// It is recommended to implent type assertion,
+	// e.g. using golang type switch, for validating the RunData type.
 	Run func(data RunData) error
 
 	// RunIf define a function that implements a condition that should be checked
@@ -55,8 +61,8 @@ type Phase struct {
 
 	// LocalFlags defines the list of flags that should be assigned to the cobra command generated
 	// for this phase.
-	// Nb. if two or phases have the same local flags, please consider using local flags in the parent command
-	// or additional flags defined in the phase runner.
+	// Nb. if two or phases have the same local flags, please consider using
+	// local flags in the parent command or additional flags defined in the phase runner.
 	LocalFlags *pflag.FlagSet
 
 	// ArgsValidator defines the positional arg function to be used for validating args for this phase

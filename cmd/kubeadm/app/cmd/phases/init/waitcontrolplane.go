@@ -49,6 +49,7 @@ func NewWaitControlPlanePhase() workflow.Phase {
 	return phase
 }
 
+// runWaitControlPlanePhase 启动 kubelet 并等待其将3大件启动完成
 func runWaitControlPlanePhase(c workflow.RunData) error {
 	data, ok := c.(InitData)
 	if !ok {
@@ -71,7 +72,9 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 	}
 
 	timeout := data.Cfg().ClusterConfiguration.APIServer.TimeoutForControlPlane.Duration
-	waiter, err := newControlPlaneWaiter(data.DryRun(), timeout, client, data.OutputWriter())
+	waiter, err := newControlPlaneWaiter(
+		data.DryRun(), timeout, client, data.OutputWriter(),
+	)
 	if err != nil {
 		return errors.Wrap(err, "error creating waiter")
 	}
@@ -105,7 +108,8 @@ func printFilesIfDryRunning(data InitData) error {
 	fmt.Println("[dryrun] The certificates or kubeconfig files would not be printed due to their sensitive nature")
 	fmt.Printf("[dryrun] Please examine the %q directory for details about what would be written\n", manifestDir)
 
-	// Print the contents of the upgraded manifests and pretend like they were in /etc/kubernetes/manifests
+	// Print the contents of the upgraded manifests and pretend like they were
+	// in /etc/kubernetes/manifests
 	files := []dryrunutil.FileToPrint{}
 	// Print static pod manifests
 	for _, component := range kubeadmconstants.ControlPlaneComponents {

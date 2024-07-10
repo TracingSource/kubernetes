@@ -113,7 +113,9 @@ func (e *Runner) computePhaseRunFlags() (map[string]bool, error) {
 		// Register current phase as part of its own parent hierarchy
 		parent := p.parent
 		for parent != nil {
-			phaseHierarchy[parent.generatedName] = append(phaseHierarchy[parent.generatedName], p.generatedName)
+			phaseHierarchy[parent.generatedName] = append(
+				phaseHierarchy[parent.generatedName], p.generatedName,
+			)
 			parent = parent.parent
 		}
 		return nil
@@ -433,7 +435,9 @@ func addPhaseRunner(e *Runner, parentRunner *phaseRunner, phase Phase) {
 	selfPath := []string{generatedName}
 
 	if parentRunner != nil {
-		generatedName = strings.Join([]string{parentRunner.generatedName, generatedName}, phaseSeparator)
+		generatedName = strings.Join(
+			[]string{parentRunner.generatedName, generatedName}, phaseSeparator,
+		)
 		use = fmt.Sprintf("%s%s", phaseSeparator, use)
 		selfPath = append(parentRunner.selfPath, selfPath...)
 	}
@@ -451,15 +455,16 @@ func addPhaseRunner(e *Runner, parentRunner *phaseRunner, phase Phase) {
 	// adds to the phaseRunners list
 	e.phaseRunners = append(e.phaseRunners, currentRunner)
 
-	// iterate for the nested, ordered list of phases, thus storing
-	// phases in the expected executing order (child phase are stored immediately after their parent phase).
+	// iterate for the nested, ordered list of phases, thus storing phases
+	// in the expected executing order
+	// (child phase are stored immediately after their parent phase).
 	for _, childPhase := range phase.Phases {
 		addPhaseRunner(e, currentRunner, childPhase)
 	}
 }
 
-// cleanName makes phase name suitable for the runner help, by lowercasing the name
-// and removing args descriptors, if any
+// cleanName makes phase name suitable for the runner help,
+// by lowercasing the name and removing args descriptors, if any
 func cleanName(name string) string {
 	ret := strings.ToLower(name)
 	if pos := strings.Index(ret, " "); pos != -1 {

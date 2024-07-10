@@ -860,11 +860,12 @@ func (ncc NumCPUCheck) Check() (warnings, errorList []error) {
 //
 // RunInitNodeChecks executes all individual, applicable to control-plane node checks.
 // The boolean flag 'isSecondaryControlPlane' controls whether we are running checks in a --join-control-plane scenario.
-// The boolean flag 'downloadCerts' controls whether we should skip checks on certificates because we are downloading them.
+// The boolean flag 'downloadCerts' controls whether we should skip checks
+// on certificates because we are downloading them.
 // If the flag is set to true we should skip checks already executed by RunJoinNodeChecks.
 func RunInitNodeChecks(
-	execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, 
-	ignorePreflightErrors sets.String, isSecondaryControlPlane bool, 
+	execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration,
+	ignorePreflightErrors sets.String, isSecondaryControlPlane bool,
 	downloadCerts bool,
 ) error {
 	if !isSecondaryControlPlane {
@@ -874,10 +875,15 @@ func RunInitNodeChecks(
 		}
 	}
 
-	manifestsDir := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)
+	manifestsDir := filepath.Join(
+		kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName,
+	)
 	checks := []Checker{
 		NumCPUCheck{NumCPU: kubeadmconstants.ControlPlaneNumCPU},
-		KubernetesVersionCheck{KubernetesVersion: cfg.KubernetesVersion, KubeadmVersion: kubeadmversion.Get().GitVersion},
+		KubernetesVersionCheck{
+			KubernetesVersion: cfg.KubernetesVersion,
+			KubeadmVersion:    kubeadmversion.Get().GitVersion,
+		},
 		FirewalldCheck{ports: []int{int(cfg.LocalAPIEndpoint.BindPort), kubeadmconstants.KubeletPort}},
 		PortOpenCheck{port: int(cfg.LocalAPIEndpoint.BindPort)},
 		PortOpenCheck{port: kubeadmconstants.KubeSchedulerPort},
@@ -927,7 +933,8 @@ func RunInitNodeChecks(
 	}
 
 	if cfg.Etcd.External != nil && !(isSecondaryControlPlane && downloadCerts) {
-		// Only check etcd certificates when using an external etcd and not joining with automatic download of certs
+		// Only check etcd certificates when using an external etcd and
+		// not joining with automatic download of certs
 		if cfg.Etcd.External.CAFile != "" {
 			checks = append(checks, FileExistingCheck{Path: cfg.Etcd.External.CAFile, Label: "ExternalEtcdClientCertificates"})
 		}
@@ -951,7 +958,7 @@ func RunInitNodeChecks(
 //
 // RunJoinNodeChecks executes all individual, applicable to node checks.
 func RunJoinNodeChecks(
-	execer utilsexec.Interface, 
+	execer utilsexec.Interface,
 	cfg *kubeadmapi.JoinConfiguration, ignorePreflightErrors sets.String,
 ) error {
 	// First, check if we're root separately from the other preflight checks and fail fast

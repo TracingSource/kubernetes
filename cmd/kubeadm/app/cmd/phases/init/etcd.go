@@ -24,7 +24,7 @@ var (
 		`)
 )
 
-// NewEtcdPhase 创建 etcd 的 static pod.
+// NewEtcdPhase 为 etcd 创建 static pod.
 //
 // NewEtcdPhase creates a kubeadm workflow phase that implements handling of etcd.
 func NewEtcdPhase() workflow.Phase {
@@ -73,17 +73,34 @@ func runEtcdPhaseLocal() func(c workflow.RunData) error {
 			// creates target folder if doesn't exist already
 			if !data.DryRun() {
 				if err := os.MkdirAll(cfg.Etcd.Local.DataDir, 0700); err != nil {
-					return errors.Wrapf(err, "failed to create etcd directory %q", cfg.Etcd.Local.DataDir)
+					return errors.Wrapf(
+						err, "failed to create etcd directory %q", 
+						cfg.Etcd.Local.DataDir,
+					)
 				}
 			} else {
-				fmt.Printf("[dryrun] Would ensure that %q directory is present\n", cfg.Etcd.Local.DataDir)
+				fmt.Printf(
+					"[dryrun] Would ensure that %q directory is present\n", 
+					cfg.Etcd.Local.DataDir,
+				)
 			}
-			fmt.Printf("[etcd] Creating static Pod manifest for local etcd in %q\n", data.ManifestDir())
-			if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(data.ManifestDir(), data.KustomizeDir(), cfg.NodeRegistration.Name, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint); err != nil {
+			fmt.Printf(
+				"[etcd] Creating static Pod manifest for local etcd in %q\n", 
+				data.ManifestDir(),
+			)
+			err := etcdphase.CreateLocalEtcdStaticPodManifestFile(
+				data.ManifestDir(), data.KustomizeDir(), 
+				cfg.NodeRegistration.Name, 
+				&cfg.ClusterConfiguration, 
+				&cfg.LocalAPIEndpoint,
+			)
+			if err != nil {
 				return errors.Wrap(err, "error creating local etcd static pod manifest file")
 			}
 		} else {
-			klog.V(1).Infoln("[etcd] External etcd mode. Skipping the creation of a manifest for local etcd")
+			klog.V(1).Infoln(
+				"[etcd] External etcd mode. Skipping the creation of a manifest for local etcd",
+			)
 		}
 		return nil
 	}

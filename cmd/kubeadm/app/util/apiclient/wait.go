@@ -150,6 +150,9 @@ func (w *KubeWaiter) WaitForHealthyKubelet(initalTimeout time.Duration, healthzE
 	}, 5) // a failureThreshold of five means waiting for a total of 155 seconds
 }
 
+// caller:
+// 	1. cmd/kubeadm/app/cmd/phases/init/waitcontrolplane.go -> runWaitControlPlanePhase()
+//
 // WaitForKubeletAndFunc waits primarily for the function f to execute,
 // even though it might take some time.
 // If that takes a long time, and the kubelet /healthz continuously are unhealthy,
@@ -182,7 +185,8 @@ func (w *KubeWaiter) SetTimeout(timeout time.Duration) {
 	w.timeout = timeout
 }
 
-// WaitForStaticPodControlPlaneHashes blocks until it timeouts or gets a hash map for all components and their Static Pods
+// WaitForStaticPodControlPlaneHashes blocks until it timeouts or gets a hash map
+// for all components and their Static Pods
 func (w *KubeWaiter) WaitForStaticPodControlPlaneHashes(nodeName string) (map[string]string, error) {
 
 	componentHash := ""
@@ -221,8 +225,10 @@ func (w *KubeWaiter) WaitForStaticPodSingleHash(nodeName string, component strin
 	return componentPodHash, err
 }
 
-// WaitForStaticPodHashChange blocks until it timeouts or notices that the Mirror Pod (for the Static Pod, respectively) has changed
-// This implicitly means this function blocks until the kubelet has restarted the Static Pod in question
+// WaitForStaticPodHashChange blocks until it timeouts or notices that the 
+// Mirror Pod (for the Static Pod, respectively) has changed
+// This implicitly means this function blocks until the kubelet has restarted
+// the Static Pod in question
 func (w *KubeWaiter) WaitForStaticPodHashChange(nodeName, component, previousHash string) error {
 	return wait.PollImmediate(kubeadmconstants.APICallRetryInterval, w.timeout, func() (bool, error) {
 
