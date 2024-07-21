@@ -39,12 +39,17 @@ func SetJoinControlPlaneDefaults(cfg *kubeadmapi.JoinControlPlane) error {
 	return nil
 }
 
-// LoadOrDefaultJoinConfiguration takes a path to a config file and a versioned configuration that can serve as the default config
-// If cfgPath is specified, defaultversionedcfg will always get overridden. Otherwise, the default config (often populated by flags) will be used.
+// LoadOrDefaultJoinConfiguration takes a path to a config file and a versioned
+// configuration that can serve as the default config
+// If cfgPath is specified, defaultversionedcfg will always get overridden.
+// Otherwise, the default config (often populated by flags) will be used.
 // Then the external, versioned configuration is defaulted and converted to the internal type.
-// Right thereafter, the configuration is defaulted again with dynamic values (like IP addresses of a machine, etc)
+// Right thereafter, the configuration is defaulted again with dynamic values
+// (like IP addresses of a machine, etc)
 // Lastly, the internal config is validated and returned.
-func LoadOrDefaultJoinConfiguration(cfgPath string, defaultversionedcfg *kubeadmapiv1beta2.JoinConfiguration) (*kubeadmapi.JoinConfiguration, error) {
+func LoadOrDefaultJoinConfiguration(
+	cfgPath string, defaultversionedcfg *kubeadmapiv1beta2.JoinConfiguration,
+) (*kubeadmapi.JoinConfiguration, error) {
 	if cfgPath != "" {
 		// Loads configuration from config file, if provided
 		// Nb. --config overrides command line flags, TODO: fix this
@@ -54,7 +59,8 @@ func LoadOrDefaultJoinConfiguration(cfgPath string, defaultversionedcfg *kubeadm
 	return DefaultedJoinConfiguration(defaultversionedcfg)
 }
 
-// LoadJoinConfigurationFromFile loads versioned JoinConfiguration from file, converts it to internal, defaults and validates it
+// LoadJoinConfigurationFromFile loads versioned JoinConfiguration from file,
+// converts it to internal, defaults and validates it
 func LoadJoinConfigurationFromFile(cfgPath string) (*kubeadmapi.JoinConfiguration, error) {
 	klog.V(1).Infof("loading configuration from %q", cfgPath)
 
@@ -71,9 +77,13 @@ func LoadJoinConfigurationFromFile(cfgPath string) (*kubeadmapi.JoinConfiguratio
 	return documentMapToJoinConfiguration(gvkmap, false)
 }
 
-// documentMapToJoinConfiguration takes a map between GVKs and YAML documents (as returned by SplitYAMLDocuments),
-// finds a JoinConfiguration, decodes it, dynamically defaults it and then validates it prior to return.
-func documentMapToJoinConfiguration(gvkmap map[schema.GroupVersionKind][]byte, allowDeprecated bool) (*kubeadmapi.JoinConfiguration, error) {
+// documentMapToJoinConfiguration takes a map between GVKs and YAML documents
+// (as returned by SplitYAMLDocuments),
+// finds a JoinConfiguration, decodes it, dynamically defaults it and then
+// validates it prior to return.
+func documentMapToJoinConfiguration(
+	gvkmap map[schema.GroupVersionKind][]byte, allowDeprecated bool,
+) (*kubeadmapi.JoinConfiguration, error) {
 	joinBytes := []byte{}
 	for gvk, bytes := range gvkmap {
 		// not interested in anything other than JoinConfiguration
@@ -113,8 +123,12 @@ func documentMapToJoinConfiguration(gvkmap map[schema.GroupVersionKind][]byte, a
 	return internalcfg, nil
 }
 
-// DefaultedJoinConfiguration takes a versioned JoinConfiguration (usually filled in by command line parameters), defaults it, converts it to internal and validates it
-func DefaultedJoinConfiguration(defaultversionedcfg *kubeadmapiv1beta2.JoinConfiguration) (*kubeadmapi.JoinConfiguration, error) {
+// DefaultedJoinConfiguration takes a versioned JoinConfiguration
+// (usually filled in by command line parameters),
+// defaults it, converts it to internal and validates it
+func DefaultedJoinConfiguration(
+	defaultversionedcfg *kubeadmapiv1beta2.JoinConfiguration,
+) (*kubeadmapi.JoinConfiguration, error) {
 	internalcfg := &kubeadmapi.JoinConfiguration{}
 
 	// Takes passed flags into account; the defaulting is executed once again enforcing assignment of

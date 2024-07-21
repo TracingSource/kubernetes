@@ -661,8 +661,9 @@ func (kl *Kubelet) IsPodDeleted(uid types.UID) bool {
 	return eviction.PodIsEvicted(status) || (pod.DeletionTimestamp != nil && notRunning(status.ContainerStatuses))
 }
 
-// PodResourcesAreReclaimed returns true if all required node-level resources that a pod was consuming have
-// been reclaimed by the kubelet.  Reclaiming resources is a prerequisite to deleting a pod from the API server.
+// PodResourcesAreReclaimed returns true if all required node-level resources
+// that a pod was consuming have been reclaimed by the kubelet. 
+// Reclaiming resources is a prerequisite to deleting a pod from the API server.
 func (kl *Kubelet) PodResourcesAreReclaimed(pod *v1.Pod, status v1.PodStatus) bool {
 	if !notRunning(status.ContainerStatuses) {
 		// We shouldn't delete pods that still have running containers

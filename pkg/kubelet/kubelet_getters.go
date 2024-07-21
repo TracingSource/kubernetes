@@ -271,10 +271,15 @@ func (kl *Kubelet) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64 {
 	return kl.volumeManager.GetExtraSupplementalGroupsForPod(pod)
 }
 
+// 获取目标 Pod volume 块中声明的卷在**宿主机**上的路径列表并返回, 比如
+// /var/lib/kubelet/pods/${podUID}/volumes/kubernetes.io~configmap/configmap名称
+// /var/lib/kubelet/pods/${podUID}/volumes/kubernetes.io~secret/secret名称
+//
 // getPodVolumePathListFromDisk returns a list of the volume paths by reading the
 // volume directories for the given pod from the disk.
 func (kl *Kubelet) getPodVolumePathListFromDisk(podUID types.UID) ([]string, error) {
 	volumes := []string{}
+	// podVolDir /var/lib/kubelet/pods/${podUID}/volumes
 	podVolDir := kl.getPodVolumesDir(podUID)
 
 	if pathExists, pathErr := mount.PathExists(podVolDir); pathErr != nil {
@@ -284,6 +289,7 @@ func (kl *Kubelet) getPodVolumePathListFromDisk(podUID types.UID) ([]string, err
 		return volumes, nil
 	}
 
+	// 获取当前 Pod volumes 中声明的卷列表, 如 [kubernetes.io~secret](这是默认的卷)
 	volumePluginDirs, err := ioutil.ReadDir(podVolDir)
 	if err != nil {
 		klog.Errorf("Could not read directory %s: %v", podVolDir, err)
@@ -303,8 +309,10 @@ func (kl *Kubelet) getPodVolumePathListFromDisk(podUID types.UID) ([]string, err
 	return volumes, nil
 }
 
+// 获取目标 pod 需要挂载的卷列表并返回(都是宿主机上的目录/文件)
 func (kl *Kubelet) getMountedVolumePathListFromDisk(podUID types.UID) ([]string, error) {
 	mountedVolumes := []string{}
+	// volumePaths 是宿主机上的路径
 	volumePaths, err := kl.getPodVolumePathListFromDisk(podUID)
 	if err != nil {
 		return mountedVolumes, err

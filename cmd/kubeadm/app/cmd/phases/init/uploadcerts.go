@@ -38,6 +38,7 @@ func runUploadCerts(c workflow.RunData) error {
 		fmt.Printf("[upload-certs] Skipping phase. Please see --%s\n", options.UploadCerts)
 		return nil
 	}
+	// 读取 /etc/kubernetes/admin.conf 配置文件构建 kube client
 	client, err := data.Client()
 	if err != nil {
 		return err

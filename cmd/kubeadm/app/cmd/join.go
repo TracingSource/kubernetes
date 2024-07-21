@@ -107,7 +107,7 @@ var (
 // supported by this api will be exposed as a flag.
 type joinOptions struct {
 	cfgPath               string
-	token                 string
+	token                 string // kubeadm join 命令中的 --token 参数值
 	controlPlane          bool
 	ignorePreflightErrors []string
 	externalcfg           *kubeadmapiv1beta2.JoinConfiguration
@@ -120,8 +120,11 @@ var _ phases.JoinData = &joinData{}
 // joinData defines all the runtime information used when running the kubeadm join workflow;
 // this data is shared across all the phases that are included in the workflow.
 type joinData struct {
-	cfg                   *kubeadmapi.JoinConfiguration
-	initCfg               *kubeadmapi.InitConfiguration
+	cfg     *kubeadmapi.JoinConfiguration
+	initCfg *kubeadmapi.InitConfiguration
+	// /etc/kubernetes/bootstrap-kubelet.conf 文件的内容, 这个文件存在的意义就在于,
+	// 新加入节点时, 新节点可以使用这个受限的客户端配置从 apiserver 获取 kubeadm 配置,
+	// 即 kube-system/kubeadm-config configMap 的内容.
 	tlsBootstrapCfg       *clientcmdapi.Config
 	clientSet             *clientset.Clientset
 	ignorePreflightErrors sets.String
@@ -205,6 +208,8 @@ func NewCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 	return cmd
 }
 
+// addJoinConfigFlags 将命令行 options 中的部分选项绑定到 cfg 对象的对应字段上.
+//
 // addJoinConfigFlags adds join flags bound to the config to the specified flagset
 func addJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta2.JoinConfiguration) {
 	flagSet.StringVar(
@@ -217,11 +222,17 @@ func addJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta2.JoinConfig
 	)
 	// add control plane endpoint flags to the specified flagset
 	flagSet.StringVar(
-		&cfg.ControlPlane.LocalAPIEndpoint.AdvertiseAddress, options.APIServerAdvertiseAddress, cfg.ControlPlane.LocalAPIEndpoint.AdvertiseAddress,
-		"If the node should host a new control plane instance, the IP address the API Server will advertise it's listening on. If not set the default network interface will be used.",
+		&cfg.ControlPlane.LocalAPIEndpoint.AdvertiseAddress,
+		options.APIServerAdvertiseAddress,
+		cfg.ControlPlane.LocalAPIEndpoint.AdvertiseAddress,
+		"If the node should host a new control plane instance, "+
+			"the IP address the API Server will advertise it's listening on. "+
+			"If not set the default network interface will be used.",
 	)
 	flagSet.Int32Var(
-		&cfg.ControlPlane.LocalAPIEndpoint.BindPort, options.APIServerBindPort, cfg.ControlPlane.LocalAPIEndpoint.BindPort,
+		&cfg.ControlPlane.LocalAPIEndpoint.BindPort,
+		options.APIServerBindPort,
+		cfg.ControlPlane.LocalAPIEndpoint.BindPort,
 		"If the node should host a new control plane instance, the port for the API Server to bind to.",
 	)
 	// adds bootstrap token specific discovery flags to the specified flagset
@@ -256,8 +267,10 @@ func addJoinOtherFlags(flagSet *flag.FlagSet, joinOptions *joinOptions) {
 		"Path to kubeadm config file.",
 	)
 	flagSet.StringSliceVar(
-		&joinOptions.ignorePreflightErrors, options.IgnorePreflightErrors, joinOptions.ignorePreflightErrors,
-		"A list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.",
+		&joinOptions.ignorePreflightErrors, options.IgnorePreflightErrors,
+		joinOptions.ignorePreflightErrors,
+		"A list of checks whose errors will be shown as warnings. "+
+			"Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.",
 	)
 	flagSet.StringVar(
 		&joinOptions.token, options.TokenStr, "",
@@ -289,11 +302,17 @@ func newJoinOptions() *joinOptions {
 	}
 }
 
-// newJoinData returns a new joinData struct to be used for the execution of the kubeadm join workflow.
-// This func takes care of validating joinOptions passed to the command, and then it converts
-// options into the internal JoinConfiguration type that is used as input all the phases in the kubeadm join workflow
+// 	@param args: kubeadm 构建 kube 集群完成后生成的 kubeadm join 命令的参数列表, 格式为
+//  {apiserver地址, --token, 内容, --discovery-token-ca-cert-hash, 内容, [--control-plane]}
+//
+// newJoinData returns a new joinData struct to be used for the execution of the
+// kubeadm join workflow.
+// This func takes care of validating joinOptions passed to the command,
+// and then it converts options into the internal JoinConfiguration type
+// that is used as input all the phases in the kubeadm join workflow
 func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Writer) (*joinData, error) {
-	// Re-apply defaults to the public kubeadm API (this will set only values not exposed/not set as a flags)
+	// Re-apply defaults to the public kubeadm API
+	// (this will set only values not exposed/not set as a flags)
 	kubeadmscheme.Scheme.Default(opt.externalcfg)
 
 	// Validate standalone flags values and/or combination of flags and then assigns
@@ -322,7 +341,10 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 		opt.externalcfg.Discovery.BootstrapToken = nil
 	} else {
 		if len(opt.cfgPath) == 0 && len(args) > 1 {
-			klog.Warningf("[preflight] WARNING: More than one API server endpoint supplied on command line %v. Using the first one.", args)
+			klog.Warningf(
+				"[preflight] WARNING: More than one API server endpoint supplied on command line %v. "+
+					"Using the first one.", args,
+			)
 		}
 		opt.externalcfg.Discovery.BootstrapToken.APIServerEndpoint = args[0]
 	}
@@ -332,12 +354,14 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 		if opt.externalcfg.ControlPlane != nil {
 			klog.Warningf(
 				"[preflight] WARNING: JoinControlPane.controlPlane settings "+
-				"will be ignored when %s flag is not set.", options.ControlPlane,
+					"will be ignored when %s flag is not set.", options.ControlPlane,
 			)
 		}
 		opt.externalcfg.ControlPlane = nil
 	}
 
+	// /etc/kubernetes/admin.conf 文件
+	//
 	// if the admin.conf file already exists, use it for skipping the discovery process.
 	// NB. this case can happen when we are joining a control-plane node only
 	// (and phases are invoked atomically)
@@ -366,8 +390,8 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 
 	if opt.externalcfg.ControlPlane != nil && opt.externalcfg.ControlPlane.LocalAPIEndpoint.AdvertiseAddress == "" {
 		klog.V(1).Infoln(
-			"[preflight] found advertiseAddress empty; "+
-			"using default interface's IP address as advertiseAddress",
+			"[preflight] found advertiseAddress empty; " +
+				"using default interface's IP address as advertiseAddress",
 		)
 	}
 
@@ -377,20 +401,20 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 		if _, err := os.Stat(adminKubeConfigPath); os.IsNotExist(err) {
 			return nil, errors.Errorf(
 				"File %s does not exists. Please use "+
-				"'kubeadm join phase control-plane-prepare' subcommands to generate it.", 
+					"'kubeadm join phase control-plane-prepare' subcommands to generate it.",
 				adminKubeConfigPath,
 			)
 		}
 		klog.V(1).Infof(
 			"[preflight] found discovery flags missing for this command. "+
-			"using FileDiscovery: %s", adminKubeConfigPath,
+				"using FileDiscovery: %s", adminKubeConfigPath,
 		)
 		opt.externalcfg.Discovery.File = &kubeadmapiv1beta2.FileDiscovery{
 			KubeConfigPath: adminKubeConfigPath,
 		}
 		//NB. this could be removed when we get better control on args
 		// (e.g. phases without discovery should have NoArgs )
-		opt.externalcfg.Discovery.BootstrapToken = nil 
+		opt.externalcfg.Discovery.BootstrapToken = nil
 	}
 
 	cfg, err := configutil.LoadOrDefaultJoinConfiguration(opt.cfgPath, opt.externalcfg)
@@ -498,6 +522,8 @@ func (j *joinData) KustomizeDir() string {
 	return j.kustomizeDir
 }
 
+// 连接 apiserver 后查询 kube-system/kubeadm-config configMap 的内容并返回.
+//
 // fetchInitConfigurationFromJoinConfiguration retrieves the init configuration
 // from a join configuration, performing the discovery
 func fetchInitConfigurationFromJoinConfiguration(

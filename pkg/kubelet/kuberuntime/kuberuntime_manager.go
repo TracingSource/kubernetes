@@ -141,7 +141,7 @@ type LegacyLogProvider interface {
 
 // 返回值被赋值给 Kubelet 的 containerRuntime, streamingRuntime, runner 3个成员
 //
-// caller: 
+// caller:
 // 	1. pkg/kubelet/kubelet.go -> NewMainKubelet()
 //
 // NewKubeGenericRuntimeManager creates a new kubeGenericRuntimeManager
@@ -162,8 +162,8 @@ func NewKubeGenericRuntimeManager(
 	imagePullBurst int,
 	cpuCFSQuota bool,
 	cpuCFSQuotaPeriod metav1.Duration,
-	runtimeService internalapi.RuntimeService,
-	imageService internalapi.ImageManagerService,
+	runtimeService internalapi.RuntimeService, // 连接 dockershim.sock 或 containerd.sock 的 grpc 客户端对象, 用于执行容器操作.
+	imageService internalapi.ImageManagerService, // 连接 dockershim.sock 或 containerd.sock 的 grpc 客户端对象, 用于执行镜像操作.
 	internalLifecycle cm.InternalContainerLifecycle,
 	legacyLogProvider LegacyLogProvider,
 	runtimeClassManager *runtimeclass.Manager,
@@ -195,12 +195,14 @@ func NewKubeGenericRuntimeManager(
 	}
 
 	// Only matching kubeRuntimeAPIVersion is supported now
-	// TODO: Runtime API machinery is under discussion at 
+	// TODO: Runtime API machinery is under discussion at
 	// https://github.com/kubernetes/kubernetes/issues/28642
 	if typedVersion.Version != kubeRuntimeAPIVersion {
-		klog.Errorf("Runtime api version %s is not supported, only %s is supported now",
+		klog.Errorf(
+			"Runtime api version %s is not supported, only %s is supported now",
 			typedVersion.Version,
-			kubeRuntimeAPIVersion)
+			kubeRuntimeAPIVersion,
+		)
 		return nil, ErrVersionNotSupported
 	}
 
@@ -312,7 +314,7 @@ func (m *kubeGenericRuntimeManager) Status() (*kubecontainer.RuntimeStatus, erro
 
 // GetPods 使用 docker api, 查询当前主机上运行着的 pause 容器, 然后反向构造 Pod 列表.
 //
-// caller: 
+// caller:
 // 	1. pkg/kubelet/images/image_gc_manager.go -> realImageGCManager.detectImages()
 // 	2. pkg/kubelet/pleg/generic.go -> GenericPLEG.relist()
 //
@@ -433,7 +435,7 @@ func (m *kubeGenericRuntimeManager) podSandboxChanged(
 ) (bool, uint32, string) {
 	if len(podStatus.SandboxStatuses) == 0 {
 		klog.V(2).Infof(
-			"No sandbox for pod %q can be found. Need to start a new one", 
+			"No sandbox for pod %q can be found. Need to start a new one",
 			format.Pod(pod),
 		)
 		return true, 0, ""
@@ -446,7 +448,7 @@ func (m *kubeGenericRuntimeManager) podSandboxChanged(
 		}
 	}
 
-	// Needs to create a new sandbox when readySandboxCount > 1 
+	// Needs to create a new sandbox when readySandboxCount > 1
 	// or the ready sandbox is not the latest one.
 	sandboxStatus := podStatus.SandboxStatuses[0]
 	if readySandboxCount > 1 {
@@ -658,7 +660,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 // If a container is still in backoff, the function will return a brief backoff error
 // and a detailed error message.
 func (m *kubeGenericRuntimeManager) doBackOff(
-	pod *v1.Pod, container *v1.Container, podStatus *kubecontainer.PodStatus, 
+	pod *v1.Pod, container *v1.Container, podStatus *kubecontainer.PodStatus,
 	backOff *flowcontrol.Backoff,
 ) (bool, string, error) {
 	var cStatus *kubecontainer.ContainerStatus
@@ -674,7 +676,7 @@ func (m *kubeGenericRuntimeManager) doBackOff(
 	}
 
 	klog.V(3).Infof("checking backoff for container %q in pod %q", container.Name, format.Pod(pod))
-	// Use the finished time of the latest exited container 
+	// Use the finished time of the latest exited container
 	// as the start point to calculate whether to do back-off.
 	ts := cStatus.FinishedAt
 	// backOff requires a unique key to identify the container.

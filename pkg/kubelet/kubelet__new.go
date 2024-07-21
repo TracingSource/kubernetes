@@ -1,6 +1,5 @@
 package kubelet
 
-
 import (
 	"context"
 	"crypto/tls"
@@ -72,10 +71,10 @@ import (
 //
 // @param rootDirectory: /var/lib/kubelet, 存储着 config.yml, pki目录等信息.
 // @param remoteRuntimeEndpoint: /var/run/dockershim.sock, 与 docker.sock 同目录.
-//        每个 docker 容器在启动时都会创建一个新的 containerd-shim 进程, 
+//        每个 docker 容器在启动时都会创建一个新的 containerd-shim 进程,
 //        并指定 dockershim.sock 路径
 //
-// caller: 
+// caller:
 // 	1. cmd/kubelet/app/server.go -> createAndInitKubelet()
 //
 // NewMainKubelet instantiates a new Kubelet object along with all the required internal modules.
@@ -322,7 +321,7 @@ func NewMainKubelet(
 		configMapManager = configmap.NewSimpleConfigMapManager(kubeDeps.KubeClient)
 	default:
 		return nil, fmt.Errorf(
-			"unknown configmap and secret manager mode: %v", 
+			"unknown configmap and secret manager mode: %v",
 			kubeCfg.ConfigMapAndSecretChangeDetectionStrategy,
 		)
 	}
@@ -364,7 +363,7 @@ func NewMainKubelet(
 	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet)
 
 	// remoteRuntimeEndpoint: /var/run/dockershim.sock, 与 docker.sock 同目录.
-	// 每个 docker 容器在启动时都会创建一个新的 containerd-shim 进程, 
+	// 每个 docker 容器在启动时都会创建一个新的 containerd-shim 进程,
 	// 并指定 dockershim.sock 路径
 	if remoteRuntimeEndpoint != "" {
 		// remoteImageEndpoint is same as remoteRuntimeEndpoint if not explicitly specified
@@ -397,10 +396,10 @@ func NewMainKubelet(
 		streamingConfig := getStreamingConfig(kubeCfg, kubeDeps, crOptions)
 		ds, err := dockershim.NewDockerService(
 			kubeDeps.DockerClientConfig, crOptions.PodSandboxImage, streamingConfig,
-			&pluginSettings, runtimeCgroups, kubeCfg.CgroupDriver, 
+			&pluginSettings, runtimeCgroups, kubeCfg.CgroupDriver,
 			crOptions.DockershimRootDirectory, !crOptions.RedirectContainerStreaming,
 		)
-		// 可以直接返回了, 如果出错了, 可能是与本地 docker.sock 建立通信失败, 
+		// 可以直接返回了, 如果出错了, 可能是与本地 docker.sock 建立通信失败,
 		// 尝试建立与远程的 docker 端口的连接.
 		if err != nil {
 			return nil, err
@@ -435,7 +434,7 @@ func NewMainKubelet(
 	default:
 		return nil, fmt.Errorf("unsupported CRI runtime: %q", containerRuntime)
 	}
-	// 这里是两个 grpc 的 service
+	// 连接 dockershim.sock 或 containerd.sock 的 grpc 客户端对象, 分别用于执行容器和镜像操作.
 	runtimeService, imageService, err := getRuntimeAndImageServices(
 		remoteRuntimeEndpoint, remoteImageEndpoint, kubeCfg.RuntimeRequestTimeout,
 	)
@@ -465,8 +464,8 @@ func NewMainKubelet(
 		int(kubeCfg.RegistryBurst),
 		kubeCfg.CPUCFSQuota,
 		kubeCfg.CPUCFSQuotaPeriod,
-		runtimeService,
-		imageService,
+		runtimeService, // 连接 dockershim.sock 或 containerd.sock 的 grpc 客户端对象, 用于执行容器操作.
+		imageService,   // 连接 dockershim.sock 或 containerd.sock 的 grpc 客户端对象, 用于执行镜像操作.
 		kubeDeps.ContainerManager.InternalContainerLifecycle(),
 		legacyLogProvider,
 		klet.runtimeClassManager,
@@ -507,7 +506,7 @@ func NewMainKubelet(
 	}
 
 	klet.pleg = pleg.NewGenericPLEG(
-		klet.containerRuntime, plegChannelCapacity, plegRelistPeriod, 
+		klet.containerRuntime, plegChannelCapacity, plegRelistPeriod,
 		klet.podCache, clock.RealClock{},
 	)
 	klet.runtimeState = newRuntimeState(maxWaitForContainerRuntime)
@@ -525,13 +524,13 @@ func NewMainKubelet(
 	}
 	klet.containerGC = containerGC
 	klet.containerDeletor = newPodContainerDeletor(
-		klet.containerRuntime, 
+		klet.containerRuntime,
 		integer.IntMax(containerGCPolicy.MaxPerPodContainer, minDeadContainerInPod),
 	)
 
 	// setup imageManager
 	imageManager, err := images.NewImageGCManager(
-		klet.containerRuntime, klet.StatsProvider, kubeDeps.Recorder, nodeRef, 
+		klet.containerRuntime, klet.StatsProvider, kubeDeps.Recorder, nodeRef,
 		imageGCPolicy, crOptions.PodSandboxImage,
 	)
 	if err != nil {
@@ -584,7 +583,7 @@ func NewMainKubelet(
 	// This function must be called before Kubelet is initialized so that the Node
 	// ReadyState is accurate with the storage state.
 	klet.volumePluginMgr, err = NewInitializedVolumePluginMgr(
-		klet, secretManager, configMapManager, tokenManager, 
+		klet, secretManager, configMapManager, tokenManager,
 		kubeDeps.VolumePlugins, kubeDeps.DynamicPluginProber,
 	)
 	if err != nil {
@@ -625,7 +624,7 @@ func NewMainKubelet(
 	klet.reasonCache = NewReasonCache()
 	klet.workQueue = queue.NewBasicWorkQueue(klet.clock)
 	klet.podWorkers = newPodWorkers(
-		klet.syncPod, kubeDeps.Recorder, klet.workQueue, klet.resyncInterval, 
+		klet.syncPod, kubeDeps.Recorder, klet.workQueue, klet.resyncInterval,
 		backOffPeriod, klet.podCache,
 	)
 
@@ -634,9 +633,9 @@ func NewMainKubelet(
 
 	// setup eviction manager
 	evictionManager, evictionAdmitHandler := eviction.NewManager(
-		klet.resourceAnalyzer, evictionConfig, 
-		killPodNow(klet.podWorkers, kubeDeps.Recorder), 
-		klet.podManager.GetMirrorPodByPod, klet.imageManager, klet.containerGC, 
+		klet.resourceAnalyzer, evictionConfig,
+		killPodNow(klet.podWorkers, kubeDeps.Recorder),
+		klet.podManager.GetMirrorPodByPod, klet.imageManager, klet.containerGC,
 		kubeDeps.Recorder, nodeRef, klet.clock,
 	)
 
@@ -684,7 +683,7 @@ func NewMainKubelet(
 	klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewProcMountAdmitHandler(klet.containerRuntime))
 
 	klet.nodeLeaseController = nodelease.NewController(
-		klet.clock, klet.heartbeatClient, string(klet.nodeName), 
+		klet.clock, klet.heartbeatClient, string(klet.nodeName),
 		kubeCfg.NodeLeaseDurationSeconds, klet.onRepeatedHeartbeatFailure,
 	)
 

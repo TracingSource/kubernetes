@@ -45,6 +45,8 @@ func NewBootstrapTokenPhase() workflow.Phase {
 	}
 }
 
+// runBootstrapToken 为初始化过程中传入或生成的 bootstrap token 创建 secret 对象, 
+// 并为这些 token 设置权限.
 func runBootstrapToken(c workflow.RunData) (err error) {
 	data, ok := c.(InitData)
 	if !ok {
@@ -78,7 +80,8 @@ func runBootstrapToken(c workflow.RunData) (err error) {
 	if err != nil {
 		return errors.Wrap(err, "error allowing bootstrap tokens to post CSRs")
 	}
-	// Create RBAC rules that makes the bootstrap tokens able to get their CSRs approved automatically
+	// Create RBAC rules that makes the bootstrap tokens able to get their CSRs
+	// approved automatically
 	err = nodebootstraptokenphase.AutoApproveNodeBootstrapTokens(client)
 	if err != nil {
 		return errors.Wrap(err, "error auto-approving node bootstrap tokens")

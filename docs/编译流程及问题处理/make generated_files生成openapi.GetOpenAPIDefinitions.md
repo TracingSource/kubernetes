@@ -8,13 +8,13 @@
 
 否则启动会报错
 
-```
+```log
 app/server.go:553:3: undefined: "k8s.io/kubernetes/pkg/generated/openapi".GetOpenAPIDefinitions (exit status 2)
 ```
 
 但是 1.17.2 版本将 stage 中的一些仓库(apimachinery, apiextensions-apiserver 等)独立出来后, 执行该命令会卡住.
 
-```console
+```log
 $ make generated_files DBG_MAKEFILE=1
 Makefile:20: ***** starting Makefile for goal(s) "generated_files"
 Makefile:21: ***** Mon Dec  5 16:30:01 CST 2022
@@ -33,7 +33,7 @@ Makefile.generated_files:451: ***** finding all +k8s:openapi-gen tags for KUBE
 
 卡住不动了, ps一下看看卡在哪了.
 
-```console
+```log
 $ ps -ef | grep make
 root      70152   1983  0 10:48 pts/0    00:00:00 make generated_files DBG_MAKEFILE=1
 root      70154  70152  0 10:48 pts/0    00:00:00 make -f Makefile.generated_files generated_files CALLED_FROM_MAIN_MAKEFILE=1

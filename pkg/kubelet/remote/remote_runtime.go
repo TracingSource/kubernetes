@@ -23,8 +23,8 @@ import (
 //
 // RemoteRuntimeService is a gRPC implementation of internalapi.RuntimeService.
 type RemoteRuntimeService struct {
-	timeout       time.Duration
-	// runtimeClient 连接 /var/run/dockershim.sock 的 grpc 客户端对象.
+	timeout time.Duration
+	// runtimeClient 连接 dockershim.sock 或 containerd.sock 的 grpc 客户端对象.
 	runtimeClient runtimeapi.RuntimeServiceClient
 	// Cache last per-container error message to reduce log spam
 	logReduction *logreduction.LogReduction
@@ -35,15 +35,18 @@ const (
 	identicalErrorDelay = 1 * time.Minute
 )
 
-// NewRemoteRuntimeService 构建连接 dockershim.sock 的对象,
-// 用于执行 docker 容器与镜像的相关函数(其实就是 dockershim 进程的 grpc 客户端).
+// NewRemoteRuntimeService 构建连接 dockershim.sock 或 containerd.sock 的对象,
+// 用于执行容器与镜像的相关操作(其实就是 grpc 客户端).
 //
 // 可以通过此函数创建 Container grpc Service(service 是 grpc server 的一种成员).
 // 还有一个平级的 RemoteImageService{} 对象.
 //
-// 	@param endpoint: /var/run/dockershim.sock, 与 docker.sock 同目录.
-// 每个 docker 容器在启动时都会创建一个新的 containerd-shim 进程,
-// 并指定 dockershim.sock 路径
+// 	@param endpoint: 有两种可能
+// 	1. /var/run/dockershim.sock
+// 	2. /var/run/containerd/containerd.sock
+//
+//  dockershim.sock 与 docker.sock 同目录, 每个 docker 容器在启动时都会创建一个新的
+//  containerd-shim 进程, 并指定 dockershim.sock 路径
 //
 // caller:
 // 	1. pkg/kubelet/kubelet.go -> getRuntimeAndImageServices()
@@ -62,7 +65,7 @@ func NewRemoteRuntimeService(
 	defer cancel()
 
 	conn, err := grpc.DialContext(
-		ctx, addr, grpc.WithInsecure(), grpc.WithDialer(dailer), 
+		ctx, addr, grpc.WithInsecure(), grpc.WithDialer(dailer),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)),
 	)
 	if err != nil {
@@ -90,7 +93,7 @@ func (r *RemoteRuntimeService) Version(apiVersion string) (*runtimeapi.VersionRe
 		return nil, err
 	}
 
-	if typedVersion.Version == "" || typedVersion.RuntimeName == "" || 
+	if typedVersion.Version == "" || typedVersion.RuntimeName == "" ||
 		typedVersion.RuntimeApiVersion == "" || typedVersion.RuntimeVersion == "" {
 		return nil, fmt.Errorf("not all fields are set in VersionResponse (%q)", *typedVersion)
 	}
@@ -101,12 +104,12 @@ func (r *RemoteRuntimeService) Version(apiVersion string) (*runtimeapi.VersionRe
 // CreateContainer 类似于 docker 的 create 子命令, 可以只创建而不启动.
 // 不过这个函数只是调用 cri-api, 本身并没有做什么, 参数也是 cri grpc 服务所需的参数.
 //
-// caller: 
+// caller:
 // 	1. pkg/kubelet/kuberuntime/kuberuntime_container.go -> kubeGenericRuntimeManager.startContainer()
 //
 // CreateContainer creates a new container in the specified PodSandbox.
 func (r *RemoteRuntimeService) CreateContainer(
-	podSandBoxID string, config *runtimeapi.ContainerConfig, 
+	podSandBoxID string, config *runtimeapi.ContainerConfig,
 	sandboxConfig *runtimeapi.PodSandboxConfig,
 ) (string, error) {
 	ctx, cancel := getContextWithTimeout(r.timeout)
@@ -119,7 +122,7 @@ func (r *RemoteRuntimeService) CreateContainer(
 	})
 	if err != nil {
 		klog.Errorf(
-			"CreateContainer in sandbox %q from runtime service failed: %v", 
+			"CreateContainer in sandbox %q from runtime service failed: %v",
 			podSandBoxID, err,
 		)
 		return "", err
@@ -191,7 +194,7 @@ func (r *RemoteRuntimeService) RemoveContainer(containerID string) error {
 	return nil
 }
 
-// caller: 
+// caller:
 // 	1. pkg/kubelet/kuberuntime/instrumented_services.go -> instrumentedRuntimeService.ListContainers()
 //
 // ListContainers lists containers by filters.

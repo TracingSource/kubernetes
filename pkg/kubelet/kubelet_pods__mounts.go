@@ -222,12 +222,26 @@ func translateMountPropagation(mountMode *v1.MountPropagationMode) (runtimeapi.M
 	}
 }
 
+// makeHostsMount 在宿主机为目标 Pod 准备 hosts 文件, 之后会将其挂载到 /etc/hosts 
+// 会根据目标 Pod 是否为 hostNetwork 写入相应的配置.
+//
+// 	@param podDir: /var/lib/kubelet/pods/${podUID}
+//
 // makeHostsMount makes the mountpoint for the hosts file that the containers
 // in a pod are injected with. podIPs is provided instead of podIP as podIPs
 // are present even if dual-stack feature flag is not enabled.
-func makeHostsMount(podDir string, podIPs []string, hostName, hostDomainName string, hostAliases []v1.HostAlias, useHostNetwork bool) (*kubecontainer.Mount, error) {
+func makeHostsMount(
+	podDir string, podIPs []string, 
+	hostName, hostDomainName string, hostAliases []v1.HostAlias, 
+	useHostNetwork bool,
+) (*kubecontainer.Mount, error) {
+	// /var/lib/kubelet/pods/${podUID}/etc-hosts
 	hostsFilePath := path.Join(podDir, "etc-hosts")
-	if err := ensureHostsFile(hostsFilePath, podIPs, hostName, hostDomainName, hostAliases, useHostNetwork); err != nil {
+	err := ensureHostsFile(
+		hostsFilePath, podIPs, hostName, hostDomainName, hostAliases, 
+		useHostNetwork,
+	)
+	if err != nil {
 		return nil, err
 	}
 	return &kubecontainer.Mount{
@@ -241,7 +255,11 @@ func makeHostsMount(podDir string, podIPs []string, hostName, hostDomainName str
 
 // ensureHostsFile ensures that the given host file has an up-to-date ip, host
 // name, and domain name.
-func ensureHostsFile(fileName string, hostIPs []string, hostName, hostDomainName string, hostAliases []v1.HostAlias, useHostNetwork bool) error {
+func ensureHostsFile(
+	fileName string, hostIPs []string, 
+	hostName, hostDomainName string, hostAliases []v1.HostAlias, 
+	useHostNetwork bool,
+) error {
 	var hostsFileContent []byte
 	var err error
 

@@ -214,6 +214,8 @@ type Kubelet struct {
 	// Streaming runtime handles container streaming.
 	streamingRuntime kubecontainer.StreamingRuntime
 
+	// 连接 dockershim.sock 或 containerd.sock 的 grpc 客户端对象
+	//
 	// Container runtime service (needed by container runtime Start()).
 	// TODO(CD): try to make this available without holding a reference in this
 	//           struct. For example, by adding a getter to generic runtime.

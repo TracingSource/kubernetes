@@ -1000,13 +1000,15 @@ func RunJoinNodeChecks(
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
 }
 
-// addCommonChecks is a helper function to duplicate checks that are common between both the
-// kubeadm init and join commands
+// addCommonChecks is a helper function to duplicate checks that are common
+// between both the kubeadm init and join commands
 func addCommonChecks(execer utilsexec.Interface, k8sVersion string, nodeReg *kubeadmapi.NodeRegistrationOptions, checks []Checker) []Checker {
 	containerRuntime, err := utilruntime.NewContainerRuntime(execer, nodeReg.CRISocket)
 	isDocker := false
 	if err != nil {
-		fmt.Printf("[preflight] WARNING: Couldn't create the interface used for talking to the container runtime: %v\n", err)
+		fmt.Printf(
+			"[preflight] WARNING: Couldn't create the interface used for talking to the container runtime: %v\n", err,
+		)
 	} else {
 		checks = append(checks, ContainerRuntimeCheck{runtime: containerRuntime})
 		if containerRuntime.IsDocker() {
@@ -1058,13 +1060,18 @@ func RunRootCheckOnly(ignorePreflightErrors sets.String) error {
 
 // RunPullImagesCheck will pull images kubeadm needs if they are not found on the system
 func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.String) error {
-	containerRuntime, err := utilruntime.NewContainerRuntime(utilsexec.New(), cfg.NodeRegistration.CRISocket)
+	containerRuntime, err := utilruntime.NewContainerRuntime(
+		utilsexec.New(), cfg.NodeRegistration.CRISocket,
+	)
 	if err != nil {
 		return err
 	}
 
 	checks := []Checker{
-		ImagePullCheck{runtime: containerRuntime, imageList: images.GetControlPlaneImages(&cfg.ClusterConfiguration)},
+		ImagePullCheck{
+			runtime:   containerRuntime,
+			imageList: images.GetControlPlaneImages(&cfg.ClusterConfiguration),
+		},
 	}
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
 }
@@ -1097,7 +1104,8 @@ func RunChecks(checks []Checker, ww io.Writer, ignorePreflightErrors sets.String
 	return nil
 }
 
-// setHasItemOrAll is helper function that return true if item is present in the set (case insensitive) or special key 'all' is present
+// setHasItemOrAll is helper function that return true if item is present
+// in the set (case insensitive) or special key 'all' is present
 func setHasItemOrAll(s sets.String, item string) bool {
 	if s.Has("all") || s.Has(strings.ToLower(item)) {
 		return true

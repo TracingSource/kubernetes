@@ -93,7 +93,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) (err error) {
 
 	// Write the bootstrap kubelet config file or the TLS-Bootstrapped kubelet config file down to disk
 	klog.V(1).Infof(
-		"[kubelet-start] writing bootstrap kubelet config file at %s", 
+		"[kubelet-start] writing bootstrap kubelet config file at %s",
 		bootstrapKubeConfigFile,
 	)
 	// 将 tlsBootstrapCfg 的内容, 写入到 /etc/kubernetes/bootstrap-kubelet.conf 文件.
@@ -158,7 +158,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) (err error) {
 	// The mark-control-plane phase will register the taints otherwise.
 	registerTaintsUsingFlags := cfg.ControlPlane == nil
 	err = kubeletphase.WriteKubeletDynamicEnvFile(
-		&initCfg.ClusterConfiguration, &initCfg.NodeRegistration, 
+		&initCfg.ClusterConfiguration, &initCfg.NodeRegistration,
 		registerTaintsUsingFlags, kubeadmconstants.KubeletRunDirectory,
 	)
 	if err != nil {
@@ -173,6 +173,8 @@ func runKubeletStartJoinPhase(c workflow.RunData) (err error) {
 	kubeletphase.TryStartKubelet()
 
 	// 再次等待 40s, 等待 kubelet 将 3 大件启动完成.
+
+	// 等待生成 /etc/kubernetes/kubelet.conf 文件
 	//
 	// Now the kubelet will perform the TLS Bootstrap, transforming
 	// /etc/kubernetes/bootstrap-kubelet.conf to /etc/kubernetes/kubelet.conf
@@ -184,12 +186,15 @@ func runKubeletStartJoinPhase(c workflow.RunData) (err error) {
 		return err
 	}
 
+	// 根据 /etc/kubernetes/kubelet.conf 文件构建 kube client
+	//
 	// When we know the /etc/kubernetes/kubelet.conf file is available, get the client
 	client, err := kubeconfigutil.ClientSetFromFile(kubeadmconstants.GetKubeletKubeConfigPath())
 	if err != nil {
 		return err
 	}
 
+	// Patch 一下当前的 Node 作为验证
 	klog.V(1).Infoln("[kubelet-start] preserving the crisocket information for the node")
 	err = patchnodephase.AnnotateCRISocket(
 		client, cfg.NodeRegistration.Name, cfg.NodeRegistration.CRISocket,
@@ -201,6 +206,9 @@ func runKubeletStartJoinPhase(c workflow.RunData) (err error) {
 	return nil
 }
 
+// waitForTLSBootstrappedClient 等待 kubelet 使用 /etc/kubernetes/bootstrap-kubelet.conf 建立与 apiserver 的受限连接,
+// 并生成 /etc/kubernetes/kubelet.conf 文件.
+//
 // waitForTLSBootstrappedClient waits for the /etc/kubernetes/kubelet.conf file to be available
 func waitForTLSBootstrappedClient() error {
 	fmt.Println("[kubelet-start] Waiting for the kubelet to perform the TLS Bootstrap...")

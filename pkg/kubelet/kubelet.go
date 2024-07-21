@@ -131,8 +131,8 @@ type Bootstrap interface {
 	BirthCry()
 	StartGarbageCollection()
 	ListenAndServe(
-		address net.IP, port uint, tlsOptions *server.TLSOptions, 
-		auth server.AuthInterface, enableCAdvisorJSONEndpoints, 
+		address net.IP, port uint, tlsOptions *server.TLSOptions,
+		auth server.AuthInterface, enableCAdvisorJSONEndpoints,
 		enableDebuggingHandlers, enableContentionProfiling bool,
 	)
 	ListenAndServeReadOnly(address net.IP, port uint, enableCAdvisorJSONEndpoints bool)
@@ -183,7 +183,7 @@ type Builder func(
 //
 // Dependencies is a bin for things we might consider "injected dependencies"
 // -- objects constructed at runtime that are necessary for running the Kubelet.
-// This is a temporary solution for grouping these objects 
+// This is a temporary solution for grouping these objects
 // while we figure out a more comprehensive dependency injection story for the Kubelet.
 type Dependencies struct {
 	Options []Option
@@ -211,13 +211,13 @@ type Dependencies struct {
 	KubeletConfigController *kubeletconfig.Controller
 }
 
-// caller: 
+// caller:
 // 	1. NewMainKubelet()
 //
 // makePodSourceConfig creates a config.PodConfig from the given
 // KubeletConfiguration or returns an error.
 func makePodSourceConfig(
-	kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *Dependencies, 
+	kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *Dependencies,
 	nodeName types.NodeName, bootstrapCheckpointPath string,
 ) (*config.PodConfig, error) {
 	manifestURLHeader := make(http.Header)
@@ -236,7 +236,7 @@ func makePodSourceConfig(
 	if kubeCfg.StaticPodPath != "" {
 		klog.Infof("Adding pod path: %v", kubeCfg.StaticPodPath)
 		config.NewSourceFile(
-			kubeCfg.StaticPodPath, nodeName, kubeCfg.FileCheckFrequency.Duration, 
+			kubeCfg.StaticPodPath, nodeName, kubeCfg.FileCheckFrequency.Duration,
 			cfg.Channel(kubetypes.FileSource),
 		)
 	}
@@ -247,7 +247,7 @@ func makePodSourceConfig(
 			"Adding pod url %q with HTTP header %v", kubeCfg.StaticPodURL, manifestURLHeader,
 		)
 		config.NewSourceURL(
-			kubeCfg.StaticPodURL, manifestURLHeader, nodeName, 
+			kubeCfg.StaticPodURL, manifestURLHeader, nodeName,
 			kubeCfg.HTTPCheckFrequency.Duration, cfg.Channel(kubetypes.HTTPSource),
 		)
 	}
@@ -276,13 +276,15 @@ func makePodSourceConfig(
 	return cfg, nil
 }
 
-// remoteRuntimeEndpoint: /var/run/dockershim.sock, 与 docker.sock 同目录.
-// 每个 docker 容器在启动时都会创建一个 containerd-shim 进程, 并指定 dockershim.sock 路径
+// 	@param remoteRuntimeEndpoint: 有两种可能
+// 	1. /var/run/dockershim.sock
+// 	2. /var/run/containerd/containerd.sock
+// 	@param remoteImageEndpoint: 一般与前者取值相同.
 //
-// caller: 
+// caller:
 // 	1. NewMainKubelet()
 func getRuntimeAndImageServices(
-	remoteRuntimeEndpoint string, remoteImageEndpoint string, 
+	remoteRuntimeEndpoint string, remoteImageEndpoint string,
 	runtimeRequestTimeout metav1.Duration,
 ) (internalapi.RuntimeService, internalapi.ImageManagerService, error) {
 	rs, err := remote.NewRemoteRuntimeService(
@@ -555,7 +557,7 @@ func (kl *Kubelet) canRunPod(pod *v1.Pod) lifecycle.PodAdmitResult {
 //         接收来自 apiserver 的常规 Pod 与 manifests 目录下的 staticPod 变动事件.
 // 	@param handler: 其实传入的是 kl(Kubetlet) 对象本身.
 //
-// caller: 
+// caller:
 // 	1. Kubelet.Run()
 //
 // syncLoop is the main loop for processing changes. It watches for changes from
@@ -648,8 +650,13 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
 // * housekeepingCh: trigger cleanup of pods
 // * liveness manager: sync pods that have failed or in which one or more
 //                     containers have failed liveness checks
-func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handler SyncHandler,
-	syncCh <-chan time.Time, housekeepingCh <-chan time.Time, plegCh <-chan *pleg.PodLifecycleEvent) bool {
+func (kl *Kubelet) syncLoopIteration(
+	configCh <-chan kubetypes.PodUpdate,
+	handler SyncHandler,
+	syncCh <-chan time.Time,
+	housekeepingCh <-chan time.Time,
+	plegCh <-chan *pleg.PodLifecycleEvent,
+) bool {
 	select {
 	case u, open := <-configCh:
 		// Update from a config source; dispatch it to the right handler
@@ -760,7 +767,7 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 // 传入的参数中, mirrorPod 有可能为 nil, 即目标 Pod 不是某个 static 的镜像记录.
 // ...我猜的.
 //
-// caller: 
+// caller:
 // 	1. Kubelet.HandlePodAdditions()
 //
 // dispatchWork starts the asynchronous sync of the pod in a pod worker.
@@ -806,7 +813,7 @@ func (kl *Kubelet) handleMirrorPod(mirrorPod *v1.Pod, start time.Time) {
 
 // HandlePodAdditions 将传入的 Pod 列表信息, 写入到本地缓存中.
 //
-// caller: 
+// caller:
 // 	1. Kubelet.syncLoopIteration() 在 kubelet 启动过各中被调用.
 //     会被调用2次, 分别传入 mirrorPod 与常规 Pod 列表, 其中后者包括前者.
 //
@@ -911,7 +918,7 @@ func (kl *Kubelet) HandlePodReconcile(pods []*v1.Pod) {
 	}
 }
 
-// caller: 
+// caller:
 // 	1. Kubelet.syncLoopIteration() 貌似在只有 status 变动的时候就会调用此函数.
 //
 // HandlePodSyncs is the callback in the syncHandler interface for pods
@@ -1008,13 +1015,13 @@ func (kl *Kubelet) ResyncInterval() time.Duration {
 //
 // ListenAndServe runs the kubelet HTTP server.
 func (kl *Kubelet) ListenAndServe(
-	address net.IP, port uint, tlsOptions *server.TLSOptions, 
+	address net.IP, port uint, tlsOptions *server.TLSOptions,
 	auth server.AuthInterface,
 	enableCAdvisorJSONEndpoints, enableDebuggingHandlers, enableContentionProfiling bool,
 ) {
 	server.ListenAndServeKubeletServer(
-		kl, kl.resourceAnalyzer, address, port, tlsOptions, auth, 
-		enableCAdvisorJSONEndpoints, enableDebuggingHandlers, 
+		kl, kl.resourceAnalyzer, address, port, tlsOptions, auth,
+		enableCAdvisorJSONEndpoints, enableDebuggingHandlers,
 		enableContentionProfiling, kl.redirectContainerStreaming, kl.criHandler,
 	)
 }

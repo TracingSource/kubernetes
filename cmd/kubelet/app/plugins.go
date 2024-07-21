@@ -52,7 +52,8 @@ func ProbeVolumePlugins(featureGate featuregate.FeatureGate) ([]volume.VolumePlu
 	// initialized later.
 	//
 	// Kubelet does not currently need to configure volume plugins.
-	// If/when it does, see kube-controller-manager/app/plugins.go for example of using volume.VolumeConfig
+	// If/when it does, see kube-controller-manager/app/plugins.go for example
+	// of using volume.VolumeConfig
 	var err error
 	allPlugins, err = appendLegacyProviderVolumes(allPlugins, featureGate)
 	if err != nil {

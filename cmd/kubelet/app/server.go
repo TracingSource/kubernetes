@@ -1237,8 +1237,8 @@ func RunKubelet(
 		kubeServer.RegisterNode,
 		kubeServer.RegisterWithTaints,
 		kubeServer.AllowedUnsafeSysctls,
-		kubeServer.RemoteRuntimeEndpoint,
-		kubeServer.RemoteImageEndpoint,
+		kubeServer.RemoteRuntimeEndpoint, // /var/run/dockershim.sock
+		kubeServer.RemoteImageEndpoint,   // /var/run/dockershim.sock
 		kubeServer.ExperimentalMounterPath,
 		kubeServer.ExperimentalKernelMemcgNotification,
 		kubeServer.ExperimentalCheckNodeCapabilitiesBeforeMount,
@@ -1374,8 +1374,8 @@ func createAndInitKubelet(
 		registerNode,
 		registerWithTaints,
 		allowedUnsafeSysctls,
-		remoteRuntimeEndpoint,
-		remoteImageEndpoint,
+		remoteRuntimeEndpoint, // /var/run/dockershim.sock
+		remoteImageEndpoint,   // /var/run/dockershim.sock
 		experimentalMounterPath,
 		experimentalKernelMemcgNotification,
 		experimentalCheckNodeCapabilitiesBeforeMount,

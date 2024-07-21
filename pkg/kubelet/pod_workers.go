@@ -107,6 +107,8 @@ type podWorkers struct {
 
 	workQueue queue.WorkQueue
 
+	// 	@assignAs: Kubelet.syncPod()
+	//
 	// This function is run to sync the desired stated of pod.
 	// NOTE: This function has to be thread-safe - it can be called for
 	// different pods at the same time.

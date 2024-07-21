@@ -157,20 +157,22 @@ func (k *KernelValidator) validateCachedKernelConfig(allConfig map[string]kConfi
 	return nil
 }
 
-// getKernelConfigReader search kernel config file in a predefined list. Once the kernel config
-// file is found it will read the configurations into a byte buffer and return. If the kernel
-// config file is not found, it will try to load kernel config module and retry again.
+// getKernelConfigReader search kernel config file in a predefined list.
+// Once the kernel config file is found it will read the configurations into
+// a byte buffer and return.
+// If the kernel config file is not found, it will try to load kernel config
+// module and retry again.
 func (k *KernelValidator) getKernelConfigReader() (io.Reader, error) {
 	possibePaths := []string{
 		"/proc/config.gz",
-		"/boot/config-" + k.kernelRelease,
+		"/boot/config-" + k.kernelRelease, // centos7 中存在
 		"/usr/src/linux-" + k.kernelRelease + "/.config",
 		"/usr/src/linux/.config",
 		"/usr/lib/modules/" + k.kernelRelease + "/config",
 		"/usr/lib/ostree-boot/config-" + k.kernelRelease,
 		"/usr/lib/kernel/config-" + k.kernelRelease,
 		"/usr/src/linux-headers-" + k.kernelRelease + "/.config",
-		"/lib/modules/" + k.kernelRelease + "/build/.config",
+		"/lib/modules/" + k.kernelRelease + "/build/.config", // centos7 中存在
 	}
 	configsModule := "configs"
 	modprobeCmd := "modprobe"
@@ -207,8 +209,10 @@ func (k *KernelValidator) getKernelConfigReader() (io.Reader, error) {
 		// config module and check again.
 		output, err := exec.Command(modprobeCmd, configsModule).CombinedOutput()
 		if err != nil {
-			return nil, errors.Wrapf(err, "unable to load kernel module: %q, output: %q, err",
-				configsModule, output)
+			return nil, errors.Wrapf(
+				err, "unable to load kernel module: %q, output: %q, err",
+				configsModule, output,
+			)
 		}
 		// Unload the kernel config module to make sure the validation have no side effect.
 		defer exec.Command(modprobeCmd, "-r", configsModule).Run()
@@ -217,7 +221,8 @@ func (k *KernelValidator) getKernelConfigReader() (io.Reader, error) {
 	return nil, errors.Errorf("no config path in %v is available", possibePaths)
 }
 
-// getKernelConfig gets kernel config from kernel config file and convert kernel config to internal type.
+// getKernelConfig gets kernel config from kernel config file and convert kernel
+// config to internal type.
 func (k *KernelValidator) getKernelConfig() (map[string]kConfigOption, error) {
 	r, err := k.getKernelConfigReader()
 	if err != nil {

@@ -144,6 +144,8 @@ func (d *initData) OutputWriter() io.Writer {
 	return d.outputWriter
 }
 
+// Client 读取 /etc/kubernetes/admin.conf 配置文件构建 kube client 并返回.
+//
 // Client returns a Kubernetes client to be used by kubeadm.
 // This function is implemented as a singleton,
 // thus avoiding to recreate the client when it is used by different phases.
