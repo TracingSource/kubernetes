@@ -14,6 +14,8 @@ import (
 
 // kube-proxy的4个与conntracker相关的选项, 都是通过这个接口的对象来设置的.
 //
+// 	@implementBy: realConntracker{}
+//
 // Conntracker is an interface to the global sysctl.
 // Descriptions of the various sysctl fields can be found here:
 //
@@ -134,7 +136,8 @@ func readIntStringFile(filename string) (int, error) {
 	return strconv.Atoi(strings.TrimSpace(string(b)))
 }
 
-// caller: SetMax()
+// caller: 
+// 	1. SetMax()
 func writeIntStringFile(filename string, value int) error {
 	return ioutil.WriteFile(filename, []byte(strconv.Itoa(value)), 0640)
 }

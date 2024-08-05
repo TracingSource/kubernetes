@@ -7,6 +7,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 )
 
+// 	@implementBy: pkg/util/ipvs/ipvs_linux.go -> runner{}
+//
 // Interface is an injectable interface for running ipvs commands. 
 // Implementations must be goroutine-safe.
 type Interface interface {

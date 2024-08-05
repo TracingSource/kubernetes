@@ -1,7 +1,6 @@
-
 ## 1. service资源与ipvs虚拟服务
 
-proxy会创建一个名为`kube-ipvs0`, 类型为dummy的网络设备, 状态一直是down的, 也不用启动. kuber集群中所有service(不管是`ClusterIP`还是`NodePort`)的ip地址, 都写在该设备中, 且是所有节点(master和worker都是). 
+proxy会创建一个名为`kube-ipvs0`, 类型为dummy的网络设备, 状态一直是down的, 也不用启动. kube 集群中所有service(不管是`ClusterIP`还是`NodePort`)的ip地址, 都写在该设备中, 且是所有节点(master和worker都是)都拥有相同的地址, 这也是在集群内部的Node上ping ServiceIP 可以ping通过的原因, 因为这个IP是真实存在的. 
 
 `kube-ipvs0`设备上的ip地址, 都是用来作ipvs中虚拟服务器的, serviceIP与该service各ports组合就是vs. 
 

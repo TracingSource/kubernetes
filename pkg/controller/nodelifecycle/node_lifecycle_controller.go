@@ -64,6 +64,9 @@ var (
 		Effect: v1.TaintEffectNoExecute,
 	}
 
+	// Node Condition 类型与污点类型的对应的关系.
+	// 比如 Node 出现磁盘压力时, 才会打上 DiskPressure 的污点
+	//
 	// map {NodeConditionType: {ConditionStatus: TaintKey}}
 	// represents which NodeConditionType under which ConditionStatus should be
 	// tainted with which TaintKey
@@ -339,11 +342,16 @@ type Controller struct {
 	useTaintBasedEvictions bool
 
 	nodeUpdateQueue workqueue.Interface
-	podUpdateQueue  workqueue.RateLimitingInterface
+	// 生产者: Controller.podUpdated()
+	// 消费者: Controller.doPodProcessingWorker()
+	podUpdateQueue workqueue.RateLimitingInterface
 }
 
-// caller: 
-// 	1. cmd/kube-controller-manager/app/core.go -> startNodeLifecycleController() 
+// 	@param useTaintBasedEvictions: 基于污点的驱逐行为, 默认为 true.
+//  即当前 controller 只进行 node 污点的变更, Pod 的驱逐行为由 TaintManager 完成.
+//
+// caller:
+// 	1. cmd/kube-controller-manager/app/core.go -> startNodeLifecycleController()
 //     在 controller manager 启动过程中被调用.
 //
 // NewNodeLifecycleController returns a new taint controller.
@@ -370,7 +378,9 @@ func NewNodeLifecycleController(
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "node-controller"})
+	recorder := eventBroadcaster.NewRecorder(
+		scheme.Scheme, v1.EventSource{Component: "node-controller"},
+	)
 	eventBroadcaster.StartLogging(klog.Infof)
 
 	klog.Infof("Sending events to api server.")
@@ -380,7 +390,10 @@ func NewNodeLifecycleController(
 		})
 
 	if kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
-		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("node_lifecycle_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
+		ratelimiter.RegisterMetricAndTrackRateLimiterUsage(
+			"node_lifecycle_controller",
+			kubeClient.CoreV1().RESTClient().GetRateLimiter(),
+		)
 	}
 
 	nc := &Controller{
@@ -405,7 +418,10 @@ func NewNodeLifecycleController(
 		runTaintManager:             runTaintManager,
 		useTaintBasedEvictions:      useTaintBasedEvictions && runTaintManager,
 		nodeUpdateQueue:             workqueue.NewNamed("node_lifecycle_controller"),
-		podUpdateQueue:              workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "node_lifecycle_controller_pods"),
+		podUpdateQueue: workqueue.NewNamedRateLimitingQueue(
+			workqueue.DefaultControllerRateLimiter(),
+			"node_lifecycle_controller_pods",
+		),
 	}
 	if useTaintBasedEvictions {
 		klog.Infof("Controller is using taint based evictions.")
@@ -433,7 +449,8 @@ func NewNodeLifecycleController(
 		},
 		DeleteFunc: func(obj interface{}) {
 			pod, isPod := obj.(*v1.Pod)
-			// We can get DeletedFinalStateUnknown instead of *v1.Pod here and we need to handle that correctly.
+			// We can get DeletedFinalStateUnknown instead of *v1.Pod here
+			// and we need to handle that correctly.
 			if !isPod {
 				deletedState, ok := obj.(cache.DeletedFinalStateUnknown)
 				if !ok {
@@ -442,7 +459,10 @@ func NewNodeLifecycleController(
 				}
 				pod, ok = deletedState.Obj.(*v1.Pod)
 				if !ok {
-					klog.Errorf("DeletedFinalStateUnknown contained non-Pod object: %v", deletedState.Obj)
+					klog.Errorf(
+						"DeletedFinalStateUnknown contained non-Pod object: %v", 
+						deletedState.Obj,
+					)
 					return
 				}
 			}
@@ -485,10 +505,14 @@ func NewNodeLifecycleController(
 	nc.podLister = podInformer.Lister()
 
 	if nc.runTaintManager {
-		podGetter := func(name, namespace string) (*v1.Pod, error) { return nc.podLister.Pods(namespace).Get(name) }
+		podGetter := func(name, namespace string) (*v1.Pod, error) {
+			return nc.podLister.Pods(namespace).Get(name)
+		}
 		nodeLister := nodeInformer.Lister()
 		nodeGetter := func(name string) (*v1.Node, error) { return nodeLister.Get(name) }
-		nc.taintManager = scheduler.NewNoExecuteTaintManager(kubeClient, podGetter, nodeGetter, nc.getPodsAssignedToNode)
+		nc.taintManager = scheduler.NewNoExecuteTaintManager(
+			kubeClient, podGetter, nodeGetter, nc.getPodsAssignedToNode,
+		)
 		nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 			AddFunc: nodeutil.CreateAddNodeHandler(func(node *v1.Node) error {
 				nc.taintManager.NodeUpdated(nil, node)
@@ -560,10 +584,10 @@ func (nc *Controller) Run(stopCh <-chan struct{}) {
 
 	// Start workers to reconcile labels and/or update NoSchedule taint for nodes.
 	for i := 0; i < scheduler.UpdateWorkerSize; i++ {
-		// Thanks to "workqueue", each worker just need to get item from queue, because
-		// the item is flagged when got from queue: if new event come, the new item will
-		// be re-queued until "Done", so no more than one worker handle the same item and
-		// no event missed.
+		// Thanks to "workqueue", each worker just need to get item from queue,
+		// because the item is flagged when got from queue:
+		// if new event come, the new item will be re-queued until "Done",
+		// so no more than one worker handle the same item and no event missed.
 		go wait.Until(nc.doNodeProcessingPassWorker, time.Second, stopCh)
 	}
 
@@ -572,8 +596,15 @@ func (nc *Controller) Run(stopCh <-chan struct{}) {
 	}
 
 	if nc.useTaintBasedEvictions {
-		// Handling taint based evictions. Because we don't want a dedicated logic in TaintManager for NC-originated
-		// taints and we normally don't rate limit evictions caused by taints, we need to rate limit adding taints.
+		// 基于污点的驱逐逻辑.
+		// TaintManager 的代码来源于 node lifecyle controller,
+		// 我们想要做限流, 又不想把 TaintManager 的逻辑搞得太复杂, 更不想把驱逐行为做限流,
+		// 那就对添加污点的行为做限流...
+		//
+		// Handling taint based evictions.
+		// Because we don't want a dedicated logic in TaintManager for NC-originated
+		// taints and we normally don't rate limit evictions caused by taints,
+		// we need to rate limit adding taints.
 		go wait.Until(nc.doNoExecuteTaintingPass, scheduler.NodeEvictionPeriod, stopCh)
 	} else {
 		// Managing eviction of nodes:
@@ -592,7 +623,7 @@ func (nc *Controller) Run(stopCh <-chan struct{}) {
 	<-stopCh
 }
 
-// caller: 
+// caller:
 // 	1. Controller.Run()
 func (nc *Controller) doNodeProcessingPassWorker() {
 	for {
@@ -604,19 +635,27 @@ func (nc *Controller) doNodeProcessingPassWorker() {
 		}
 		nodeName := obj.(string)
 		if err := nc.doNoScheduleTaintingPass(nodeName); err != nil {
-			klog.Errorf("Failed to taint NoSchedule on node <%s>, requeue it: %v", nodeName, err)
+			klog.Errorf(
+				"Failed to taint NoSchedule on node <%s>, requeue it: %v",
+				nodeName, err,
+			)
 			// TODO(k82cn): Add nodeName back to the queue
 		}
 		// TODO: re-evaluate whether there are any labels that need to be
 		// reconcile in 1.19. Remove this function if it's no longer necessary.
 		if err := nc.reconcileNodeLabels(nodeName); err != nil {
-			klog.Errorf("Failed to reconcile labels for node <%s>, requeue it: %v", nodeName, err)
+			klog.Errorf(
+				"Failed to reconcile labels for node <%s>, requeue it: %v",
+				nodeName, err,
+			)
 			// TODO(yujuhong): Add nodeName back to the queue
 		}
 		nc.nodeUpdateQueue.Done(nodeName)
 	}
 }
 
+// doNoScheduleTaintingPass 根据 node conditions 生成对应的 taint 污点列表并更新.
+//
 // caller:
 // 	1. Controller.doNodeProcessingPassWorker()
 func (nc *Controller) doNoScheduleTaintingPass(nodeName string) error {
@@ -629,6 +668,8 @@ func (nc *Controller) doNoScheduleTaintingPass(nodeName string) error {
 		return err
 	}
 
+	// 根据 node conditions 生成对应的 taint 污点列表.
+	//
 	// Map node's condition to Taints.
 	var taints []v1.Taint
 	for _, condition := range node.Status.Conditions {
@@ -649,6 +690,8 @@ func (nc *Controller) doNoScheduleTaintingPass(nodeName string) error {
 		})
 	}
 
+	// 污点信息多退少补
+	//
 	// Get exist taints of node.
 	nodeTaints := taintutils.TaintSetFilter(node.Spec.Taints, func(t *v1.Taint) bool {
 		// only NoSchedule taints are candidates to be compared with "taints" later
@@ -674,25 +717,33 @@ func (nc *Controller) doNoScheduleTaintingPass(nodeName string) error {
 	return nil
 }
 
-// caller: 
+// caller:
 // 	1. Controller.Run()
 func (nc *Controller) doNoExecuteTaintingPass() {
 	nc.evictorLock.Lock()
 	defer nc.evictorLock.Unlock()
 	for k := range nc.zoneNoExecuteTainter {
-		// Function should return 'false' and a time after which it should be retried, or 'true' if it shouldn't (it succeeded).
+		// Function should return 'false' and a time after which it should be retried,
+		// or 'true' if it shouldn't (it succeeded).
 		nc.zoneNoExecuteTainter[k].Try(func(value scheduler.TimedValue) (bool, time.Duration) {
 			node, err := nc.nodeLister.Get(value.Value)
 			if apierrors.IsNotFound(err) {
 				klog.Warningf("Node %v no longer present in nodeLister!", value.Value)
 				return true, 0
 			} else if err != nil {
-				klog.Warningf("Failed to get Node %v from the nodeLister: %v", value.Value, err)
+				klog.Warningf(
+					"Failed to get Node %v from the nodeLister: %v",
+					value.Value, err,
+				)
 				// retry in 50 millisecond
 				return false, 50 * time.Millisecond
 			}
 			_, condition := nodeutil.GetNodeCondition(&node.Status, v1.NodeReady)
-			// Because we want to mimic NodeStatus.Condition["Ready"] we make "unreachable" and "not ready" taints mutually exclusive.
+			// 与 Ready 状态类似, NotReady与Unreachable也是互斥的,
+			// False 对应 NotReady, Unknown 对应 Unreachable.
+			//
+			// Because we want to mimic(模仿) NodeStatus.Condition["Ready"]
+			// we make "unreachable" and "not ready" taints mutually exclusive.
 			taintToAdd := v1.Taint{}
 			oppositeTaint := v1.Taint{}
 			switch condition.Status {
@@ -704,11 +755,19 @@ func (nc *Controller) doNoExecuteTaintingPass() {
 				oppositeTaint = *NotReadyTaintTemplate
 			default:
 				// It seems that the Node is ready again, so there's no need to taint it.
-				klog.V(4).Infof("Node %v was in a taint queue, but it's ready now. Ignoring taint request.", value.Value)
+				klog.V(4).Infof(
+					"Node %v was in a taint queue, but it's ready now. Ignoring taint request.",
+					value.Value,
+				)
 				return true, 0
 			}
 
-			result := nodeutil.SwapNodeControllerTaint(nc.kubeClient, []*v1.Taint{&taintToAdd}, []*v1.Taint{&oppositeTaint}, node)
+			result := nodeutil.SwapNodeControllerTaint(
+				nc.kubeClient,
+				[]*v1.Taint{&taintToAdd},    // 新增的污点
+				[]*v1.Taint{&oppositeTaint}, // 待删除的污点
+				node,
+			)
 			if result {
 				//count the evictionsNumber
 				zone := utilnode.GetZoneKey(node)
@@ -720,53 +779,7 @@ func (nc *Controller) doNoExecuteTaintingPass() {
 	}
 }
 
-// caller: 
-// 	1. Controller.Run()
-func (nc *Controller) doEvictionPass() {
-	nc.evictorLock.Lock()
-	defer nc.evictorLock.Unlock()
-	for k := range nc.zonePodEvictor {
-		// Function should return 'false' and a time after which it should be retried,
-		// or 'true' if it shouldn't (it succeeded).
-		nc.zonePodEvictor[k].Try(func(value scheduler.TimedValue) (bool, time.Duration) {
-			node, err := nc.nodeLister.Get(value.Value)
-			if apierrors.IsNotFound(err) {
-				klog.Warningf("Node %v no longer present in nodeLister!", value.Value)
-			} else if err != nil {
-				klog.Warningf("Failed to get Node %v from the nodeLister: %v", value.Value, err)
-			}
-			nodeUID, _ := value.UID.(string)
-			pods, err := nc.getPodsAssignedToNode(value.Value)
-			if err != nil {
-				utilruntime.HandleError(fmt.Errorf("unable to list pods from node %q: %v", value.Value, err))
-				return false, 0
-			}
-			remaining, err := nodeutil.DeletePods(nc.kubeClient, pods, nc.recorder, value.Value, nodeUID, nc.daemonSetStore)
-			if err != nil {
-				// We are not setting eviction status here.
-				// New pods will be handled by zonePodEvictor retry
-				// instead of immediate pod eviction.
-				utilruntime.HandleError(fmt.Errorf("unable to evict node %q: %v", value.Value, err))
-				return false, 0
-			}
-			if !nc.nodeEvictionMap.setStatus(value.Value, evicted) {
-				klog.V(2).Infof("node %v was unregistered in the meantime - skipping setting status", value.Value)
-			}
-			if remaining {
-				klog.Infof("Pods awaiting deletion due to Controller eviction")
-			}
-
-			if node != nil {
-				zone := utilnode.GetZoneKey(node)
-				evictionsNumber.WithLabelValues(zone).Inc()
-			}
-
-			return true, 0
-		})
-	}
-}
-
-// caller: 
+// caller:
 // 	1. Controller.Run()
 //
 // monitorNodeHealth verifies node health are constantly updated by kubelet,
@@ -789,7 +802,11 @@ func (nc *Controller) monitorNodeHealth() error {
 
 	for i := range added {
 		klog.V(1).Infof("Controller observed a new Node: %#v", added[i].Name)
-		nodeutil.RecordNodeEvent(nc.recorder, added[i].Name, string(added[i].UID), v1.EventTypeNormal, "RegisteredNode", fmt.Sprintf("Registered Node %v in Controller", added[i].Name))
+		nodeutil.RecordNodeEvent(
+			nc.recorder, added[i].Name, string(added[i].UID), v1.EventTypeNormal,
+			"RegisteredNode",
+			fmt.Sprintf("Registered Node %v in Controller", added[i].Name),
+		)
 		nc.knownNodeSet[added[i].Name] = added[i]
 		nc.addPodEvictorForNewZone(added[i])
 		if nc.useTaintBasedEvictions {
@@ -801,7 +818,11 @@ func (nc *Controller) monitorNodeHealth() error {
 
 	for i := range deleted {
 		klog.V(1).Infof("Controller observed a Node deletion: %v", deleted[i].Name)
-		nodeutil.RecordNodeEvent(nc.recorder, deleted[i].Name, string(deleted[i].UID), v1.EventTypeNormal, "RemovingNode", fmt.Sprintf("Removing Node %v from Controller", deleted[i].Name))
+		nodeutil.RecordNodeEvent(
+			nc.recorder, deleted[i].Name, string(deleted[i].UID),
+			v1.EventTypeNormal, "RemovingNode",
+			fmt.Sprintf("Removing Node %v from Controller", deleted[i].Name),
+		)
 		delete(nc.knownNodeSet, deleted[i].Name)
 	}
 
@@ -916,7 +937,10 @@ func (nc *Controller) processTaintBaseEviction(node *v1.Node, observedReadyCondi
 	}
 }
 
-func (nc *Controller) processNoTaintBaseEviction(node *v1.Node, observedReadyCondition *v1.NodeCondition, gracePeriod time.Duration, pods []*v1.Pod) error {
+func (nc *Controller) processNoTaintBaseEviction(
+	node *v1.Node, observedReadyCondition *v1.NodeCondition,
+	gracePeriod time.Duration, pods []*v1.Pod,
+) error {
 	decisionTimestamp := nc.now()
 	nodeHealthData := nc.nodeHealthMap.getDeepCopy(node.Name)
 	if nodeHealthData == nil {
@@ -931,9 +955,9 @@ func (nc *Controller) processNoTaintBaseEviction(node *v1.Node, observedReadyCon
 				return err
 			}
 			if enqueued {
-				klog.V(2).Infof("Node is NotReady. Adding Pods on Node %s to eviction queue: %v is later than %v + %v",
-					node.Name,
-					decisionTimestamp,
+				klog.V(2).Infof(
+					"Node is NotReady. Adding Pods on Node %s to eviction queue: %v is later than %v + %v",
+					node.Name, decisionTimestamp,
 					nodeHealthData.readyTransitionTimestamp,
 					nc.podEvictionTimeout,
 				)
@@ -1001,8 +1025,9 @@ func legacyIsMasterNode(nodeName string) bool {
 	return false
 }
 
-// tryUpdateNodeHealth checks a given node's conditions and tries to update it. Returns grace period to
-// which given node is entitled, state of current and last observed Ready Condition, and an error if it occurred.
+// tryUpdateNodeHealth checks a given node's conditions and tries to update it.
+// Returns grace period to which given node is entitled, state of current
+// and last observed Ready Condition, and an error if it occurred.
 func (nc *Controller) tryUpdateNodeHealth(node *v1.Node) (time.Duration, v1.NodeCondition, *v1.NodeCondition, error) {
 	nodeHealth := nc.nodeHealthMap.getDeepCopy(node.Name)
 	defer func() {
@@ -1293,7 +1318,8 @@ func (nc *Controller) doPodProcessingWorker() {
 
 // processPod is processing events of assigning pods to nodes. In particular:
 // 1. for NodeReady=true node, taint eviction for this pod will be cancelled
-// 2. for NodeReady=false or unknown node, taint eviction of pod will happen and pod will be marked as not ready
+// 2. for NodeReady=false or unknown node, taint eviction of pod will happen
+// and pod will be marked as not ready
 // 3. if node doesn't exist in cache, it will be skipped and handled later by doEvictionPass
 func (nc *Controller) processPod(podItem podUpdateItem) {
 	defer nc.podUpdateQueue.Done(podItem)
@@ -1303,7 +1329,10 @@ func (nc *Controller) processPod(podItem podUpdateItem) {
 			// If the pod was deleted, there is no need to requeue.
 			return
 		}
-		klog.Warningf("Failed to read pod %v/%v: %v.", podItem.namespace, podItem.name, err)
+		klog.Warningf(
+			"Failed to read pod %v/%v: %v.",
+			podItem.namespace, podItem.name, err,
+		)
 		nc.podUpdateQueue.AddRateLimited(podItem)
 		return
 	}
@@ -1324,20 +1353,31 @@ func (nc *Controller) processPod(podItem podUpdateItem) {
 		return
 	}
 
+	// 获取 node 节点的 ready 状态.
 	_, currentReadyCondition := nodeutil.GetNodeCondition(nodeHealth.status, v1.NodeReady)
 	if currentReadyCondition == nil {
-		// Lack of NodeReady condition may only happen after node addition (or if it will be maliciously deleted).
+		// Lack of NodeReady condition may only happen after node addition
+		// (or if it will be maliciously deleted).
 		// In both cases, the pod will be handled correctly (evicted if needed) during processing
 		// of the next node update event.
 		return
 	}
 
 	pods := []*v1.Pod{pod}
+	// 基于污点驱逐时, 当前 controller 只进行 node 污点的变更, 并不实际驱逐 Pod,
+	// Pod 的驱逐行为由 TaintManager 完成.
+	//
 	// In taint-based eviction mode, only node updates are processed by NodeLifecycleController.
 	// Pods are processed by TaintManager.
 	if !nc.useTaintBasedEvictions {
-		if err := nc.processNoTaintBaseEviction(node, currentReadyCondition, nc.nodeMonitorGracePeriod, pods); err != nil {
-			klog.Warningf("Unable to process pod %+v eviction from node %v: %v.", podItem, nodeName, err)
+		err := nc.processNoTaintBaseEviction(
+			node, currentReadyCondition, nc.nodeMonitorGracePeriod, pods,
+		)
+		if err != nil {
+			klog.Warningf(
+				"Unable to process pod %+v eviction from node %v: %v.",
+				podItem, nodeName, err,
+			)
 			nc.podUpdateQueue.AddRateLimited(podItem)
 			return
 		}
@@ -1345,7 +1385,10 @@ func (nc *Controller) processPod(podItem podUpdateItem) {
 
 	if currentReadyCondition.Status != v1.ConditionTrue {
 		if err := nodeutil.MarkPodsNotReady(nc.kubeClient, pods, nodeName); err != nil {
-			klog.Warningf("Unable to mark pod %+v NotReady on node %v: %v.", podItem, nodeName, err)
+			klog.Warningf(
+				"Unable to mark pod %+v NotReady on node %v: %v.",
+				podItem, nodeName, err,
+			)
 			nc.podUpdateQueue.AddRateLimited(podItem)
 		}
 	}
@@ -1435,13 +1478,17 @@ func (nc *Controller) addPodEvictorForNewZone(node *v1.Node) {
 	if _, found := nc.zoneStates[zone]; !found {
 		nc.zoneStates[zone] = stateInitial
 		if !nc.useTaintBasedEvictions {
-			nc.zonePodEvictor[zone] =
-				scheduler.NewRateLimitedTimedQueue(
-					flowcontrol.NewTokenBucketRateLimiter(nc.evictionLimiterQPS, scheduler.EvictionRateLimiterBurst))
+			nc.zonePodEvictor[zone] = scheduler.NewRateLimitedTimedQueue(
+				flowcontrol.NewTokenBucketRateLimiter(
+					nc.evictionLimiterQPS, scheduler.EvictionRateLimiterBurst,
+				),
+			)
 		} else {
-			nc.zoneNoExecuteTainter[zone] =
-				scheduler.NewRateLimitedTimedQueue(
-					flowcontrol.NewTokenBucketRateLimiter(nc.evictionLimiterQPS, scheduler.EvictionRateLimiterBurst))
+			nc.zoneNoExecuteTainter[zone] = scheduler.NewRateLimitedTimedQueue(
+				flowcontrol.NewTokenBucketRateLimiter(
+					nc.evictionLimiterQPS, scheduler.EvictionRateLimiterBurst,
+				),
+			)
 		}
 		// Init the metric for the new zone.
 		klog.Infof("Initializing eviction metric for zone: %v", zone)
@@ -1478,14 +1525,19 @@ func (nc *Controller) evictPods(node *v1.Node, pods []*v1.Pod) (bool, error) {
 	if ok && status == evicted {
 		// Node eviction already happened for this node.
 		// Handling immediate pod deletion.
-		_, err := nodeutil.DeletePods(nc.kubeClient, pods, nc.recorder, node.Name, string(node.UID), nc.daemonSetStore)
+		_, err := nodeutil.DeletePods(
+			nc.kubeClient, pods, nc.recorder, node.Name, string(node.UID), nc.daemonSetStore,
+		)
 		if err != nil {
 			return false, fmt.Errorf("unable to delete pods from node %q: %v", node.Name, err)
 		}
 		return false, nil
 	}
 	if !nc.nodeEvictionMap.setStatus(node.Name, toBeEvicted) {
-		klog.V(2).Infof("node %v was unregistered in the meantime - skipping setting status", node.Name)
+		klog.V(2).Infof(
+			"node %v was unregistered in the meantime - skipping setting status",
+			node.Name,
+		)
 	}
 	return nc.zonePodEvictor[utilnode.GetZoneKey(node)].Add(node.Name, string(node.UID)), nil
 }
@@ -1499,12 +1551,16 @@ func (nc *Controller) markNodeForTainting(node *v1.Node) bool {
 func (nc *Controller) markNodeAsReachable(node *v1.Node) (bool, error) {
 	nc.evictorLock.Lock()
 	defer nc.evictorLock.Unlock()
-	err := controller.RemoveTaintOffNode(nc.kubeClient, node.Name, node, UnreachableTaintTemplate)
+	err := controller.RemoveTaintOffNode(
+		nc.kubeClient, node.Name, node, UnreachableTaintTemplate,
+	)
 	if err != nil {
 		klog.Errorf("Failed to remove taint from node %v: %v", node.Name, err)
 		return false, err
 	}
-	err = controller.RemoveTaintOffNode(nc.kubeClient, node.Name, node, NotReadyTaintTemplate)
+	err = controller.RemoveTaintOffNode(
+		nc.kubeClient, node.Name, node, NotReadyTaintTemplate,
+	)
 	if err != nil {
 		klog.Errorf("Failed to remove taint from node %v: %v", node.Name, err)
 		return false, err
@@ -1537,6 +1593,8 @@ func (nc *Controller) ComputeZoneState(nodeReadyConditions []*v1.NodeCondition) 
 	}
 }
 
+// reconcileNodeLabels 只用来协调 os/arch 两个标签的信息, 忽略.
+//
 // reconcileNodeLabels reconciles node labels.
 func (nc *Controller) reconcileNodeLabels(nodeName string) error {
 	node, err := nc.nodeLister.Get(nodeName)

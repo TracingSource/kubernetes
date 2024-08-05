@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 package cm
@@ -189,8 +190,8 @@ func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 // Takes the absolute name of the specified containers.
 // Empty container name disables use of the specified container.
 func NewContainerManager(
-	mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, 
-	nodeConfig NodeConfig, failSwapOn bool, devicePluginEnabled bool, 
+	mountUtil mount.Interface, cadvisorInterface cadvisor.Interface,
+	nodeConfig NodeConfig, failSwapOn bool, devicePluginEnabled bool,
 	recorder record.EventRecorder,
 ) (ContainerManager, error) {
 	subsystems, err := GetCgroupSubsystems()
@@ -212,7 +213,7 @@ func NewContainerManager(
 		if len(swapLines) > 1 {
 			return nil, fmt.Errorf(
 				"running with swap on is not supported, please disable swap! "+
-				"or set --fail-swap-on flag to false. /proc/swaps contained: %v", 
+					"or set --fail-swap-on flag to false. /proc/swaps contained: %v",
 				swapLines,
 			)
 		}
@@ -334,7 +335,7 @@ func NewContainerManager(
 	return cm, nil
 }
 
-// NewPodContainerManager 只有 kubelet 开启了 cgroups-per-qos 选项时, 
+// NewPodContainerManager 只有 kubelet 开启了 cgroups-per-qos 选项时,
 // 才返回 podContainerManagerImpl 对象, 否则返回一个空对象.
 //
 // NewPodContainerManager is a factory method returns a PodContainerManager object
@@ -425,7 +426,7 @@ func setupKernelTunables(option KernelTunableBehavior) error {
 
 // setupNode ...
 //
-// caller: 
+// caller:
 // 	1. containerManagerImpl.Start()
 //
 func (cm *containerManagerImpl) setupNode(activePods ActivePodsFunc) error {
@@ -464,16 +465,21 @@ func (cm *containerManagerImpl) setupNode(activePods ActivePodsFunc) error {
 	if cm.ContainerRuntime == "docker" {
 		// With the docker-CRI integration, dockershim manages the cgroups
 		// and oom score for the docker processes.
-		// Check the cgroup for docker periodically, so kubelet can serve stats for the docker runtime.
+		// Check the cgroup for docker periodically, so kubelet can serve stats
+		// for the docker runtime.
 		// TODO(KEP#866): remove special processing for CRI "docker" enablement
 		cm.periodicTasks = append(cm.periodicTasks, func() {
-			klog.V(4).Infof("[ContainerManager]: Adding periodic tasks for docker CRI integration")
+			klog.V(4).Infof(
+				"[ContainerManager]: Adding periodic tasks for docker CRI integration",
+			)
 			cont, err := getContainerNameForProcess(dockerProcessName, dockerPidFile)
 			if err != nil {
 				klog.Error(err)
 				return
 			}
-			klog.V(2).Infof("[ContainerManager]: Discovered runtime cgroups name: %s", cont)
+			klog.V(2).Infof(
+				"[ContainerManager]: Discovered runtime cgroups name: %s", cont,
+			)
 			cm.Lock()
 			defer cm.Unlock()
 			cm.RuntimeCgroupsName = cont
@@ -504,7 +510,9 @@ func (cm *containerManagerImpl) setupNode(activePods ActivePodsFunc) error {
 			},
 		}
 		cont.ensureStateFunc = func(_ *fs.Manager) error {
-			return ensureProcessInContainerWithOOMScore(os.Getpid(), qos.KubeletOOMScoreAdj, &manager)
+			return ensureProcessInContainerWithOOMScore(
+				os.Getpid(), qos.KubeletOOMScoreAdj, &manager,
+			)
 		}
 		systemContainers = append(systemContainers, cont)
 	} else {
@@ -529,10 +537,10 @@ func (cm *containerManagerImpl) setupNode(activePods ActivePodsFunc) error {
 	return nil
 }
 
-// getContainerNameForProcess 获取指定pid及名称的进程的cgroup名称, 
+// getContainerNameForProcess 获取指定pid及名称的进程的cgroup名称,
 // 参数分别为const字符串: dockerd, /var/run/docker.pid
 //
-// caller: 
+// caller:
 // 	1. setupNode()
 // 	2. helper_linux.go -> GetRuntimeContainer()
 //
@@ -582,7 +590,7 @@ func (cm *containerManagerImpl) Status() Status {
 
 // Start ...
 //
-// caller: 
+// caller:
 // 	1. pkg/kubelet/kubelet__init.go -> Kubelet.initializeRuntimeDependentModules()
 //
 // ...其实就是在 kubelet.Run() 方法的一系列调用过程中的.
@@ -666,7 +674,7 @@ func (cm *containerManagerImpl) GetPluginRegistrationHandler() cache.PluginHandl
 	return cm.deviceManager.GetWatcherHandler()
 }
 
-// caller: 
+// caller:
 // 	1. pkg/kubelet/kubelet_pods.go -> Kubelet.GenerateRunContainerOptions()
 //
 // TODO: move the GetResources logic to PodContainerManager.
@@ -712,6 +720,11 @@ func (cm *containerManagerImpl) SystemCgroupsLimit() v1.ResourceList {
 	}
 }
 
+// isProcessRunningInHost 判断目标 pid 进程是否与1号进程处于同一命名空间.
+// 由于 kubelet 运行在宿主机, 因此该函数可以用于判断 pid 进程是否运行在宿主机空间.
+//
+// caller:
+// 	1. ensureProcessInContainerWithOOMScore() 只有这一处
 func isProcessRunningInHost(pid int) (bool, error) {
 	// Get init pid namespace.
 	initPidNs, err := os.Readlink("/proc/1/ns/pid")
@@ -773,33 +786,44 @@ func getPidsForProcess(name, pidFile string) ([]int, error) {
 // Temporarily export the function to be used by dockershim.
 // TODO(yujuhong): Move this function to dockershim once kubelet migrates to
 // dockershim as the default.
-func EnsureDockerInContainer(dockerAPIVersion *utilversion.Version, oomScoreAdj int, manager *fs.Manager) error {
+func EnsureDockerInContainer(
+	dockerAPIVersion *utilversion.Version, oomScoreAdj int, manager *fs.Manager,
+) error {
 	type process struct{ name, file string }
 	dockerProcs := []process{{dockerProcessName, dockerPidFile}}
 	if dockerAPIVersion.AtLeast(containerdAPIVersion) {
-		dockerProcs = append(dockerProcs, process{containerdProcessName, containerdPidFile})
+		dockerProcs = append(
+			dockerProcs, process{containerdProcessName, containerdPidFile},
+		)
 	}
 	var errs []error
 	for _, proc := range dockerProcs {
 		pids, err := getPidsForProcess(proc.name, proc.file)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to get pids for %q: %v", proc.name, err))
+			errs = append(errs, fmt.Errorf(
+				"failed to get pids for %q: %v", proc.name, err,
+			))
 			continue
 		}
 
 		// Move if the pid is not already in the desired container.
 		for _, pid := range pids {
 			if err := ensureProcessInContainerWithOOMScore(pid, oomScoreAdj, manager); err != nil {
-				errs = append(errs, fmt.Errorf("errors moving %q pid: %v", proc.name, err))
+				errs = append(errs, fmt.Errorf(
+					"errors moving %q pid: %v", proc.name, err,
+				))
 			}
 		}
 	}
 	return utilerrors.NewAggregate(errs)
 }
 
-func ensureProcessInContainerWithOOMScore(pid int, oomScoreAdj int, manager *fs.Manager) error {
+func ensureProcessInContainerWithOOMScore(
+	pid int, oomScoreAdj int, manager *fs.Manager,
+) error {
 	if runningInHost, err := isProcessRunningInHost(pid); err != nil {
-		// Err on the side of caution. Avoid moving the docker daemon unless we are able to identify its context.
+		// Err on the side of caution.
+		// Avoid moving the docker daemon unless we are able to identify its context.
 		return err
 	} else if !runningInHost {
 		// Process is running inside a container. Don't touch that.
@@ -811,30 +835,44 @@ func ensureProcessInContainerWithOOMScore(pid int, oomScoreAdj int, manager *fs.
 	if manager != nil {
 		cont, err := getContainer(pid)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to find container of PID %d: %v", pid, err))
+			errs = append(errs, fmt.Errorf(
+				"failed to find container of PID %d: %v", pid, err,
+			))
 		}
 
 		if cont != manager.Cgroups.Name {
 			err = manager.Apply(pid)
 			if err != nil {
-				errs = append(errs, fmt.Errorf("failed to move PID %d (in %q) to %q: %v", pid, cont, manager.Cgroups.Name, err))
+				errs = append(errs, fmt.Errorf(
+					"failed to move PID %d (in %q) to %q: %v",
+					pid, cont, manager.Cgroups.Name, err,
+				))
 			}
 		}
 	}
 
 	// Also apply oom-score-adj to processes
 	oomAdjuster := oom.NewOOMAdjuster()
-	klog.V(5).Infof("attempting to apply oom_score_adj of %d to pid %d", oomScoreAdj, pid)
+	klog.V(5).Infof(
+		"attempting to apply oom_score_adj of %d to pid %d", oomScoreAdj, pid,
+	)
 	if err := oomAdjuster.ApplyOOMScoreAdj(pid, oomScoreAdj); err != nil {
-		klog.V(3).Infof("Failed to apply oom_score_adj %d for pid %d: %v", oomScoreAdj, pid, err)
-		errs = append(errs, fmt.Errorf("failed to apply oom score %d to PID %d: %v", oomScoreAdj, pid, err))
+		klog.V(3).Infof(
+			"Failed to apply oom_score_adj %d for pid %d: %v",
+			oomScoreAdj, pid, err,
+		)
+		errs = append(errs, fmt.Errorf(
+			"failed to apply oom score %d to PID %d: %v", oomScoreAdj, pid, err,
+		))
 	}
 	return utilerrors.NewAggregate(errs)
 }
 
 // getContainer 获取目标pid进程的cgroup配置, 首选key排序: name=systemd > cpu
 //
-// caller: pkg/kubelet/cm/helpers_linux.go -> GetKubeletContainer()
+// caller:
+// 	1. pkg/kubelet/cm/helpers_linux.go -> GetKubeletContainer()
+//	2. ensureProcessInContainerWithOOMScore()
 //
 // unified: 统一的, 一致的.
 //
@@ -860,7 +898,10 @@ func getContainer(pid int) (string, error) {
 	// 就是说cpu和memory的值应该是相同的.
 	// since we use this container for accounting, we need to ensure its a unified hierarchy.
 	if cpu != memory {
-		return "", fmt.Errorf("cpu and memory cgroup hierarchy not unified.  cpu: %s, memory: %s", cpu, memory)
+		return "", fmt.Errorf(
+			"cpu and memory cgroup hierarchy not unified.  cpu: %s, memory: %s",
+			cpu, memory,
+		)
 	}
 
 	// on systemd, every pid is in a unified cgroup hierarchy (name=systemd as seen in systemd-cgls)
@@ -902,7 +943,8 @@ func ensureSystemCgroups(rootCgroupPath string, manager *fs.Manager) error {
 			continue
 		}
 
-		// Remove kernel pids and other protected PIDs (pid 1, PIDs already in system & kubelet containers)
+		// Remove kernel pids and other protected PIDs
+		// (pid 1, PIDs already in system & kubelet containers)
 		pids := make([]int, 0, len(allPids))
 		for _, pid := range allPids {
 			if pid == 1 || isKernelPid(pid) {
@@ -911,7 +953,10 @@ func ensureSystemCgroups(rootCgroupPath string, manager *fs.Manager) error {
 
 			pids = append(pids, pid)
 		}
-		klog.Infof("Found %d PIDs in root, %d of them are not to be moved", len(allPids), len(allPids)-len(pids))
+		klog.Infof(
+			"Found %d PIDs in root, %d of them are not to be moved",
+			len(allPids), len(allPids)-len(pids),
+		)
 
 		// Check if we have moved all the non-kernel PIDs.
 		if len(pids) == 0 {
@@ -922,7 +967,10 @@ func ensureSystemCgroups(rootCgroupPath string, manager *fs.Manager) error {
 		for _, pid := range pids {
 			err := manager.Apply(pid)
 			if err != nil {
-				finalErr = fmt.Errorf("failed to move PID %d into the system container %q: %v", pid, manager.Cgroups.Name, err)
+				finalErr = fmt.Errorf(
+					"failed to move PID %d into the system container %q: %v",
+					pid, manager.Cgroups.Name, err,
+				)
 			}
 		}
 
@@ -942,11 +990,15 @@ func (cm *containerManagerImpl) GetCapacity() v1.ResourceList {
 	return cm.capacity
 }
 
-func (cm *containerManagerImpl) GetDevicePluginResourceCapacity() (v1.ResourceList, v1.ResourceList, []string) {
+func (cm *containerManagerImpl) GetDevicePluginResourceCapacity() (
+	v1.ResourceList, v1.ResourceList, []string,
+) {
 	return cm.deviceManager.GetCapacity()
 }
 
-func (cm *containerManagerImpl) GetDevices(podUID, containerName string) []*podresourcesapi.ContainerDevices {
+func (cm *containerManagerImpl) GetDevices(
+	podUID, containerName string,
+) []*podresourcesapi.ContainerDevices {
 	return cm.deviceManager.GetDevices(podUID, containerName)
 }
 

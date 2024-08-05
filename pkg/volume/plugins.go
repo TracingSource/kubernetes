@@ -35,7 +35,7 @@ type ProbeOperation uint32
 type ProbeEvent struct {
 	// VolumePlugin that was added/updated/removed.
 	// if ProbeEvent.Op is 'ProbeRemove', Plugin should be nil
-	Plugin     VolumePlugin 
+	Plugin     VolumePlugin
 	PluginName string
 	Op         ProbeOperation // The operation to the plugin
 }
@@ -571,7 +571,9 @@ func NewSpecFromPersistentVolume(pv *v1.PersistentVolume, readOnly bool) *Spec {
 // InitPlugins initializes each plugin.  All plugins must have unique names.
 // This must be called exactly once before any New* methods are called on any
 // plugins.
-func (pm *VolumePluginMgr) InitPlugins(plugins []VolumePlugin, prober DynamicPluginProber, host VolumeHost) error {
+func (pm *VolumePluginMgr) InitPlugins(
+	plugins []VolumePlugin, prober DynamicPluginProber, host VolumeHost,
+) error {
 	pm.mutex.Lock()
 	defer pm.mutex.Unlock()
 
@@ -635,10 +637,10 @@ func (pm *VolumePluginMgr) initProbedPlugin(probedPlugin VolumePlugin) error {
 	return nil
 }
 
-// caller: 
+// caller:
 // 	1. pkg/volume/util/operationexecutor/operation_generator.go -> operationGenerator.GenerateMountVolumeFunc()
 //
-// FindPluginBySpec looks for a plugin that can support a given volume specification. 
+// FindPluginBySpec looks for a plugin that can support a given volume specification.
 // If no plugins can support or more than one plugin can support it, return error.
 func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 	pm.mutex.Lock()
@@ -662,6 +664,7 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 		}
 	}
 
+	// 当 matches 中只有一个成员时才可以
 	if len(matches) == 0 {
 		return nil, fmt.Errorf("no volume plugin matched")
 	}
@@ -670,18 +673,24 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 		for _, plugin := range matches {
 			matchedPluginNames = append(matchedPluginNames, plugin.GetPluginName())
 		}
-		return nil, fmt.Errorf("multiple volume plugins matched: %s", strings.Join(matchedPluginNames, ","))
+		return nil, fmt.Errorf(
+			"multiple volume plugins matched: %s",
+			strings.Join(matchedPluginNames, ","),
+		)
 	}
 
 	// Issue warning if the matched provider is deprecated
 	if detail, ok := deprecatedVolumeProviders[matches[0].GetPluginName()]; ok {
-		klog.Warningf("WARNING: %s built-in volume provider is now deprecated. %s", matches[0].GetPluginName(), detail)
+		klog.Warningf(
+			"WARNING: %s built-in volume provider is now deprecated. %s",
+			matches[0].GetPluginName(), detail,
+		)
 	}
 	return matches[0], nil
 }
 
-// FindPluginByName fetches a plugin by name or by legacy name.  If no plugin
-// is found, returns error.
+// FindPluginByName fetches a plugin by name or by legacy name.
+// If no plugin is found, returns error.
 func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 	pm.mutex.Lock()
 	defer pm.mutex.Unlock()
@@ -820,8 +829,8 @@ func (pm *VolumePluginMgr) FindProvisionablePluginByName(name string) (Provision
 	return nil, fmt.Errorf("no provisionable volume plugin matched")
 }
 
-// FindDeletablePluginBySpec fetches a persistent volume plugin by spec.  If
-// no plugin is found, returns error.
+// FindDeletablePluginBySpec fetches a persistent volume plugin by spec.
+// If no plugin is found, returns error.
 func (pm *VolumePluginMgr) FindDeletablePluginBySpec(spec *Spec) (DeletableVolumePlugin, error) {
 	volumePlugin, err := pm.FindPluginBySpec(spec)
 	if err != nil {
@@ -833,8 +842,8 @@ func (pm *VolumePluginMgr) FindDeletablePluginBySpec(spec *Spec) (DeletableVolum
 	return nil, fmt.Errorf("no deletable volume plugin matched")
 }
 
-// FindDeletablePluginByName fetches a persistent volume plugin by name.  If
-// no plugin is found, returns error.
+// FindDeletablePluginByName fetches a persistent volume plugin by name. 
+// If no plugin is found, returns error.
 func (pm *VolumePluginMgr) FindDeletablePluginByName(name string) (DeletableVolumePlugin, error) {
 	volumePlugin, err := pm.FindPluginByName(name)
 	if err != nil {

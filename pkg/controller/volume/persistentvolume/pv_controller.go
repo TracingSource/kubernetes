@@ -1265,10 +1265,11 @@ func (ctrl *PersistentVolumeController) isVolumeUsed(pv *v1.PersistentVolume) ([
 	return podNames.List(), podNames.Len() != 0, nil
 }
 
-// doDeleteVolume finds appropriate delete plugin and deletes given volume, returning
-// the volume plugin name. Also, it returns 'true', when the volume was deleted and
-// 'false' when the volume cannot be deleted because the deleter is external. No
-// error should be reported in this case.
+// doDeleteVolume finds appropriate delete plugin and deletes given volume,
+// returning the volume plugin name.
+// Also, it returns 'true', when the volume was deleted and
+// 'false' when the volume cannot be deleted because the deleter is external.
+// No error should be reported in this case.
 func (ctrl *PersistentVolumeController) doDeleteVolume(volume *v1.PersistentVolume) (string, bool, error) {
 	klog.V(4).Infof("doDeleteVolume [%s]", volume.Name)
 	var err error
@@ -1290,7 +1291,9 @@ func (ctrl *PersistentVolumeController) doDeleteVolume(volume *v1.PersistentVolu
 	deleter, err := plugin.NewDeleter(spec)
 	if err != nil {
 		// Cannot create deleter
-		return pluginName, false, fmt.Errorf("Failed to create deleter for volume %q: %v", volume.Name, err)
+		return pluginName, false, fmt.Errorf(
+			"Failed to create deleter for volume %q: %v", volume.Name, err,
+		)
 	}
 
 	opComplete := util.OperationCompleteHook(pluginName, "volume_delete")
@@ -1690,7 +1693,10 @@ func (ctrl *PersistentVolumeController) findDeletablePlugin(volume *v1.Persisten
 	plugin, err := ctrl.volumePluginMgr.FindDeletablePluginBySpec(spec)
 	if err != nil {
 		// No deleter found. Emit an event and mark the volume Failed.
-		return nil, fmt.Errorf("Error getting deleter volume plugin for volume %q: %v", volume.Name, err)
+		return nil, fmt.Errorf(
+			"Error getting deleter volume plugin for volume %q: %v", 
+			volume.Name, err,
+		)
 	}
 	return plugin, nil
 }

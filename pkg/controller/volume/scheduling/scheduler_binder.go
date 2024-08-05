@@ -738,7 +738,9 @@ func (b *volumeBinder) findMatchingVolumes(pod *v1.Pod, claimsToBind []*v1.Persi
 // checkVolumeProvisions checks given unbound claims (the claims have gone through func
 // findMatchingVolumes, and do not have matching volumes for binding), and return true
 // if all of the claims are eligible for dynamic provision.
-func (b *volumeBinder) checkVolumeProvisions(pod *v1.Pod, claimsToProvision []*v1.PersistentVolumeClaim, node *v1.Node) (provisionSatisfied bool, provisionedClaims []*v1.PersistentVolumeClaim, err error) {
+func (b *volumeBinder) checkVolumeProvisions(
+	pod *v1.Pod, claimsToProvision []*v1.PersistentVolumeClaim, node *v1.Node,
+) (provisionSatisfied bool, provisionedClaims []*v1.PersistentVolumeClaim, err error) {
 	podName := getPodName(pod)
 	provisionedClaims = []*v1.PersistentVolumeClaim{}
 
@@ -755,13 +757,19 @@ func (b *volumeBinder) checkVolumeProvisions(pod *v1.Pod, claimsToProvision []*v
 		}
 		provisioner := class.Provisioner
 		if provisioner == "" || provisioner == pvutil.NotSupportedProvisioner {
-			klog.V(4).Infof("storage class %q of claim %q does not support dynamic provisioning", className, pvcName)
+			klog.V(4).Infof(
+				"storage class %q of claim %q does not support dynamic provisioning", 
+				className, pvcName,
+			)
 			return false, nil, nil
 		}
 
 		// Check if the node can satisfy the topology requirement in the class
 		if !v1helper.MatchTopologySelectorTerms(class.AllowedTopologies, labels.Set(node.Labels)) {
-			klog.V(4).Infof("Node %q cannot satisfy provisioning topology requirements of claim %q", node.Name, pvcName)
+			klog.V(4).Infof(
+				"Node %q cannot satisfy provisioning topology requirements of claim %q", 
+				node.Name, pvcName,
+			)
 			return false, nil, nil
 		}
 
@@ -771,7 +779,10 @@ func (b *volumeBinder) checkVolumeProvisions(pod *v1.Pod, claimsToProvision []*v
 		provisionedClaims = append(provisionedClaims, claim)
 
 	}
-	klog.V(4).Infof("Provisioning for claims of pod %q that has no matching volumes on node %q ...", podName, node.Name)
+	klog.V(4).Infof(
+		"Provisioning for claims of pod %q that has no matching volumes on node %q ...", 
+		podName, node.Name,
+	)
 
 	return true, provisionedClaims, nil
 }

@@ -49,7 +49,9 @@ func NewProxyServer(o *Options) (*ProxyServer, error) {
 }
 
 func newProxyServer(
-	config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExit bool, master string,
+	config *proxyconfigapi.KubeProxyConfiguration, 
+	cleanupAndExit bool, 
+	master string,
 ) (*ProxyServer, error) {
 
 	if config == nil {
@@ -64,7 +66,9 @@ func newProxyServer(
 
 	protocol := utiliptables.ProtocolIpv4
 	if net.ParseIP(config.BindAddress).To4() == nil {
-		klog.V(0).Infof("IPv6 bind address (%s), assume IPv6 operation", config.BindAddress)
+		klog.V(0).Infof(
+			"IPv6 bind address (%s), assume IPv6 operation", config.BindAddress,
+		)
 		protocol = utiliptables.ProtocolIpv6
 	}
 
@@ -107,7 +111,10 @@ func newProxyServer(
 	}
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(
-		proxyconfigscheme.Scheme, v1.EventSource{Component: "kube-proxy", Host: hostname},
+		proxyconfigscheme.Scheme, v1.EventSource{
+			Component: "kube-proxy", 
+			Host: hostname,
+		},
 	)
 
 	nodeRef := &v1.ObjectReference{
@@ -120,30 +127,32 @@ func newProxyServer(
 	var healthzServer *healthcheck.ProxierHealthServer
 	if len(config.HealthzBindAddress) > 0 {
 		healthzServer = healthcheck.NewProxierHealthServer(
-			config.HealthzBindAddress, 2*config.IPTables.SyncPeriod.Duration, recorder, nodeRef,
+			config.HealthzBindAddress, 
+			2*config.IPTables.SyncPeriod.Duration, 
+			recorder, 
+			nodeRef,
 		)
 	}
 
+	// 无论是 iptbales 还是 ipvs, 都需要进行初始化, 类似于 iptables 构建规则链.
 	var proxier proxy.Provider
 
 	proxyMode := getProxyMode(
 		string(config.Mode), kernelHandler, ipsetInterface, iptables.LinuxKernelCompatTester{},
 	)
 	nodeIP := net.ParseIP(config.BindAddress)
-	/*
-		// 本地调试的时候可能需要将这里注释掉, 因为调试机可能不在集群中, GetNodeIP会出错.
-		// nodeIP 0.0.0.0吧
-		if nodeIP.IsUnspecified() {
-			nodeIP = utilnode.GetNodeIP(client, hostname)
-			if nodeIP == nil {
-				klog.V(0).Infof(
-					"can't determine this node's IP, assuming 127.0.0.1; "+
-					"if this is incorrect, please set the --bind-address flag",
-				)
-				nodeIP = net.ParseIP("127.0.0.1")
-			}
+	// 本地调试的时候可能需要将这里注释掉, 因为调试机可能不在集群中, GetNodeIP会出错.
+	// nodeIP 0.0.0.0吧
+	if nodeIP.IsUnspecified() {
+		nodeIP = utilnode.GetNodeIP(client, hostname)
+		if nodeIP == nil {
+			klog.V(0).Infof(
+				"can't determine this node's IP, assuming 127.0.0.1; "+
+				"if this is incorrect, please set the --bind-address flag",
+			)
+			nodeIP = net.ParseIP("127.0.0.1")
 		}
-	*/
+	}
 	if proxyMode == proxyModeIPTables {
 		klog.V(0).Info("Using iptables Proxier.")
 		if config.IPTables.MasqueradeBit == nil {

@@ -7,9 +7,9 @@ import (
 )
 
 const (
-	// PodInfraOOMAdj is very docker specific. For arbitrary runtime, it may not make
-	// sense to set sandbox level oom score, e.g. a sandbox could only be a namespace
-	// without a process.
+	// PodInfraOOMAdj is very docker specific.
+	// For arbitrary runtime, it may not make sense to set sandbox level oom score,
+	// e.g. a sandbox could only be a namespace without a process.
 	// TODO: Handle infra container oom score adj in a runtime agnostic way.
 	PodInfraOOMAdj int = -998
 	// KubeletOOMScoreAdj is the OOM score adjustment for Kubelet
@@ -22,13 +22,18 @@ const (
 	besteffortOOMScoreAdj int = 1000
 )
 
-// GetContainerOOMScoreAdjust returns the amount by which the OOM score of all processes in the
-// container should be adjusted.
-// The OOM score of a process is the percentage of memory it consumes
-// multiplied by 10 (barring exceptional cases) + a configurable quantity which is between -1000
-// and 1000. Containers with higher OOM scores are killed if the system runs out of memory.
+// GetContainerOOMScoreAdjust 根据目标 pod 的 requests/limits 值判断其 QoS 类型并返回.
+//
+// GetContainerOOMScoreAdjust returns the amount by which the OOM score of all
+// processes in the container should be adjusted.
+// The OOM score of a process is the percentage of memory it consumes multiplied
+// by 10 (barring exceptional cases) + a configurable quantity
+// which is between -1000 and 1000.
+// Containers with higher OOM scores are killed if the system runs out of memory.
 // See https://lwn.net/Articles/391222/ for more information.
-func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapacity int64) int {
+func GetContainerOOMScoreAdjust(
+	pod *v1.Pod, container *v1.Container, memoryCapacity int64,
+) int {
 	if types.IsCriticalPod(pod) {
 		// Critical pods should be the last to get killed.
 		return guaranteedOOMScoreAdj

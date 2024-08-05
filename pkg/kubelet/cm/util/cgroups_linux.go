@@ -28,7 +28,8 @@ func getCgroupPath(cgroupPath string) (string, error) {
 		return "", err
 	}
 
-	// If the cgroup name/path is absolute do not look relative to the cgroup of the init process.
+	// If the cgroup name/path is absolute do not look relative to the cgroup
+	// of the init process.
 	if filepath.IsAbs(cgroupPath) {
 		// Sometimes subsystems can be mounted together as 'cpu,cpuacct'.
 		return filepath.Join(root, mnt, cgroupPath), nil
@@ -42,7 +43,8 @@ func getCgroupPath(cgroupPath string) (string, error) {
 	return filepath.Join(parentPath, cgroupPath), nil
 }
 
-// getCgroupParentPath gets the parent filepath to this cgroup, for resolving relative cgroup paths.
+// getCgroupParentPath gets the parent filepath to this cgroup,
+// for resolving relative cgroup paths.
 func getCgroupParentPath(mountpoint, root string) (string, error) {
 	// Use GetThisCgroupDir instead of GetInitCgroupDir, because the creating
 	// process could in container and shared pid namespace with host, and

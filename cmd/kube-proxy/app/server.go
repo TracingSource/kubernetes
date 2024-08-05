@@ -18,6 +18,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	cliflag "k8s.io/component-base/cli/flag"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/version/verflag"
 	"k8s.io/klog"
@@ -32,11 +37,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/filesystem"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	utilpointer "k8s.io/utils/pointer"
-	cliflag "k8s.io/component-base/cli/flag"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/rest"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 const (
@@ -69,7 +69,7 @@ type Options struct {
 	watcher filesystem.FSWatcher
 	// proxyServer is the interface to run the proxy server
 	proxyServer proxyRun
-	// errCh proxyServer.Run()执行时, 或是watcher.Run()在监听配置文件变动及监听出现异常时, 
+	// errCh proxyServer.Run()执行时, 或是watcher.Run()在监听配置文件变动及监听出现异常时,
 	// 都可能出现错误, 这些错误都会被发送到errCh通道中.
 	//
 	// errCh is the channel that errors will be sent
@@ -87,7 +87,8 @@ type Options struct {
 	// metricsPort is the port to be used by the metrics server.
 	metricsPort int32
 
-	// hostnameOverride, if set from the command line flag, takes precedence over the `HostnameOverride` value from the config file
+	// hostnameOverride, if set from the command line flag, takes precedence
+	// over the `HostnameOverride` value from the config file
 	hostnameOverride string
 }
 
@@ -165,7 +166,10 @@ func NewOptions() *Options {
 // Complete completes all the required options.
 func (o *Options) Complete() error {
 	if len(o.ConfigFile) == 0 && len(o.WriteConfigTo) == 0 {
-		klog.Warning("WARNING: all flags other than --config, --write-config-to, and --cleanup are deprecated. Please begin using a config file ASAP.")
+		klog.Warning(
+			"WARNING: all flags other than --config, --write-config-to, " +
+				"and --cleanup are deprecated. Please begin using a config file ASAP.",
+		)
 		o.config.HealthzBindAddress = addressFromDeprecatedFlags(o.config.HealthzBindAddress, o.healthzPort)
 		o.config.MetricsBindAddress = addressFromDeprecatedFlags(o.config.MetricsBindAddress, o.metricsPort)
 	}
@@ -192,7 +196,7 @@ func (o *Options) Complete() error {
 
 // initWatcher 创建文件系统监听器, 监测配置文件变动.
 //
-// caller: 
+// caller:
 // 	1. Options.Complete()
 //
 // Creates a new filesystem watcher and adds watches for the config file.
@@ -212,7 +216,7 @@ func (o *Options) initWatcher() error {
 }
 
 // errorHandler: 用于处理监听中出现文件变动的event事件(文件变动也会写入errCh通道).
-// caller: 
+// caller:
 // 	1. Options.initWatcher() -> fswatcher.Init()
 //
 func (o *Options) eventHandler(ent fsnotify.Event) {
@@ -228,7 +232,7 @@ func (o *Options) eventHandler(ent fsnotify.Event) {
 }
 
 // errorHandler: 用于处理监听中出现的error事件
-// caller: 
+// caller:
 // 	1. o.initWatcher() -> fswatcher.Init()
 func (o *Options) errorHandler(err error) {
 	o.errCh <- err
@@ -260,7 +264,7 @@ func (o *Options) Validate(args []string) error {
 	return nil
 }
 
-// Run 创建proxyServer, 并开始执行. runLoop()是实际的执行函数.
+// Run 创建 proxyServer, 并开始执行.
 //
 // Run runs the specified ProxyServer.
 func (o *Options) Run() error {
@@ -310,12 +314,16 @@ func (o *Options) runLoop() error {
 
 func (o *Options) writeConfigFile() (err error) {
 	const mediaType = runtime.ContentTypeYAML
-	info, ok := runtime.SerializerInfoForMediaType(proxyconfigscheme.Codecs.SupportedMediaTypes(), mediaType)
+	info, ok := runtime.SerializerInfoForMediaType(
+		proxyconfigscheme.Codecs.SupportedMediaTypes(), mediaType,
+	)
 	if !ok {
 		return fmt.Errorf("unable to locate encoder -- %q is not a supported media type", mediaType)
 	}
 
-	encoder := proxyconfigscheme.Codecs.EncoderForVersion(info.Serializer, v1alpha1.SchemeGroupVersion)
+	encoder := proxyconfigscheme.Codecs.EncoderForVersion(
+		info.Serializer, v1alpha1.SchemeGroupVersion,
+	)
 
 	configFile, err := os.Create(o.WriteConfigTo)
 	if err != nil {
@@ -376,7 +384,6 @@ func (o *Options) loadConfigFromFile(file string) (*kubeproxyconfig.KubeProxyCon
 
 // loadConfig decodes a serialized KubeProxyConfiguration to the internal type.
 func (o *Options) loadConfig(data []byte) (*kubeproxyconfig.KubeProxyConfiguration, error) {
-
 	configObj, gvk, err := proxyconfigscheme.Codecs.UniversalDecoder().Decode(data, nil, nil)
 	if err != nil {
 		// Try strict decoding first. If that fails decode with a lenient
@@ -410,7 +417,9 @@ func (o *Options) loadConfig(data []byte) (*kubeproxyconfig.KubeProxyConfigurati
 }
 
 // ApplyDefaults applies the default values to Options.
-func (o *Options) ApplyDefaults(in *kubeproxyconfig.KubeProxyConfiguration) (*kubeproxyconfig.KubeProxyConfiguration, error) {
+func (o *Options) ApplyDefaults(
+	in *kubeproxyconfig.KubeProxyConfiguration,
+) (*kubeproxyconfig.KubeProxyConfiguration, error) {
 	external, err := proxyconfigscheme.Scheme.ConvertToVersion(in, v1alpha1.SchemeGroupVersion)
 	if err != nil {
 		return nil, err
@@ -418,7 +427,9 @@ func (o *Options) ApplyDefaults(in *kubeproxyconfig.KubeProxyConfiguration) (*ku
 
 	proxyconfigscheme.Scheme.Default(external)
 
-	internal, err := proxyconfigscheme.Scheme.ConvertToVersion(external, kubeproxyconfig.SchemeGroupVersion)
+	internal, err := proxyconfigscheme.Scheme.ConvertToVersion(
+		external, kubeproxyconfig.SchemeGroupVersion,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -476,7 +487,7 @@ with the apiserver API to configure the proxy.`,
 	return cmd
 }
 
-// createClients 使用InClusterConfig()创建clientset客户端及event客户端.
+// createClients 使用InClusterConfig()创建 kube client 及event客户端.
 //
 // createClients creates a kube client and an event client
 // from the given config and masterOverride.
@@ -489,14 +500,18 @@ func createClients(
 	var err error
 
 	if len(config.Kubeconfig) == 0 && len(masterOverride) == 0 {
-		klog.Info("Neither kubeconfig file nor master URL was specified. Falling back to in-cluster config.")
+		klog.Info(
+			"Neither kubeconfig file nor master URL was specified. " +
+				"Falling back to in-cluster config.",
+		)
 		kubeConfig, err = rest.InClusterConfig()
 	} else {
 		// This creates a client, first loading any specified kubeconfig
 		// file, and then overriding the Master flag, if non-empty.
 		kubeConfig, err = clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 			&clientcmd.ClientConfigLoadingRules{ExplicitPath: config.Kubeconfig},
-			&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: masterOverride}}).ClientConfig()
+			&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: masterOverride}},
+		).ClientConfig()
 	}
 	if err != nil {
 		return nil, nil, err

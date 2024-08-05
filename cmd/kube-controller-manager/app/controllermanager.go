@@ -427,8 +427,7 @@ const (
 // 	2. KnownControllers()
 //
 // NewControllerInitializers is a public map of named controller groups
-// (you can start more than one in an init func)
-// paired to their InitFunc. 
+// (you can start more than one in an init func) paired to their InitFunc. 
 // This allows for structured downstream composition and subdivision.
 func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc {
 	controllers := map[string]InitFunc{}
@@ -462,9 +461,12 @@ func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc 
 		controllers["cloud-node-lifecycle"] = startCloudNodeLifecycleController
 		// TODO: volume controller into the IncludeCloudLoops only set.
 	}
+
+	// 下面3个组件都与持久卷的管理有关
 	controllers["persistentvolume-binder"] = startPersistentVolumeBinderController
 	controllers["attachdetach"] = startAttachDetachController
 	controllers["persistentvolume-expander"] = startVolumeExpandController
+
 	controllers["clusterrole-aggregation"] = startClusterRoleAggregrationController
 	controllers["pvc-protection"] = startPVCProtectionController
 	controllers["pv-protection"] = startPVProtectionController

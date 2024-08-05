@@ -12,6 +12,7 @@ import (
 
 // caller: 
 // 	1. cmd/kubelet/app/plugins.go -> ProbeVolumePlugins()
+// 	2. cmd/kube-controller-manager/app/plugins.go -> ProbeControllerVolumePlugins()
 //
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
 // The volumeConfig arg provides the ability to configure volume behavior. 

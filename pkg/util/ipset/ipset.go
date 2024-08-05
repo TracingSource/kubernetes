@@ -12,6 +12,8 @@ import (
 	utilexec "k8s.io/utils/exec"
 )
 
+// 	@implementBy: runner{}
+//
 // Interface is an injectable interface for running ipset commands. 
 // Implementations must be goroutine-safe.
 type Interface interface {
@@ -256,6 +258,9 @@ func New(exec utilexec.Interface) Interface {
 	}
 }
 
+// caller:
+// 	1. pkg/proxy/ipvs/ipset.go -> ensureIPSet()
+//
 // CreateSet creates a new set, it will ignore error when the set already exists if ignoreExistErr=true.
 func (runner *runner) CreateSet(set *IPSet, ignoreExistErr bool) error {
 	// 这里只是设置几个默认值, 真正执行写入操作的是runner.createSet()函数.
@@ -271,8 +276,9 @@ func (runner *runner) CreateSet(set *IPSet, ignoreExistErr bool) error {
 	return runner.createSet(set, ignoreExistErr)
 }
 
-// If ignoreExistErr is set to true, then the -exist option of ipset will be specified, ipset ignores the error
-// otherwise raised when the same set (setname and create parameters are identical) already exists.
+// If ignoreExistErr is set to true, then the -exist option of ipset will be specified,
+// ipset ignores the error otherwise raised when the same set
+// (setname and create parameters are identical) already exists.
 func (runner *runner) createSet(set *IPSet, ignoreExistErr bool) error {
 	args := []string{"create", set.Name, string(set.SetType)}
 	if set.SetType == HashIPPortIP || set.SetType == HashIPPort || set.SetType == HashIPPortNet {

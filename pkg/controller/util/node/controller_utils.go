@@ -12,7 +12,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	appsv1listers "k8s.io/client-go/listers/apps/v1"
 	utilpod "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -160,15 +160,27 @@ func RecordNodeStatusChange(recorder record.EventRecorder, node *v1.Node, newSta
 		UID:       node.UID,
 		Namespace: "",
 	}
-	klog.V(2).Infof("Recording status change %s event message for node %s", newStatus, node.Name)
+	klog.V(2).Infof(
+		"Recording status change %s event message for node %s", 
+		newStatus, node.Name,
+	)
 	// TODO: This requires a transaction, either both node status is updated
 	// and event is recorded or neither should happen, see issue #6055.
-	recorder.Eventf(ref, v1.EventTypeNormal, newStatus, "Node %s status is now: %s", node.Name, newStatus)
+	recorder.Eventf(
+		ref, v1.EventTypeNormal, newStatus, 
+		"Node %s status is now: %s", node.Name, newStatus,
+	)
 }
 
-// SwapNodeControllerTaint returns true in case of success and false
-// otherwise.
-func SwapNodeControllerTaint(kubeClient clientset.Interface, taintsToAdd, taintsToRemove []*v1.Taint, node *v1.Node) bool {
+// SwapNodeControllerTaint 为目标主机新增并删除污点.
+// 新增与删除是分开的两个操作, 因为是为了防止全量覆盖, 所以只做增量变动.
+//
+// SwapNodeControllerTaint returns true in case of success and false otherwise.
+func SwapNodeControllerTaint(
+	kubeClient clientset.Interface,
+	taintsToAdd, taintsToRemove []*v1.Taint,
+	node *v1.Node,
+) bool {
 	for _, taintToAdd := range taintsToAdd {
 		now := metav1.Now()
 		taintToAdd.TimeAdded = &now
@@ -176,24 +188,20 @@ func SwapNodeControllerTaint(kubeClient clientset.Interface, taintsToAdd, taints
 
 	err := controller.AddOrUpdateTaintOnNode(kubeClient, node.Name, taintsToAdd...)
 	if err != nil {
-		utilruntime.HandleError(
-			fmt.Errorf(
-				"unable to taint %+v unresponsive Node %q: %v",
-				taintsToAdd,
-				node.Name,
-				err))
+		utilruntime.HandleError(fmt.Errorf(
+			"unable to taint %+v unresponsive Node %q: %v",
+			taintsToAdd, node.Name, err,
+		))
 		return false
 	}
 	klog.V(4).Infof("Added %+v Taint to Node %v", taintsToAdd, node.Name)
 
 	err = controller.RemoveTaintOffNode(kubeClient, node.Name, node, taintsToRemove...)
 	if err != nil {
-		utilruntime.HandleError(
-			fmt.Errorf(
-				"unable to remove %+v unneeded taint from unresponsive Node %q: %v",
-				taintsToRemove,
-				node.Name,
-				err))
+		utilruntime.HandleError(fmt.Errorf(
+			"unable to remove %+v unneeded taint from unresponsive Node %q: %v",
+			taintsToRemove, node.Name, err,
+		))
 		return false
 	}
 	klog.V(4).Infof("Made sure that Node %+v has no %v Taint", node.Name, taintsToRemove)
@@ -203,15 +211,15 @@ func SwapNodeControllerTaint(kubeClient clientset.Interface, taintsToAdd, taints
 
 // AddOrUpdateLabelsOnNode updates the labels on the node and returns true on
 // success and false on failure.
-func AddOrUpdateLabelsOnNode(kubeClient clientset.Interface, labelsToUpdate map[string]string, node *v1.Node) bool {
+func AddOrUpdateLabelsOnNode(
+	kubeClient clientset.Interface, labelsToUpdate map[string]string, node *v1.Node,
+) bool {
 	err := controller.AddOrUpdateLabelsOnNode(kubeClient, node.Name, labelsToUpdate)
 	if err != nil {
-		utilruntime.HandleError(
-			fmt.Errorf(
-				"unable to update labels %+v for Node %q: %v",
-				labelsToUpdate,
-				node.Name,
-				err))
+		utilruntime.HandleError(fmt.Errorf(
+			"unable to update labels %+v for Node %q: %v",
+			labelsToUpdate, node.Name, err,
+		))
 		return false
 	}
 	klog.V(4).Infof("Updated labels %+v to Node %v", labelsToUpdate, node.Name)

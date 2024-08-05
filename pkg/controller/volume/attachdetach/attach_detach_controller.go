@@ -101,7 +101,8 @@ func NewAttachDetachController(
 	prober volume.DynamicPluginProber,
 	disableReconciliationSync bool,
 	reconcilerSyncDuration time.Duration,
-	timerConfig TimerConfig) (AttachDetachController, error) {
+	timerConfig TimerConfig,
+) (AttachDetachController, error) {
 
 	adc := &attachDetachController{
 		kubeClient:  kubeClient,
@@ -115,7 +116,9 @@ func NewAttachDetachController(
 		nodeLister:  nodeInformer.Lister(),
 		nodesSynced: nodeInformer.Informer().HasSynced,
 		cloud:       cloud,
-		pvcQueue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcs"),
+		pvcQueue:    workqueue.NewNamedRateLimitingQueue(
+			workqueue.DefaultControllerRateLimiter(), "pvcs",
+		),
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) &&

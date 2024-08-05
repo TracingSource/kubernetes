@@ -12,22 +12,22 @@ import (
 )
 
 const (
-	// MinIPSetCheckVersion is the min ipset version we need.  IPv6 is supported in ipset 6.x
+	// MinIPSetCheckVersion is the min ipset version we need. 
+	// IPv6 is supported in ipset 6.x
 	MinIPSetCheckVersion = "6.0"
 
-	kubeLoopBackIPSetComment = "Kubernetes endpoints dst ip:port, source ip for solving hairpin purpose"
-	// kubeLoopBackIPSet 该集合中存储的都是当前集群中的endpoints, 但不是全部, 而是恰好在当前宿主机上的ep.
-	// 比如一个service下有两个pod, 那该service衍生的ep会有两个目标: PodIP1和PodIP2.
-	// 如果pod分别调度在两个不同的节点上, pod1在worker1上, pod2在worker2上, 
-	// 那么worker1上的kubeLoopBackIPSet就只有PodIP1, worker2则只有PodIP2.
-	// 名字叫作KUBE-LOOP-BACK应该是为了体现就近原则, 如果访问的目标Pod刚好在本机, 那么直接在本机处理不香吗?
+	// kubeLoopBackIPSet 存储的当前集群中**恰好在当前宿主机上**的 endpoints.
+	// 如果访问的目标Pod刚好在本机, 那么直接在本机处理.
+	//
+	// 比如一个 service 下有两个 pod, 那该对应的 ep 会有两个目标: PodIP1 和 PodIP2,
+	// 如果 pod 分别调度在两个不同的节点上, pod1 在 worker1 上, pod2 在 worker2 上, 
+	// 那么worker1上的 kubeLoopBackIPSet 就只有PodIP1, worker2 则只有 PodIP2.
 	kubeLoopBackIPSet        = "KUBE-LOOP-BACK"
+	kubeLoopBackIPSetComment = "Kubernetes endpoints dst ip:port, source ip for solving hairpin purpose"
 
-	kubeClusterIPSetComment = "Kubernetes service cluster ip + port for masquerade purpose"
-	// kubeClusterIPSet 的type为ip,port 存的是各service对象的clusterIP:port
-	// kube-dns服务有3个port(53/UDP,53/TCP,9153/TCP), 那么在这个ipset中, 
-	// 就会有3个成员, clusterIP相同而port不同.
+	// kubeClusterIPSet 集群中所有 service 对象的 clusterIP:Port, 就像 map 表一样.
 	kubeClusterIPSet        = "KUBE-CLUSTER-IP"
+	kubeClusterIPSetComment = "Kubernetes service cluster ip + port for masquerade purpose"
 
 	kubeExternalIPSetComment = "Kubernetes service external ip + port for masquerade and filter purpose"
 	kubeExternalIPSet        = "KUBE-EXTERNAL-IP"
@@ -158,16 +158,25 @@ func (set *IPSet) syncIPSetEntries() {
 		for _, entry := range currentIPSetEntries.Difference(set.activeEntries).List() {
 			if err := set.handle.DelEntry(entry, set.Name); err != nil {
 				if !utilipset.IsNotFoundError(err) {
-					klog.Errorf("Failed to delete ip set entry: %s from ip set: %s, error: %v", entry, set.Name, err)
+					klog.Errorf(
+						"Failed to delete ip set entry: %s from ip set: %s, error: %v", 
+						entry, set.Name, err,
+					)
 				}
 			} else {
-				klog.V(3).Infof("Successfully delete legacy ip set entry: %s from ip set: %s", entry, set.Name)
+				klog.V(3).Infof(
+					"Successfully delete legacy ip set entry: %s from ip set: %s", 
+					entry, set.Name,
+				)
 			}
 		}
 		// Create active entries
 		for _, entry := range set.activeEntries.Difference(currentIPSetEntries).List() {
 			if err := set.handle.AddEntry(entry, &set.IPSet, true); err != nil {
-				klog.Errorf("Failed to add entry: %v to ip set: %s, error: %v", entry, set.Name, err)
+				klog.Errorf(
+					"Failed to add entry: %v to ip set: %s, error: %v", 
+					entry, set.Name, err,
+				)
 			} else {
 				klog.V(3).Infof("Successfully add entry: %v to ip set: %s", entry, set.Name)
 			}
@@ -175,7 +184,7 @@ func (set *IPSet) syncIPSetEntries() {
 	}
 }
 
-// ensureIPSet 创建ipset项
+// ensureIPSet 创建 ipset 项
 func ensureIPSet(set *IPSet) error {
 	if err := set.handle.CreateSet(&set.IPSet, true); err != nil {
 		klog.Errorf("Failed to make sure ip set: %v exist, error: %v", set, err)
@@ -194,7 +203,10 @@ func checkMinVersion(vstring string) bool {
 
 	minVersion, err := utilversion.ParseGeneric(MinIPSetCheckVersion)
 	if err != nil {
-		klog.Errorf("MinCheckVersion (%s) is not a valid version string: %v", MinIPSetCheckVersion, err)
+		klog.Errorf(
+			"MinCheckVersion (%s) is not a valid version string: %v", 
+			MinIPSetCheckVersion, err,
+		)
 		return false
 	}
 	return !version.LessThan(minVersion)

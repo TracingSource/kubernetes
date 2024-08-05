@@ -91,6 +91,8 @@ type MounterArgs struct {
 	DesiredSize *resource.Quantity
 }
 
+// 	@implementBy: pkg/volume/hostpath/host_path.go -> hostPathMounter{}
+//
 // Mounter interface provides methods to set up/mount the volume.
 type Mounter interface {
 	// Uses Interface to provide the path for Docker binds.

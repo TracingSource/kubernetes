@@ -14,7 +14,7 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
@@ -26,7 +26,6 @@ import (
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/pkg/controller"
-	cloudcontroller "k8s.io/kubernetes/pkg/controller/cloud"
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	namespacecontroller "k8s.io/kubernetes/pkg/controller/namespace"
@@ -37,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/podgc"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
-	routecontroller "k8s.io/kubernetes/pkg/controller/route"
 	servicecontroller "k8s.io/kubernetes/pkg/controller/service"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	ttlcontroller "k8s.io/kubernetes/pkg/controller/ttl"
@@ -204,74 +202,12 @@ func startNodeLifecycleController(ctx ControllerContext) (http.Handler, bool, er
 	return nil, true, nil
 }
 
-func startCloudNodeLifecycleController(ctx ControllerContext) (http.Handler, bool, error) {
-	cloudNodeLifecycleController, err := cloudcontroller.NewCloudNodeLifecycleController(
-		ctx.InformerFactory.Core().V1().Nodes(),
-		// cloud node lifecycle controller uses existing cluster role from node-controller
-		ctx.ClientBuilder.ClientOrDie("node-controller"),
-		ctx.Cloud,
-		ctx.ComponentConfig.KubeCloudShared.NodeMonitorPeriod.Duration,
-	)
-	if err != nil {
-		// the controller manager should continue to run if the "Instances" interface is not
-		// supported, though it's unlikely for a cloud provider to not support it
-		klog.Errorf("failed to start cloud node lifecycle controller: %v", err)
-		return nil, false, nil
-	}
-
-	go cloudNodeLifecycleController.Run(ctx.Stop)
-	return nil, true, nil
-}
-
-func startRouteController(ctx ControllerContext) (http.Handler, bool, error) {
-	if !ctx.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs || !ctx.ComponentConfig.KubeCloudShared.ConfigureCloudRoutes {
-		klog.Infof("Will not configure cloud provider routes for allocate-node-cidrs: %v, configure-cloud-routes: %v.", ctx.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs, ctx.ComponentConfig.KubeCloudShared.ConfigureCloudRoutes)
-		return nil, false, nil
-	}
-	if ctx.Cloud == nil {
-		klog.Warning("configure-cloud-routes is set, but no cloud provider specified. Will not configure cloud provider routes.")
-		return nil, false, nil
-	}
-	routes, ok := ctx.Cloud.Routes()
-	if !ok {
-		klog.Warning("configure-cloud-routes is set, but cloud provider does not support routes. Will not configure cloud provider routes.")
-		return nil, false, nil
-	}
-
-	// failure: bad cidrs in config
-	clusterCIDRs, dualStack, err := processCIDRs(ctx.ComponentConfig.KubeCloudShared.ClusterCIDR)
-	if err != nil {
-		return nil, false, err
-	}
-
-	// failure: more than one cidr and dual stack is not enabled
-	if len(clusterCIDRs) > 1 && !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.IPv6DualStack) {
-		return nil, false, fmt.Errorf("len of ClusterCIDRs==%v and dualstack feature is not enabled", len(clusterCIDRs))
-	}
-
-	// failure: more than one cidr but they are not configured as dual stack
-	if len(clusterCIDRs) > 1 && !dualStack {
-		return nil, false, fmt.Errorf("len of ClusterCIDRs==%v and they are not configured as dual stack (at least one from each IPFamily", len(clusterCIDRs))
-	}
-
-	// failure: more than cidrs is not allowed even with dual stack
-	if len(clusterCIDRs) > 2 {
-		return nil, false, fmt.Errorf("length of clusterCIDRs is:%v more than max allowed of 2", len(clusterCIDRs))
-	}
-
-	routeController := routecontroller.New(routes,
-		ctx.ClientBuilder.ClientOrDie("route-controller"),
-		ctx.InformerFactory.Core().V1().Nodes(),
-		ctx.ComponentConfig.KubeCloudShared.ClusterName,
-		clusterCIDRs)
-	go routeController.Run(ctx.Stop, ctx.ComponentConfig.KubeCloudShared.RouteReconciliationPeriod.Duration)
-	return nil, true, nil
-}
-
 func startPersistentVolumeBinderController(ctx ControllerContext) (http.Handler, bool, error) {
 	plugins, err := ProbeControllerVolumePlugins(ctx.Cloud, ctx.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration)
 	if err != nil {
-		return nil, true, fmt.Errorf("failed to probe volume plugins when starting persistentvolume controller: %v", err)
+		return nil, true, fmt.Errorf(
+			"failed to probe volume plugins when starting persistentvolume controller: %v", err,
+		)
 	}
 	params := persistentvolumecontroller.ControllerParameters{
 		KubeClient:                ctx.ClientBuilder.ClientOrDie("persistent-volume-binder"),
@@ -288,7 +224,9 @@ func startPersistentVolumeBinderController(ctx ControllerContext) (http.Handler,
 	}
 	volumeController, volumeControllerErr := persistentvolumecontroller.NewController(params)
 	if volumeControllerErr != nil {
-		return nil, true, fmt.Errorf("failed to construct persistentvolume controller: %v", volumeControllerErr)
+		return nil, true, fmt.Errorf(
+			"failed to construct persistentvolume controller: %v", volumeControllerErr,
+		)
 	}
 	go volumeController.Run(ctx.Stop)
 	return nil, true, nil
@@ -296,7 +234,9 @@ func startPersistentVolumeBinderController(ctx ControllerContext) (http.Handler,
 
 func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, error) {
 	if ctx.ComponentConfig.AttachDetachController.ReconcilerSyncLoopPeriod.Duration < time.Second {
-		return nil, true, fmt.Errorf("duration time must be greater than one second as set via command line option reconcile-sync-loop-period")
+		return nil, true, fmt.Errorf(
+			"duration time must be greater than one second as set via command line option reconcile-sync-loop-period",
+		)
 	}
 
 	var (
@@ -312,7 +252,9 @@ func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, err
 
 	plugins, err := ProbeAttachableVolumePlugins()
 	if err != nil {
-		return nil, true, fmt.Errorf("failed to probe volume plugins when starting attach/detach controller: %v", err)
+		return nil, true, fmt.Errorf(
+			"failed to probe volume plugins when starting attach/detach controller: %v", err,
+		)
 	}
 
 	attachDetachController, attachDetachControllerErr :=
@@ -332,7 +274,9 @@ func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, err
 			attachdetach.DefaultTimerConfig,
 		)
 	if attachDetachControllerErr != nil {
-		return nil, true, fmt.Errorf("failed to start attach/detach controller: %v", attachDetachControllerErr)
+		return nil, true, fmt.Errorf(
+			"failed to start attach/detach controller: %v", attachDetachControllerErr,
+		)
 	}
 	go attachDetachController.Run(ctx.Stop)
 	return nil, true, nil
@@ -406,9 +350,9 @@ func startResourceQuotaController(ctx ControllerContext) (http.Handler, bool, er
 	quotaConfiguration := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource)
 
 	resourceQuotaControllerOptions := &resourcequotacontroller.ResourceQuotaControllerOptions{
-		QuotaClient:               resourceQuotaControllerClient.CoreV1(),
-		ResourceQuotaInformer:     ctx.InformerFactory.Core().V1().ResourceQuotas(),
-		ResyncPeriod:              controller.StaticResyncPeriodFunc(
+		QuotaClient:           resourceQuotaControllerClient.CoreV1(),
+		ResourceQuotaInformer: ctx.InformerFactory.Core().V1().ResourceQuotas(),
+		ResyncPeriod: controller.StaticResyncPeriodFunc(
 			ctx.ComponentConfig.ResourceQuotaController.ResourceQuotaSyncPeriod.Duration,
 		),
 		InformerFactory:           ctx.ObjectOrMetadataInformerFactory,
@@ -420,7 +364,7 @@ func startResourceQuotaController(ctx ControllerContext) (http.Handler, bool, er
 	}
 	if resourceQuotaControllerClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		err := ratelimiter.RegisterMetricAndTrackRateLimiterUsage(
-			"resource_quota_controller", 
+			"resource_quota_controller",
 			resourceQuotaControllerClient.CoreV1().RESTClient().GetRateLimiter(),
 		)
 		if err != nil {
@@ -435,7 +379,7 @@ func startResourceQuotaController(ctx ControllerContext) (http.Handler, bool, er
 		return nil, false, err
 	}
 	go resourceQuotaController.Run(
-		int(ctx.ComponentConfig.ResourceQuotaController.ConcurrentResourceQuotaSyncs), 
+		int(ctx.ComponentConfig.ResourceQuotaController.ConcurrentResourceQuotaSyncs),
 		ctx.Stop,
 	)
 
@@ -447,12 +391,12 @@ func startResourceQuotaController(ctx ControllerContext) (http.Handler, bool, er
 
 // startNamespaceController ...
 //
-// caller: 
+// caller:
 // 	1. cmd/kube-controller-manager/app/controllermanager.go -> StartControllers()
 func startNamespaceController(ctx ControllerContext) (http.Handler, bool, error) {
-	// the namespace cleanup controller is very chatty. 
+	// the namespace cleanup controller is very chatty.
 	// It makes lots of discovery calls and then it makes lots of delete calls
-	// the ratelimiter negatively affects its speed. 
+	// the ratelimiter negatively affects its speed.
 	// Deleting 100 total items in a namespace (that's only a few of each resource
 	// including events), takes ~10 seconds by default.
 	nsKubeconfig := ctx.ClientBuilder.ConfigOrDie("namespace-controller")
@@ -482,7 +426,7 @@ func startModifiedNamespaceController(
 		v1.FinalizerKubernetes,
 	)
 	go namespaceController.Run(
-		int(ctx.ComponentConfig.NamespaceController.ConcurrentNamespaceSyncs), 
+		int(ctx.ComponentConfig.NamespaceController.ConcurrentNamespaceSyncs),
 		ctx.Stop,
 	)
 

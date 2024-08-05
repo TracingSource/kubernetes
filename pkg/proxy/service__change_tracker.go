@@ -17,14 +17,17 @@ import (
 	utilnet "k8s.io/utils/net"
 )
 
-func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, service *v1.Service) *BaseServiceInfo {
+func (sct *ServiceChangeTracker) newBaseServiceInfo(
+	port *v1.ServicePort, service *v1.Service,
+) *BaseServiceInfo {
 	onlyNodeLocalEndpoints := false
 	if apiservice.RequestsOnlyLocalTraffic(service) {
 		onlyNodeLocalEndpoints = true
 	}
 	var stickyMaxAgeSeconds int
 	if service.Spec.SessionAffinity == v1.ServiceAffinityClientIP {
-		// Kube-apiserver side guarantees SessionAffinityConfig won't be nil when session affinity type is ClientIP
+		// Kube-apiserver side guarantees SessionAffinityConfig won't be nil
+		// when session affinity type is ClientIP
 		stickyMaxAgeSeconds = int(*service.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds)
 	}
 	info := &BaseServiceInfo{
@@ -50,20 +53,34 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 		// If ExternalIPs and LoadBalancerSourceRanges on service contains incorrect IP versions,
 		// only filter out the incorrect ones.
 		var incorrectIPs []string
-		info.externalIPs, incorrectIPs = utilproxy.FilterIncorrectIPVersion(service.Spec.ExternalIPs, *sct.isIPv6Mode)
+		info.externalIPs, incorrectIPs = utilproxy.FilterIncorrectIPVersion(
+			service.Spec.ExternalIPs, *sct.isIPv6Mode,
+		)
 		if len(incorrectIPs) > 0 {
-			utilproxy.LogAndEmitIncorrectIPVersionEvent(sct.recorder, "externalIPs", strings.Join(incorrectIPs, ","), service.Namespace, service.Name, service.UID)
+			utilproxy.LogAndEmitIncorrectIPVersionEvent(
+				sct.recorder, "externalIPs", strings.Join(incorrectIPs, ","), 
+				service.Namespace, service.Name, service.UID,
+			)
 		}
-		info.loadBalancerSourceRanges, incorrectIPs = utilproxy.FilterIncorrectCIDRVersion(service.Spec.LoadBalancerSourceRanges, *sct.isIPv6Mode)
+		info.loadBalancerSourceRanges, incorrectIPs = utilproxy.FilterIncorrectCIDRVersion(
+			service.Spec.LoadBalancerSourceRanges, *sct.isIPv6Mode,
+		)
 		if len(incorrectIPs) > 0 {
-			utilproxy.LogAndEmitIncorrectIPVersionEvent(sct.recorder, "loadBalancerSourceRanges", strings.Join(incorrectIPs, ","), service.Namespace, service.Name, service.UID)
+			utilproxy.LogAndEmitIncorrectIPVersionEvent(
+				sct.recorder, "loadBalancerSourceRanges", 
+				strings.Join(incorrectIPs, ","), 
+				service.Namespace, service.Name, service.UID,
+			)
 		}
 	}
 
 	if apiservice.NeedsHealthCheck(service) {
 		p := service.Spec.HealthCheckNodePort
 		if p == 0 {
-			klog.Errorf("Service %s/%s has no healthcheck nodeport", service.Namespace, service.Name)
+			klog.Errorf(
+				"Service %s/%s has no healthcheck nodeport", 
+				service.Namespace, service.Name,
+			)
 		} else {
 			info.healthCheckNodePort = int(p)
 		}
@@ -74,8 +91,9 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 
 type makeServicePortFunc func(*v1.ServicePort, *v1.Service, *BaseServiceInfo) ServicePort
 
-// serviceChange contains all changes to services that happened since proxy rules were synced.  For a single object,
-// changes are accumulated, i.e. previous is state from before applying the changes,
+// serviceChange contains all changes to services that happened since proxy rules were synced. 
+// For a single object, changes are accumulated,
+// i.e. previous is state from before applying the changes,
 // current is state after applying all of the changes.
 type serviceChange struct {
 	previous ServiceMap
@@ -97,7 +115,10 @@ type ServiceChangeTracker struct {
 }
 
 // NewServiceChangeTracker initializes a ServiceChangeTracker
-func NewServiceChangeTracker(makeServiceInfo makeServicePortFunc, isIPv6Mode *bool, recorder record.EventRecorder) *ServiceChangeTracker {
+func NewServiceChangeTracker(
+	makeServiceInfo makeServicePortFunc, isIPv6Mode *bool, 
+	recorder record.EventRecorder,
+) *ServiceChangeTracker {
 	return &ServiceChangeTracker{
 		items:           make(map[types.NamespacedName]*serviceChange),
 		makeServiceInfo: makeServiceInfo,
@@ -106,8 +127,10 @@ func NewServiceChangeTracker(makeServiceInfo makeServicePortFunc, isIPv6Mode *bo
 	}
 }
 
-// Update updates given service's change map based on the <previous, current> service pair.  It returns true if items changed,
-// otherwise return false.  Update can be used to add/update/delete items of ServiceChangeMap.  For example,
+// Update updates given service's change map based on the <previous, current> service pair. 
+// It returns true if items changed, otherwise return false. 
+// Update can be used to add/update/delete items of ServiceChangeMap. 
+// For example,
 // Add item
 //   - pass <nil, service> as the <previous, current> pair.
 // Update item

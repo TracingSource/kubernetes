@@ -60,6 +60,10 @@ func (h *netlinkHandle) UnbindAddress(address, devName string) error {
 	return nil
 }
 
+// 	@param devName: kube-ipvs0
+//
+// caller:
+// 	1. pkg/proxy/ipvs/proxier__sync_proxy_rules.go -> Proxier.syncProxyRules()
 // EnsureDummyDevice is part of interface
 func (h *netlinkHandle) EnsureDummyDevice(devName string) (bool, error) {
 	_, err := h.LinkByName(devName)

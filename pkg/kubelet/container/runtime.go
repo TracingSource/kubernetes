@@ -40,7 +40,7 @@ type ImageStats struct {
 	TotalStorageBytes uint64
 }
 
-// Runtime 由 pkg/kubelet/kuberuntime/kuberuntime_manager.go -> kubeGenericRuntimeManager{} 实现
+// 	@implementBy: pkg/kubelet/kuberuntime/kuberuntime_manager.go -> kubeGenericRuntimeManager{}
 //
 // Runtime interface defines the interfaces that should be implemented
 // by a container runtime.

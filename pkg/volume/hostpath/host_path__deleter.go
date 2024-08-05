@@ -22,8 +22,9 @@ func (r *hostPathDeleter) GetPath() string {
 }
 
 // Delete for hostPath removes the local directory so long as it is beneath /tmp/*.
-// THIS IS FOR TESTING AND LOCAL DEVELOPMENT ONLY!  This message should scare you away from using
-// this deleter for anything other than development and testing.
+// THIS IS FOR TESTING AND LOCAL DEVELOPMENT ONLY! 
+// This message should scare you away from using this deleter for anything
+// other than development and testing.
 func (r *hostPathDeleter) Delete() error {
 	regexp := regexp.MustCompile("/tmp/.+")
 	if !regexp.MatchString(r.GetPath()) {

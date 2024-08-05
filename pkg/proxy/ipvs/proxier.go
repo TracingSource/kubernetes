@@ -75,6 +75,12 @@ const (
 	// DefaultScheduler is the default ipvs scheduler algorithm - round robin.
 	DefaultScheduler = "rr"
 
+	// 在每个开启 ipvs 的 Node 节点上, 都拥有 kube-ipvs0 设备.
+	// ta们拥有的 ip 地址都是相同的, 都包含了集群中所有 service 的 ClusterIP 值.
+	// 这也是在集群内部的主机上可以 ping 通过 service 地址的原因 - 这些 IP 真实存在.
+	//
+	// NodePort 类型的 service 也有 clusterIP, headless 才没有(显式设置成了 None).
+	//
 	// DefaultDummyDevice is the default dummy interface which ipvs service address will bind to it.
 	DefaultDummyDevice = "kube-ipvs0"
 )
@@ -198,20 +204,21 @@ type Proxier struct {
 	endpointsChanges *proxy.EndpointChangeTracker
 	serviceChanges   *proxy.ServiceChangeTracker
 
-	mu           sync.Mutex // protects the following fields
-	// proxier.serviceMap 的值为当前集群中所有service的映射表,
-	// key为 namespace/serviceName:portName, val为 serviceIP:port/协议
-	// 一个service中可能有多个port, 每个port都对应serviceMap中的一个成员.
-	serviceMap   proxy.ServiceMap
-	// proxier.EndpointsMap 的值为当前集群中各service对应的endpoint表
-	// (一个svc中可能存在多个port, 也就存在多个ep).
-	// key为 namespace/serviceName:portName(与ServiceMap的key相同),
-	// val为成员格式 serviceIP:port 的数组.
+	// protects the following fields
+	mu sync.Mutex 
+	// serviceMap 当前集群中所有 service 的映射表,
+	// key 为 namespace/serviceName:portName, val为 serviceIP:port/协议.
+	// 一个 service 可能有多个 port, 每个 port 都是独立的键值对.
+	serviceMap proxy.ServiceMap
+	// endpointsMap 当前集群中各 service 对应的 endpoint 表
+	// (一个 svc 中可能存在多个 port, 也就存在多个 ep).
+	// key 为 namespace/serviceName:portName(与ServiceMap的key相同),
+	// val 为 成员格式 serviceIP:port 的数组.
 	endpointsMap proxy.EndpointsMap
 	// portsMap key为各nodePort类型服务要监听的本地(宿主机)端口, val貌似为socket对象.
 	// 在proxier.syncProxyRules()函数进行赋值操作.
-	portsMap     map[utilproxy.LocalPort]utilproxy.Closeable
-	nodeLabels   map[string]string
+	portsMap   map[utilproxy.LocalPort]utilproxy.Closeable
+	nodeLabels map[string]string
 	// endpointsSynced, endpointSlicesSynced, and servicesSynced are set to true when
 	// corresponding objects are synced after startup. This is used to avoid updating
 	// ipvs rules with some partial data after kube-proxy restart.
@@ -324,9 +331,11 @@ func parseExcludedCIDRs(excludeCIDRs []string) []*net.IPNet {
 	return cidrExclusions
 }
 
-// @param scheduler: ipvs调度方式, 可选的有rr, wrr, lc等.
+// NewProxier 初始化 ipvs (也有类似 iptables 的链)
 //
-// caller: 
+// @param scheduler: ipvs调度方式, 可选的有 rr, wrr, lc 等, 默认为 rr
+//
+// caller:
 // 	1. server_others.go -> newProxyServer()
 //
 // NewProxier returns a new Proxier given an iptables and ipvs Interface instance.
@@ -365,7 +374,10 @@ func NewProxier(ipt utiliptables.Interface,
 	// are connected to a Linux bridge (but not SDN bridges).  Until most
 	// plugins handle this, log when config is missing
 	if val, err := sysctl.GetSysctl(sysctlBridgeCallIPTables); err == nil && val != 1 {
-		klog.Infof("missing br-netfilter module or unset sysctl br-nf-call-iptables; proxy may not work as intended")
+		klog.Infof(
+			"missing br-netfilter module or unset sysctl br-nf-call-iptables; " +
+				"proxy may not work as intended",
+		)
 	}
 
 	// Set the conntrack sysctl we need for
@@ -431,9 +443,14 @@ func NewProxier(ipt utiliptables.Interface,
 	klog.V(2).Infof("nodeIP: %v, isIPv6: %v", nodeIP, isIPv6)
 
 	if len(clusterCIDR) == 0 {
-		klog.Warningf("clusterCIDR not specified, unable to distinguish between internal and external traffic")
+		klog.Warningf(
+			"clusterCIDR not specified, unable to distinguish between internal and external traffic",
+		)
 	} else if utilnet.IsIPv6CIDRString(clusterCIDR) != isIPv6 {
-		return nil, fmt.Errorf("clusterCIDR %s has incorrect IP version: expect isIPv6=%t", clusterCIDR, isIPv6)
+		return nil, fmt.Errorf(
+			"clusterCIDR %s has incorrect IP version: expect isIPv6=%t",
+			clusterCIDR, isIPv6,
+		)
 	}
 	// ipvsScheduler ipvs调度方式, 可选的有rr, wrr, lc等.
 	if len(scheduler) == 0 {
@@ -487,7 +504,10 @@ func NewProxier(ipt utiliptables.Interface,
 		proxier.ipsetList[is.name] = NewIPSet(ipset, is.name, is.setType, isIPv6, is.comment)
 	}
 	burstSyncs := 2
-	klog.V(3).Infof("minSyncPeriod: %v, syncPeriod: %v, burstSyncs: %d", minSyncPeriod, syncPeriod, burstSyncs)
+	klog.V(3).Infof(
+		"minSyncPeriod: %v, syncPeriod: %v, burstSyncs: %d",
+		minSyncPeriod, syncPeriod, burstSyncs,
+	)
 	// config.conf中的ipvs中有相关配置,
 	// 也可以使用`--ipvs-min-sync-period`和`--ipvs-sync-period`选项.
 	proxier.syncRunner = async.NewBoundedFrequencyRunner(
@@ -619,7 +639,7 @@ func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 	if err != nil {
 		klog.Warningf(
 			"Failed to read file /proc/modules with error %v. "+
-			"Kube-proxy requires loadable modules support enabled in the kernel", 
+				"Kube-proxy requires loadable modules support enabled in the kernel",
 			err,
 		)
 		return nil, err
@@ -635,8 +655,8 @@ func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 	if err != nil {
 		klog.Warningf(
 			"Failed to read file %s with error %v. "+
-			"You can ignore this message when kube-proxy is running inside container "+
-			"without mounting /lib/modules", 
+				"You can ignore this message when kube-proxy is running inside container "+
+				"without mounting /lib/modules",
 			builtinModsFilePath, err,
 		)
 	}
@@ -705,7 +725,9 @@ func CanUseIPVSProxier(handle KernelHandler, ipsetver IPSetVersioner) (bool, err
 
 	kernelVersionStr, err := handle.GetKernelVersion()
 	if err != nil {
-		return false, fmt.Errorf("error determining kernel version to find required kernel modules for ipvs support: %v", err)
+		return false, fmt.Errorf(
+			"error determining kernel version to find required kernel modules for ipvs support: %v", err,
+		)
 	}
 	kernelVersion, err := version.ParseGeneric(kernelVersionStr)
 	if err != nil {
@@ -740,7 +762,10 @@ func CanUseIPVSProxier(handle KernelHandler, ipsetver IPSetVersioner) (bool, err
 		return false, fmt.Errorf("error getting ipset version, error: %v", err)
 	}
 	if !checkMinVersion(versionString) {
-		return false, fmt.Errorf("ipset version: %s is less than min required version: %s", versionString, MinIPSetCheckVersion)
+		return false, fmt.Errorf(
+			"ipset version: %s is less than min required version: %s", 
+			versionString, MinIPSetCheckVersion,
+		)
 	}
 	return true, nil
 }
@@ -762,7 +787,8 @@ func cleanupIptablesLeftovers(ipt utiliptables.Interface) (encounteredError bool
 		}
 	}
 
-	// Flush and remove all of our chains. Flushing all chains before removing them also removes all links between chains first.
+	// Flush and remove all of our chains. 
+	// Flushing all chains before removing them also removes all links between chains first.
 	for _, ch := range iptablesCleanupChains {
 		if err := ipt.FlushChain(ch.table, ch.chain); err != nil {
 			if !utiliptables.IsNotFoundError(err) {
@@ -786,7 +812,9 @@ func cleanupIptablesLeftovers(ipt utiliptables.Interface) (encounteredError bool
 }
 
 // CleanupLeftovers clean up all ipvs and iptables rules created by ipvs Proxier.
-func CleanupLeftovers(ipvs utilipvs.Interface, ipt utiliptables.Interface, ipset utilipset.Interface, cleanupIPVS bool) (encounteredError bool) {
+func CleanupLeftovers(
+	ipvs utilipvs.Interface, ipt utiliptables.Interface, ipset utilipset.Interface, cleanupIPVS bool,
+) (encounteredError bool) {
 	if cleanupIPVS {
 		// Return immediately when ipvs interface is nil - Probably initialization failed in somewhere.
 		if ipvs == nil {
@@ -803,7 +831,10 @@ func CleanupLeftovers(ipvs utilipvs.Interface, ipt utiliptables.Interface, ipset
 	nl := NewNetLinkHandle(false)
 	err := nl.DeleteDummyDevice(DefaultDummyDevice)
 	if err != nil {
-		klog.Errorf("Error deleting dummy device %s created by IPVS proxier: %v", DefaultDummyDevice, err)
+		klog.Errorf(
+			"Error deleting dummy device %s created by IPVS proxier: %v",
+			DefaultDummyDevice, err,
+		)
 		encounteredError = true
 	}
 	// Clear iptables created by ipvs Proxier.
@@ -833,8 +864,8 @@ func (proxier *Proxier) Sync() {
 // SyncLoop 运行周期性任务proxier.syncProxyRules(), 阻塞不返回.
 // syncRunner在NewProxier()中初始化.
 //
-// SyncLoop runs periodic work. 
-// This is expected to run as a goroutine or as the main loop of the app. 
+// SyncLoop runs periodic work.
+// This is expected to run as a goroutine or as the main loop of the app.
 // It does not return.
 func (proxier *Proxier) SyncLoop() {
 	// Update healthz timestamp at beginning in case Sync() never succeeds.
@@ -874,7 +905,11 @@ func (proxier *Proxier) OnServiceDelete(service *v1.Service) {
 	proxier.OnServiceUpdate(service, nil)
 }
 
-// OnServiceSynced is called once all the initial event handlers were called and the state is fully propagated to local cache.
+// caller:
+// 	1. pkg/proxy/config/config.go -> ServiceConfig.Run()
+//
+// OnServiceSynced is called once all the initial event handlers were called
+// and the state is fully propagated to local cache.
 func (proxier *Proxier) OnServiceSynced() {
 	proxier.mu.Lock()
 	proxier.servicesSynced = true
@@ -957,7 +992,10 @@ func (proxier *Proxier) OnEndpointSlicesSynced() {
 // is observed.
 func (proxier *Proxier) OnNodeAdd(node *v1.Node) {
 	if node.Name != proxier.hostname {
-		klog.Errorf("Received a watch event for a node %s that doesn't match the current node %v", node.Name, proxier.hostname)
+		klog.Errorf(
+			"Received a watch event for a node %s that doesn't match the current node %v", 
+			node.Name, proxier.hostname,
+		)
 		return
 	}
 	oldLabels := proxier.nodeLabels
@@ -974,7 +1012,10 @@ func (proxier *Proxier) OnNodeAdd(node *v1.Node) {
 // node object is observed.
 func (proxier *Proxier) OnNodeUpdate(oldNode, node *v1.Node) {
 	if node.Name != proxier.hostname {
-		klog.Errorf("Received a watch event for a node %s that doesn't match the current node %v", node.Name, proxier.hostname)
+		klog.Errorf(
+			"Received a watch event for a node %s that doesn't match the current node %v", 
+			node.Name, proxier.hostname,
+		)
 		return
 	}
 	oldLabels := proxier.nodeLabels
@@ -991,7 +1032,10 @@ func (proxier *Proxier) OnNodeUpdate(oldNode, node *v1.Node) {
 // object is observed.
 func (proxier *Proxier) OnNodeDelete(node *v1.Node) {
 	if node.Name != proxier.hostname {
-		klog.Errorf("Received a watch event for a node %s that doesn't match the current node %v", node.Name, proxier.hostname)
+		klog.Errorf(
+			"Received a watch event for a node %s that doesn't match the current node %v", 
+			node.Name, proxier.hostname,
+		)
 		return
 	}
 	proxier.mu.Lock()
@@ -1051,7 +1095,7 @@ func (proxier *Proxier) deleteEndpointConnections(connectionMap []proxy.ServiceE
 			)
 			if err != nil {
 				klog.Errorf(
-					"Failed to delete %s endpoint connections, error: %v", 
+					"Failed to delete %s endpoint connections, error: %v",
 					epSvcPair.ServicePortName.String(), err,
 				)
 			}
@@ -1061,7 +1105,7 @@ func (proxier *Proxier) deleteEndpointConnections(connectionMap []proxy.ServiceE
 				)
 				if err != nil {
 					klog.Errorf(
-						"Failed to delete %s endpoint connections for externalIP %s, error: %v", 
+						"Failed to delete %s endpoint connections for externalIP %s, error: %v",
 						epSvcPair.ServicePortName.String(), extIP, err,
 					)
 				}
@@ -1072,7 +1116,7 @@ func (proxier *Proxier) deleteEndpointConnections(connectionMap []proxy.ServiceE
 				)
 				if err != nil {
 					klog.Errorf(
-						"Failed to delete %s endpoint connections for LoadBalancerIP %s, error: %v", 
+						"Failed to delete %s endpoint connections for LoadBalancerIP %s, error: %v",
 						epSvcPair.ServicePortName.String(), lbIP, err,
 					)
 				}
@@ -1081,15 +1125,15 @@ func (proxier *Proxier) deleteEndpointConnections(connectionMap []proxy.ServiceE
 	}
 }
 
-// cleanLegacyService 清理遗留的ipvs虚拟服务. 实际上是清理在currentServices中, 但不在activeServices中的虚拟服务. 
+// cleanLegacyService 清理遗留的ipvs虚拟服务. 实际上是清理在currentServices中, 但不在activeServices中的虚拟服务.
 // 另外, 如果符合上述条件的IP地址同样存在于legacyBindAddrs映射中, 则将这个地址从dummy网络设备中删除.
 //
 // 	@param activeServices: 本轮同步操作要绑定在dummy设备上的ip地址映射表, key为各service对象的clusterIP
 // 	@param currentServices: 本轮sync操作时, 已经存在的ipvs虚拟服务.
 //
 func (proxier *Proxier) cleanLegacyService(
-	activeServices map[string]bool, 
-	currentServices map[string]*utilipvs.VirtualServer, 
+	activeServices map[string]bool,
+	currentServices map[string]*utilipvs.VirtualServer,
 	legacyBindAddrs map[string]bool,
 ) {
 	isIPv6 := utilnet.IsIPv6(proxier.nodeIP)
@@ -1115,9 +1159,13 @@ func (proxier *Proxier) cleanLegacyService(
 			if _, ok := legacyBindAddrs[addr]; ok {
 				klog.V(4).Infof("Unbinding address %s", addr)
 				if err := proxier.netlinkHandle.UnbindAddress(addr, DefaultDummyDevice); err != nil {
-					klog.Errorf("Failed to unbind service addr %s from dummy interface %s: %v", addr, DefaultDummyDevice, err)
+					klog.Errorf(
+						"Failed to unbind service addr %s from dummy interface %s: %v", 
+						addr, DefaultDummyDevice, err,
+					)
 				} else {
-					// In case we delete a multi-port service, avoid trying to unbind multiple times
+					// In case we delete a multi-port service,
+					// avoid trying to unbind multiple times
 					delete(legacyBindAddrs, addr)
 				}
 			}
@@ -1140,7 +1188,7 @@ func (proxier *Proxier) isIPInExcludeCIDRs(ip net.IP) bool {
 // @param activeBindAddrs: 本轮同步操作要绑定在dummy设备上的ip地址映射表, key为各service对象的clusterIP
 // @param currentBindAddrs: dummy设备上当前已经绑定的ip列表.
 //
-// caller: 
+// caller:
 // 	1. proxier.syncProxyRules()
 //
 func (proxier *Proxier) getLegacyBindAddr(

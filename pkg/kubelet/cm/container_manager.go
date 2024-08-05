@@ -102,23 +102,22 @@ type ContainerManager interface {
 }
 
 type NodeConfig struct {
-	RuntimeCgroupsName    string
-	SystemCgroupsName     string
-	KubeletCgroupsName    string
-	// ContainerRuntime 一般为 "docker"
-	ContainerRuntime      string
-	CgroupsPerQOS         bool
-	CgroupRoot            string
-	CgroupDriver          string
-	KubeletRootDir        string
-	ProtectKernelDefaults bool
+	RuntimeCgroupsName    string // ""
+	SystemCgroupsName     string // ""
+	KubeletCgroupsName    string // ""
+	ContainerRuntime      string // "docker" 或 "remote"
+	CgroupsPerQOS         bool   // true
+	CgroupRoot            string // "/"
+	CgroupDriver          string // "systemd"
+	KubeletRootDir        string // /var/lib/kubelet
+	ProtectKernelDefaults bool   // false
 	NodeAllocatableConfig
 	QOSReserved                           map[v1.ResourceName]int64
 	ExperimentalCPUManagerPolicy          string
-	ExperimentalCPUManagerReconcilePeriod time.Duration
+	ExperimentalCPUManagerReconcilePeriod time.Duration // 10s
 	ExperimentalPodPidsLimit              int64
-	EnforceCPULimits                      bool
-	CPUCFSQuotaPeriod                     time.Duration
+	EnforceCPULimits                      bool // true
+	CPUCFSQuotaPeriod                     time.Duration // 100ms
 	ExperimentalTopologyManagerPolicy     string
 }
 

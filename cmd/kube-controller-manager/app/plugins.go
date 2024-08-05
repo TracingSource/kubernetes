@@ -82,19 +82,26 @@ func ProbeExpandableVolumePlugins(config persistentvolumeconfig.VolumeConfigurat
 	return allPlugins, nil
 }
 
+// hostpath、nfs
+//
 // ProbeControllerVolumePlugins collects all persistent volume plugins into an
-// easy to use list. Only volume plugins that implement any of
-// provisioner/recycler/deleter interface should be returned.
-func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config persistentvolumeconfig.VolumeConfiguration) ([]volume.VolumePlugin, error) {
+// easy to use list.
+// Only volume plugins that implement any of provisioner/recycler/deleter 
+// interface should be returned.
+func ProbeControllerVolumePlugins(
+	cloud cloudprovider.Interface, config persistentvolumeconfig.VolumeConfiguration,
+) ([]volume.VolumePlugin, error) {
 	allPlugins := []volume.VolumePlugin{}
 
 	// The list of plugins to probe is decided by this binary, not
-	// by dynamic linking or other "magic".  Plugins will be analyzed and
-	// initialized later.
+	// by dynamic linking or other "magic".
+	// Plugins will be analyzed and initialized later.
 
 	// Each plugin can make use of VolumeConfig.  The single arg to this func contains *all* enumerated
-	// options meant to configure volume plugins.  From that single config, create an instance of volume.VolumeConfig
+	// options meant to configure volume plugins.
+	// From that single config, create an instance of volume.VolumeConfig
 	// for a specific plugin and pass that instance to the plugin's ProbeVolumePlugins(config) func.
+	var err error
 
 	// HostPath recycling is for testing and development purposes only!
 	hostPathConfig := volume.VolumeConfig{
@@ -103,8 +110,15 @@ func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config persiste
 		RecyclerPodTemplate:      volume.NewPersistentVolumeRecyclerPodTemplate(),
 		ProvisioningEnabled:      config.EnableHostPathProvisioning,
 	}
-	if err := AttemptToLoadRecycler(config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathHostPath, &hostPathConfig); err != nil {
-		klog.Fatalf("Could not create hostpath recycler pod from file %s: %+v", config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathHostPath, err)
+	err = AttemptToLoadRecycler(
+		config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathHostPath,
+		&hostPathConfig,
+	)
+	if err != nil {
+		klog.Fatalf(
+			"Could not create hostpath recycler pod from file %s: %+v",
+			config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathHostPath, err,
+		)
 	}
 	allPlugins = append(allPlugins, hostpath.ProbeVolumePlugins(hostPathConfig)...)
 
@@ -113,7 +127,11 @@ func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config persiste
 		RecyclerTimeoutIncrement: int(config.PersistentVolumeRecyclerConfiguration.IncrementTimeoutNFS),
 		RecyclerPodTemplate:      volume.NewPersistentVolumeRecyclerPodTemplate(),
 	}
-	if err := AttemptToLoadRecycler(config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathNFS, &nfsConfig); err != nil {
+
+	err = AttemptToLoadRecycler(
+		config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathNFS, &nfsConfig,
+	)
+	if err != nil {
 		klog.Fatalf("Could not create NFS recycler pod from file %s: %+v", config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathNFS, err)
 	}
 	allPlugins = append(allPlugins, nfs.ProbeVolumePlugins(nfsConfig)...)
@@ -121,8 +139,9 @@ func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config persiste
 	// add rbd provisioner
 	allPlugins = append(allPlugins, rbd.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, quobyte.ProbeVolumePlugins()...)
-	var err error
-	allPlugins, err = appendExpandableLegacyProviderVolumes(allPlugins, utilfeature.DefaultFeatureGate)
+	allPlugins, err = appendExpandableLegacyProviderVolumes(
+		allPlugins, utilfeature.DefaultFeatureGate,
+	)
 	if err != nil {
 		return allPlugins, err
 	}

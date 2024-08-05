@@ -3,7 +3,10 @@ package ipset
 // Type represents the ipset type
 type Type string
 
+// 这里列举的格式都是 ipset 自身定义的, 有好多, kube-proxy 只使用如下几种.
 const (
+	// 最常见的格式, 所有的 clusterIP 类型都注册为这个类型(IP,Port 就是 clusterIP 的IP,Port).
+	//
 	// HashIPPort represents the `hash:ip,port` type ipset. 
 	// The hash:ip,port is similar to hash:ip but
 	// you can store IP address and protocol-port pairs in it. 

@@ -52,10 +52,7 @@ func (plugin *configMapPlugin) GetVolumeName(spec *volume.Spec) (string, error) 
 		return "", fmt.Errorf("Spec does not reference a ConfigMap volume type")
 	}
 
-	return fmt.Sprintf(
-		"%v/%v",
-		spec.Name(),
-		volumeSource.Name), nil
+	return fmt.Sprintf("%v/%v", spec.Name(), volumeSource.Name), nil
 }
 
 func (plugin *configMapPlugin) CanSupport(spec *volume.Spec) bool {
@@ -172,7 +169,9 @@ func (b *configMapVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterA
 	klog.V(3).Infof("Setting up volume %v for pod %v at %v", b.volName, b.pod.UID, dir)
 
 	// Wrap EmptyDir, let it do the setup.
-	wrapped, err := b.plugin.host.NewWrapperMounter(b.volName, wrappedVolumeSpec(), &b.pod, *b.opts)
+	wrapped, err := b.plugin.host.NewWrapperMounter(
+		b.volName, wrappedVolumeSpec(), &b.pod, *b.opts,
+	)
 	if err != nil {
 		return err
 	}
@@ -193,11 +192,11 @@ func (b *configMapVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterA
 	}
 
 	totalBytes := totalBytes(configMap)
-	klog.V(3).Infof("Received configMap %v/%v containing (%v) pieces of data, %v total bytes",
-		b.pod.Namespace,
-		b.source.Name,
-		len(configMap.Data)+len(configMap.BinaryData),
-		totalBytes)
+	klog.V(3).Infof(
+		"Received configMap %v/%v containing (%v) pieces of data, %v total bytes",
+		b.pod.Namespace, b.source.Name,
+		len(configMap.Data)+len(configMap.BinaryData), totalBytes,
+	)
 
 	payload, err := MakePayload(b.source.Items, configMap, b.source.DefaultMode, optional)
 	if err != nil {

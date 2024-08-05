@@ -24,6 +24,9 @@ import (
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
 )
 
+// syncProxyRules 启动时 Service、Endpoint 首次同步完成, 就会被调用以进行初始化.
+// 不管谁先同步完成, 这个函数只执行一次就行, 可以提前结束.
+//
 // This is where all of the ipvs calls happen.
 // assumes proxier.mu is held
 func (proxier *Proxier) syncProxyRules() {
@@ -32,7 +35,9 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// don't sync rules till we've received services and endpoints
 	if !proxier.isInitialized() {
-		klog.V(2).Info("Not syncing ipvs rules until Services and Endpoints have been received from master")
+		klog.V(2).Info(
+			"Not syncing ipvs rules until Services and Endpoints have been received from master",
+		)
 		return
 	}
 
@@ -84,7 +89,12 @@ func (proxier *Proxier) syncProxyRules() {
 
 	proxier.createAndLinkeKubeChain()
 
-	// make sure dummy interface exists in the system where ipvs Proxier will bind service address on it
+	// 确保 kube-ipvs0 设备存在, 如不存在则会自动创建(但不用启动).
+	// 集群中所有 service 的 clusterIP 都会附加到这个设备上
+	// (nodePort 类型也有 clusterIP 值, headless 没有)
+	//
+	// make sure dummy interface exists in the system where ipvs Proxier
+	// will bind service address on it
 	_, err = proxier.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
 	if err != nil {
 		klog.Errorf("Failed to create dummy interface: %s, error: %v", DefaultDummyDevice, err)
@@ -127,7 +137,9 @@ func (proxier *Proxier) syncProxyRules() {
 	)
 
 	if hasNodePort {
-		nodeAddrSet, err := utilproxy.GetNodeAddresses(proxier.nodePortAddresses, proxier.networkInterfacer)
+		nodeAddrSet, err := utilproxy.GetNodeAddresses(
+			proxier.nodePortAddresses, proxier.networkInterfacer,
+		)
 		if err != nil {
 			klog.Errorf("Failed to get node ip address matching nodeport cidr: %v", err)
 		}
@@ -576,9 +588,14 @@ func (proxier *Proxier) syncProxyRules() {
 	proxier.iptablesData.Write(proxier.filterRules.Bytes())
 
 	klog.V(5).Infof("Restoring iptables rules: %s", proxier.iptablesData.Bytes())
-	err = proxier.iptables.RestoreAll(proxier.iptablesData.Bytes(), utiliptables.NoFlushTables, utiliptables.RestoreCounters)
+	err = proxier.iptables.RestoreAll(
+		proxier.iptablesData.Bytes(), utiliptables.NoFlushTables, utiliptables.RestoreCounters,
+	)
 	if err != nil {
-		klog.Errorf("Failed to execute iptables-restore: %v\nRules:\n%s", err, proxier.iptablesData.Bytes())
+		klog.Errorf(
+			"Failed to execute iptables-restore: %v\nRules:\n%s",
+			err, proxier.iptablesData.Bytes(),
+		)
 		metrics.IptablesRestoreFailuresTotal.Inc()
 		// Revert new local ports.
 		utilproxy.RevertPorts(replacementPortsMap, proxier.portsMap)
@@ -678,7 +695,11 @@ func (proxier *Proxier) syncService(svcName string, vs *utilipvs.VirtualServer, 
 	return nil
 }
 
-func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNodeLocalEndpoints bool, vs *utilipvs.VirtualServer) error {
+func (proxier *Proxier) syncEndpoint(
+	svcPortName proxy.ServicePortName,
+	onlyNodeLocalEndpoints bool,
+	vs *utilipvs.VirtualServer,
+) error {
 	appliedVirtualServer, err := proxier.ipvs.GetVirtualServer(vs)
 	if err != nil || appliedVirtualServer == nil {
 		klog.Errorf("Failed to get IPVS service, error: %v", err)
@@ -706,8 +727,12 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 	// 2. ServiceTopology is not enabled.
 	// 3. EndpointSlice is not enabled (service topology depends on endpoint slice
 	// to get topology information).
-	if !onlyNodeLocalEndpoints && utilfeature.DefaultFeatureGate.Enabled(features.ServiceTopology) && utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice) {
-		endpoints = proxy.FilterTopologyEndpoint(proxier.nodeLabels, proxier.serviceMap[svcPortName].TopologyKeys(), endpoints)
+	if !onlyNodeLocalEndpoints &&
+		utilfeature.DefaultFeatureGate.Enabled(features.ServiceTopology) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice) {
+		endpoints = proxy.FilterTopologyEndpoint(
+			proxier.nodeLabels, proxier.serviceMap[svcPortName].TopologyKeys(), endpoints,
+		)
 	}
 
 	for _, epInfo := range endpoints {
@@ -737,7 +762,8 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 		}
 
 		if curEndpoints.Has(ep) {
-			// check if newEndpoint is in gracefulDelete list, if true, delete this ep immediately
+			// check if newEndpoint is in gracefulDelete list,
+			// if true, delete this ep immediately
 			uniqueRS := GetUniqueRSName(vs, newDest)
 			if !proxier.gracefuldeleteManager.InTerminationList(uniqueRS) {
 				continue
