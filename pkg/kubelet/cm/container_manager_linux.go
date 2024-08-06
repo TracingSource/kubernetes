@@ -821,6 +821,7 @@ func EnsureDockerInContainer(
 func ensureProcessInContainerWithOOMScore(
 	pid int, oomScoreAdj int, manager *fs.Manager,
 ) error {
+	// 如果目标进程运行在宿主机空间下则报错.
 	if runningInHost, err := isProcessRunningInHost(pid); err != nil {
 		// Err on the side of caution.
 		// Avoid moving the docker daemon unless we are able to identify its context.

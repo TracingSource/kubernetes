@@ -81,11 +81,6 @@ func (m *kubeGenericRuntimeManager) recordContainerEvent(pod *v1.Pod, container 
 // 	1. kuberuntime_manager.go -> SyncPod() 只有这一处.
 //
 // startContainer starts a container and returns a message indicates why it is failed on error.
-// It starts the container through the following steps:
-// * pull the image
-// * create the container
-// * start the container
-// * run the post start lifecycle hooks (if applicable)
 func (m *kubeGenericRuntimeManager) startContainer(
 	podSandboxID string, podSandboxConfig *runtimeapi.PodSandboxConfig, 
 	container *v1.Container, pod *v1.Pod, podStatus *kubecontainer.PodStatus, 
@@ -123,6 +118,7 @@ func (m *kubeGenericRuntimeManager) startContainer(
 		restartCount = containerStatus.RestartCount + 1
 	}
 
+	// containerConfig 中包含 requests/limits, oom_store_adj 等信息.
 	containerConfig, cleanupAction, err := m.generateContainerConfig(
 		container, pod, restartCount, podIP, imageRef, podIPs,
 	)
@@ -138,6 +134,7 @@ func (m *kubeGenericRuntimeManager) startContainer(
 		return s.Message(), ErrCreateContainerConfig
 	}
 
+	// 创建容器(但未启动), 得到 containerID
 	containerID, err := m.runtimeService.CreateContainer(
 		podSandboxID, containerConfig, podSandboxConfig,
 	)

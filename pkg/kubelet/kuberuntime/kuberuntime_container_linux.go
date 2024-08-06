@@ -13,7 +13,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 )
 
-// applyPlatformSpecificContainerConfig applies platform specific configurations to runtimeapi.ContainerConfig.
+// applyPlatformSpecificContainerConfig applies platform specific configurations
+// to runtimeapi.ContainerConfig.
 func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(
 	config *runtimeapi.ContainerConfig, container *v1.Container, pod *v1.Pod, 
 	uid *int64, username string,
@@ -47,8 +48,8 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(
 	if cpuRequest.IsZero() && !cpuLimit.IsZero() {
 		cpuShares = milliCPUToShares(cpuLimit.MilliValue())
 	} else {
-		// if cpuRequest.Amount is nil, then milliCPUToShares will return the minimal number
-		// of CPU shares.
+		// if cpuRequest.Amount is nil, then milliCPUToShares will return the
+		// minimal number of CPU shares.
 		cpuShares = milliCPUToShares(cpuRequest.MilliValue())
 	}
 	lc.Resources.CpuShares = cpuShares
@@ -61,8 +62,8 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(
 	lc.Resources.OomScoreAdj = oomScoreAdj
 
 	if m.cpuCFSQuota {
-		// if cpuLimit.Amount is nil, then the appropriate default value is returned
-		// to allow full usage of cpu resource.
+		// if cpuLimit.Amount is nil, then the appropriate default value is
+		// returned to allow full usage of cpu resource.
 		cpuPeriod := int64(quotaPeriod)
 		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUCFSQuotaPeriod) {
 			cpuPeriod = int64(m.cpuCFSQuotaPeriod.Duration / time.Microsecond)
