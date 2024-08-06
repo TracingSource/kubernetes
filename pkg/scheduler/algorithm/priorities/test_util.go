@@ -63,6 +63,7 @@ func runMapReducePriority(mapFn PriorityMapFunction, reduceFn PriorityReduceFunc
 	return result, nil
 }
 
+// sortNodeScoreList 对 node 列表进行升序排序, 依据: score, nodeName
 func sortNodeScoreList(out framework.NodeScoreList) {
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Score == out[j].Score {

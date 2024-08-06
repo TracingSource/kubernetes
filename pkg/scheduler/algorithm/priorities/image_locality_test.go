@@ -14,6 +14,7 @@ import (
 )
 
 func TestImageLocalityPriority(t *testing.T) {
+	// test40250 需要 40 和 250 两个镜像
 	test40250 := v1.PodSpec{
 		Containers: []v1.Container{
 			{
@@ -25,6 +26,7 @@ func TestImageLocalityPriority(t *testing.T) {
 		},
 	}
 
+	// test40300 需要 40 和 300 两个镜像
 	test40300 := v1.PodSpec{
 		Containers: []v1.Container{
 			{
@@ -168,8 +170,14 @@ func TestImageLocalityPriority(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, test.nodes))
-			list, err := runMapReducePriority(ImageLocalityPriorityMap, nil, &priorityMetadata{totalNumNodes: len(test.nodes)}, test.pod, snapshot, test.nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(
+				nodeinfosnapshot.CreateNodeInfoMap(test.pods, test.nodes),
+			)
+			list, err := runMapReducePriority(
+				ImageLocalityPriorityMap, nil, 
+				&priorityMetadata{totalNumNodes: len(test.nodes)}, 
+				test.pod, snapshot, test.nodes,
+			)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

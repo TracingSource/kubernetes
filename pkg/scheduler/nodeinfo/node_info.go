@@ -53,14 +53,16 @@ type NodeInfo struct {
 	taints    []v1.Taint
 	taintsErr error
 
-	// imageStates holds the entry of an image if and only if this image is on the node. The entry can be used for
-	// checking an image's existence and advanced usage (e.g., image locality scheduling policy) based on the image
+	// imageStates holds the entry of an image if and only if this image is on the node.
+	// The entry can be used for checking an image's existence and advanced usage
+	// (e.g., image locality scheduling policy) based on the image
 	// state information.
 	imageStates map[string]*ImageStateSummary
 
-	// TransientInfo holds the information pertaining to a scheduling cycle. This will be destructed at the end of
-	// scheduling cycle.
-	// TODO: @ravig. Remove this once we have a clear approach for message passing across predicates and priorities.
+	// TransientInfo holds the information pertaining to a scheduling cycle.
+	// This will be destructed at the end of scheduling cycle.
+	// TODO: @ravig. Remove this once we have a clear approach for message
+	// passing across predicates and priorities.
 	TransientInfo *TransientSchedulerInfo
 
 	// Cached conditions of node for faster lookup.

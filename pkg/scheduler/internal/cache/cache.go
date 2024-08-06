@@ -564,8 +564,9 @@ func (cache *schedulerCache) RemoveNode(node *v1.Node) error {
 	return nil
 }
 
-// addNodeImageStates adds states of the images on given node to the given nodeInfo and update the imageStates in
-// scheduler cache. This function assumes the lock to scheduler cache has been acquired.
+// addNodeImageStates adds states of the images on given node to the given
+// nodeInfo and update the imageStates in scheduler cache.
+// This function assumes the lock to scheduler cache has been acquired.
 func (cache *schedulerCache) addNodeImageStates(node *v1.Node, nodeInfo *schedulernodeinfo.NodeInfo) {
 	newSum := make(map[string]*schedulernodeinfo.ImageStateSummary)
 

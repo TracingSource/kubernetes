@@ -22,8 +22,8 @@ type NodeScoreList []NodeScore
 
 // NodeScore is a struct with node name and score.
 type NodeScore struct {
-	Name  string
-	Score int64
+	Name  string // Node 节点名称
+	Score int64  // 该 Node 的 score 分值(优选)
 }
 
 // PluginToNodeScores declares a map from plugin name to its NodeScoreList.

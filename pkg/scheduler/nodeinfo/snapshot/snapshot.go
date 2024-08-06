@@ -16,10 +16,16 @@ import (
 // The scheduler takes a snapshot at the beginning of each scheduling cycle
 // and uses it for its operations in that cycle.
 type Snapshot struct {
+	// key 为 node 节点名称, value 为该 node 的详细信息, 包含 pod 列表, 镜像概要等.
+	//
 	// NodeInfoMap a map of node name to a snapshot of its NodeInfo.
 	NodeInfoMap map[string]*schedulernodeinfo.NodeInfo
+	// NodeInfoMap 成员中 value 组成的列表
+	//
 	// NodeInfoList is the list of nodes as ordered in the cache's nodeTree.
 	NodeInfoList []*schedulernodeinfo.NodeInfo
+	// NodeInfoList 中, 存在 podAffinity 的部分
+	//
 	// HavePodsWithAffinityNodeInfoList is the list of nodes with at least one
 	// pod declaring affinity terms.
 	HavePodsWithAffinityNodeInfoList []*schedulernodeinfo.NodeInfo
@@ -35,6 +41,8 @@ func NewEmptySnapshot() *Snapshot {
 	}
 }
 
+// 除了 _test.go 测试文件, 没有其他调用者.
+//
 // NewSnapshot initializes a Snapshot struct and returns it.
 func NewSnapshot(nodeInfoMap map[string]*schedulernodeinfo.NodeInfo) *Snapshot {
 	nodeInfoList := make([]*schedulernodeinfo.NodeInfo, 0, len(nodeInfoMap))
@@ -54,17 +62,28 @@ func NewSnapshot(nodeInfoMap map[string]*schedulernodeinfo.NodeInfo) *Snapshot {
 	return s
 }
 
-// CreateNodeInfoMap obtains a list of pods and pivots that list into a map where the keys are node names
-// and the values are the aggregated information for that node.
-func CreateNodeInfoMap(pods []*v1.Pod, nodes []*v1.Node) map[string]*schedulernodeinfo.NodeInfo {
+//
+//
+// 	@return: key 为 node 节点名称, value 为该 node 的详细信息, 包含 pod 列表, 镜像概要等.
+//
+// CreateNodeInfoMap obtains a list of pods and pivots that list into a map
+// where the keys are node names and the values are the aggregated information
+// for that node.
+func CreateNodeInfoMap(
+	pods []*v1.Pod, nodes []*v1.Node,
+) map[string]*schedulernodeinfo.NodeInfo {
+	// 梳理 pods 与所属 node 的关联关系, 并以 .spec.nodeName 为 key, pod 本身为 value.
 	nodeNameToInfo := make(map[string]*schedulernodeinfo.NodeInfo)
 	for _, pod := range pods {
 		nodeName := pod.Spec.NodeName
+		// value 是结构体对象, key 不存在时需要先创建, 已存在则新增即可.
 		if _, ok := nodeNameToInfo[nodeName]; !ok {
 			nodeNameToInfo[nodeName] = schedulernodeinfo.NewNodeInfo()
 		}
 		nodeNameToInfo[nodeName].AddPod(pod)
 	}
+	// 梳理目标 nodes 列表上的所有镜像, 以镜像名称为 key 构建 map, value 是存在该镜像的
+	// Node 的 nodeName 集合.
 	imageExistenceMap := createImageExistenceMap(nodes)
 
 	for _, node := range nodes {
@@ -78,8 +97,17 @@ func CreateNodeInfoMap(pods []*v1.Pod, nodes []*v1.Node) map[string]*schedulerno
 	return nodeNameToInfo
 }
 
-// getNodeImageStates returns the given node's image states based on the given imageExistence map.
-func getNodeImageStates(node *v1.Node, imageExistenceMap map[string]sets.String) map[string]*schedulernodeinfo.ImageStateSummary {
+// getNodeImageStates 从 imageExistenceMap 中查询目标 node 上所有镜像的 size 信息,
+// 以及集群中拥有各个镜像的节点的数量(比如 node 拥有 centos:7 镜像, 而该存在于3个节点上).
+//
+// 	@param imageExistenceMap: key 为集群中存在的所有镜像名称, value 为拥有该镜像的所有
+// node 节点的 nodeName 集合.
+//
+// getNodeImageStates returns the given node's image states based on the given
+// imageExistence map.
+func getNodeImageStates(
+	node *v1.Node, imageExistenceMap map[string]sets.String,
+) map[string]*schedulernodeinfo.ImageStateSummary {
 	imageStates := make(map[string]*schedulernodeinfo.ImageStateSummary)
 
 	for _, image := range node.Status.Images {
@@ -93,12 +121,18 @@ func getNodeImageStates(node *v1.Node, imageExistenceMap map[string]sets.String)
 	return imageStates
 }
 
+// createImageExistenceMap 梳理目标 nodes 列表上的所有镜像, 以镜像名称为 key 构建 map.
+//
+// 	@return: key 为 镜像名称, value 是存在该镜像的 Node 的 nodeName 集合.
+//
 // createImageExistenceMap returns a map recording on which nodes the images exist,
 // keyed by the images' names.
 func createImageExistenceMap(nodes []*v1.Node) map[string]sets.String {
 	imageExistenceMap := make(map[string]sets.String)
 	for _, node := range nodes {
+		// 遍历当前 node 上存在的所有 image
 		for _, image := range node.Status.Images {
+			// 虽然同一个 image 的 image id 是相同的, 但这里还是按 image name 为 key
 			for _, name := range image.Names {
 				if _, ok := imageExistenceMap[name]; !ok {
 					imageExistenceMap[name] = sets.NewString(node.Name)
