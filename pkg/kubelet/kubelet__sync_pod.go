@@ -16,7 +16,7 @@ import (
 )
 
 // caller:
-// 	1. pkg/kubelet/pod_workers.go -> managePodLoop()
+// 	1. pkg/kubelet/pod_workers.go -> managePodLoop() 作为 syncPodFn() 被调用.
 //
 // syncPod is the transaction script for the sync of a single pod.
 //

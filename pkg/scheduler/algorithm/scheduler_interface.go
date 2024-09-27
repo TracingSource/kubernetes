@@ -6,6 +6,8 @@ import (
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
+// 	@implementBy: pkg/scheduler/core/extender.go -> HTTPExtender{}
+//
 // SchedulerExtender is an interface for external processes to influence scheduling
 // decisions made by Kubernetes. This is typically needed for resources not directly
 // managed by Kubernetes.

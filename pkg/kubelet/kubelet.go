@@ -769,6 +769,8 @@ func (kl *Kubelet) syncLoopIteration(
 //
 // caller:
 // 	1. Kubelet.HandlePodAdditions()
+// 	2. Kubelet.HandlePodUpdates()
+// 	3. ...
 //
 // dispatchWork starts the asynchronous sync of the pod in a pod worker.
 // If the pod is terminated, dispatchWork

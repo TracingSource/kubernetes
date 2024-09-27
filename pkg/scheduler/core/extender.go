@@ -23,6 +23,8 @@ const (
 	DefaultExtenderTimeout = 5 * time.Second
 )
 
+// 	@implementOf: pkg/scheduler/algorithm/scheduler_interface.go -> SchedulerExtender
+//
 // HTTPExtender implements the algorithm.SchedulerExtender interface.
 type HTTPExtender struct {
 	extenderURL      string

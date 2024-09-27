@@ -131,7 +131,8 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 // Zeros out extended resource capacity during reconciliation.
 func (kl *Kubelet) reconcileExtendedResource(initialNode, node *v1.Node) bool {
 	requiresUpdate := false
-	// Check with the device manager to see if node has been recreated, in which case extended resources should be zeroed until they are available
+	// Check with the device manager to see if node has been recreated,
+	// in which case extended resources should be zeroed until they are available
 	if kl.containerManager.ShouldResetExtendedResourceCapacity() {
 		for k := range node.Status.Capacity {
 			if v1helper.IsExtendedResourceName(k) {

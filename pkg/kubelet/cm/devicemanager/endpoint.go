@@ -122,6 +122,12 @@ func (e *endpointImpl) setStopTime(t time.Time) {
 	e.stopTime = t
 }
 
+//
+// 	@param devs: 将要分配给目标 pod 的设备列表.
+//
+// caller:
+// 	1. pkg/kubelet/cm/devicemanager/manager.go -> ManagerImpl.allocateContainerResources()
+//
 // allocate issues Allocate gRPC call to the device plugin.
 func (e *endpointImpl) allocate(devs []string) (*pluginapi.AllocateResponse, error) {
 	if e.isStopped() {
@@ -139,7 +145,9 @@ func (e *endpointImpl) preStartContainer(devs []string) (*pluginapi.PreStartCont
 	if e.isStopped() {
 		return nil, fmt.Errorf(errEndpointStopped, e)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), pluginapi.KubeletPreStartContainerRPCTimeoutInSecs*time.Second)
+	ctx, cancel := context.WithTimeout(
+		context.Background(), pluginapi.KubeletPreStartContainerRPCTimeoutInSecs*time.Second,
+	)
 	defer cancel()
 	return e.client.PreStartContainer(ctx, &pluginapi.PreStartContainerRequest{
 		DevicesIDs: devs,

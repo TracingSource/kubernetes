@@ -48,6 +48,9 @@ func (pdev podDevices) delete(pods []string) {
 	}
 }
 
+// containerDevices 从缓存中获取已分配给该 pod/container 下的设备列表并返回.
+// 容器重启后可能会尝试重新分配, 如果这里能查到, 到主调函数就不需要继续往下走了.
+//
 // Returns list of device Ids allocated to the given container for the given resource.
 // Returns nil if we don't have cached state for the given <podUID, contName, resource>.
 func (pdev podDevices) containerDevices(podUID, contName, resource string) sets.String {
@@ -65,7 +68,9 @@ func (pdev podDevices) containerDevices(podUID, contName, resource string) sets.
 }
 
 // Populates allocatedResources with the device resources allocated to the specified <podUID, contName>.
-func (pdev podDevices) addContainerAllocatedResources(podUID, contName string, allocatedResources map[string]sets.String) {
+func (pdev podDevices) addContainerAllocatedResources(
+	podUID, contName string, allocatedResources map[string]sets.String,
+) {
 	containers, exists := pdev[podUID]
 	if !exists {
 		return
@@ -80,7 +85,9 @@ func (pdev podDevices) addContainerAllocatedResources(podUID, contName string, a
 }
 
 // Removes the device resources allocated to the specified <podUID, contName> from allocatedResources.
-func (pdev podDevices) removeContainerAllocatedResources(podUID, contName string, allocatedResources map[string]sets.String) {
+func (pdev podDevices) removeContainerAllocatedResources(
+	podUID, contName string, allocatedResources map[string]sets.String,
+) {
 	containers, exists := pdev[podUID]
 	if !exists {
 		return
