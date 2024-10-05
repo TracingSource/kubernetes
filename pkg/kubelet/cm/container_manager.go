@@ -25,7 +25,7 @@ import (
 
 type ActivePodsFunc func() []*v1.Pod
 
-// 由 pkg/kubelet/cm/container_manager_linux.go -> containerManagerImpl{} 结体体实现.
+// 	@implementBy: pkg/kubelet/cm/container_manager_linux.go -> containerManagerImpl{}
 //
 // Manages the containers running on a machine.
 type ContainerManager interface {

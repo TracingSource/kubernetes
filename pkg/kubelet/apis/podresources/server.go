@@ -7,6 +7,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 )
 
+// 	@implementBy: pkg/kubelet/cm/container_manager_linux.go -> containerManagerImpl{}
+//
 // DevicesProvider knows how to provide the devices used by the given container
 type DevicesProvider interface {
 	GetDevices(podUID, containerName string) []*v1alpha1.ContainerDevices
@@ -23,9 +25,11 @@ type podResourcesServer struct {
 	devicesProvider DevicesProvider
 }
 
-// NewPodResourcesServer returns a PodResourcesListerServer which lists pods provided by the PodsProvider
-// with device information provided by the DevicesProvider
-func NewPodResourcesServer(podsProvider PodsProvider, devicesProvider DevicesProvider) v1alpha1.PodResourcesListerServer {
+// NewPodResourcesServer returns a PodResourcesListerServer which lists pods
+// provided by the PodsProvider with device information provided by the DevicesProvider
+func NewPodResourcesServer(
+	podsProvider PodsProvider, devicesProvider DevicesProvider,
+) v1alpha1.PodResourcesListerServer {
 	return &podResourcesServer{
 		podsProvider:    podsProvider,
 		devicesProvider: devicesProvider,
@@ -33,7 +37,9 @@ func NewPodResourcesServer(podsProvider PodsProvider, devicesProvider DevicesPro
 }
 
 // List returns information about the resources assigned to pods on the node
-func (p *podResourcesServer) List(ctx context.Context, req *v1alpha1.ListPodResourcesRequest) (*v1alpha1.ListPodResourcesResponse, error) {
+func (p *podResourcesServer) List(
+	ctx context.Context, req *v1alpha1.ListPodResourcesRequest,
+) (*v1alpha1.ListPodResourcesResponse, error) {
 	pods := p.podsProvider.GetPods()
 	podResources := make([]*v1alpha1.PodResources, len(pods))
 

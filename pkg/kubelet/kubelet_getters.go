@@ -21,6 +21,8 @@ import (
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 )
 
+// getRootDir /var/lib/kubelet
+//
 // getRootDir returns the full path to the directory under which kubelet can
 // store data.  These functions are useful to pass interfaces to other modules
 // that may need to know where to write data without getting a whole kubelet

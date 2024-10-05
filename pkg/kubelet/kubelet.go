@@ -1032,7 +1032,9 @@ func (kl *Kubelet) ListenAndServe(
 func (kl *Kubelet) ListenAndServeReadOnly(
 	address net.IP, port uint, enableCAdvisorJSONEndpoints bool,
 ) {
-	server.ListenAndServeKubeletReadOnlyServer(kl, kl.resourceAnalyzer, address, port, enableCAdvisorJSONEndpoints)
+	server.ListenAndServeKubeletReadOnlyServer(
+		kl, kl.resourceAnalyzer, address, port, enableCAdvisorJSONEndpoints,
+	)
 }
 
 // ListenAndServePodResources runs the kubelet podresources grpc service
@@ -1060,12 +1062,12 @@ func (kl *Kubelet) cleanUpContainersInPod(podID types.UID, exitedContainerID str
 	}
 }
 
-// fastStatusUpdateOnce starts a loop that checks the internal node indexer cache for when a CIDR
-// is applied  and tries to update pod CIDR immediately. After pod CIDR is updated it fires off
-// a runtime update and a node status update.
+// fastStatusUpdateOnce starts a loop that checks the internal node indexer cache
+// for when a CIDR is applied  and tries to update pod CIDR immediately.
+// After pod CIDR is updated it fires off a runtime update and a node status update.
 // Function returns after one successful node status update.
-// Function is executed only during Kubelet start which improves latency to ready node by updating
-// pod CIDR, runtime status and node statuses ASAP.
+// Function is executed only during Kubelet start which improves latency to
+// ready node by updating pod CIDR, runtime status and node statuses ASAP.
 func (kl *Kubelet) fastStatusUpdateOnce() {
 	for {
 		time.Sleep(100 * time.Millisecond)
