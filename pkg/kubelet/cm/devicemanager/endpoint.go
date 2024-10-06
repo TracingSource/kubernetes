@@ -38,6 +38,8 @@ type endpointImpl struct {
 	cb    monitorCallback
 }
 
+// 	@param callback: pkg/kubelet/cm/devicemanager/manager.go -> ManagerImpl.genericDeviceUpdateCallback()
+//
 // newEndpointImpl creates a new endpoint for the given resourceName.
 // This is to be used during normal device plugin registration.
 func newEndpointImpl(socketPath, resourceName string, callback monitorCallback) (*endpointImpl, error) {
@@ -67,6 +69,8 @@ func newStoppedEndpointImpl(resourceName string) *endpointImpl {
 	}
 }
 
+// callback kubelet 通过 ListAndWatch 从 device plugin 处获得本机上 devicce 设备
+// 的变动后, 调用该方法进行回调更新.
 func (e *endpointImpl) callback(resourceName string, devices []pluginapi.Device) {
 	e.cb(resourceName, devices)
 }

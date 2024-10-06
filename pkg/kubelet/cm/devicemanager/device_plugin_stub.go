@@ -174,7 +174,9 @@ func (m *Stub) GetDevicePluginOptions(ctx context.Context, e *pluginapi.Empty) (
 }
 
 // PreStartContainer resets the devices received
-func (m *Stub) PreStartContainer(ctx context.Context, r *pluginapi.PreStartContainerRequest) (*pluginapi.PreStartContainerResponse, error) {
+func (m *Stub) PreStartContainer(
+	ctx context.Context, r *pluginapi.PreStartContainerRequest,
+) (*pluginapi.PreStartContainerResponse, error) {
 	log.Printf("PreStartContainer, %+v", r)
 	return &pluginapi.PreStartContainerResponse{}, nil
 }

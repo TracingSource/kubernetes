@@ -1000,9 +1000,12 @@ var _Registration_serviceDesc = grpc.ServiceDesc{
 	Metadata: "api.proto",
 }
 
+// 	@implementBy: devicePluginClient{}
+//
 // DevicePluginClient is the client API for DevicePlugin service.
 //
-// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to
+// https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type DevicePluginClient interface {
 	// GetDevicePluginOptions returns options to be communicated with Device
 	// Manager
@@ -1038,7 +1041,11 @@ func (c *devicePluginClient) GetDevicePluginOptions(ctx context.Context, in *Emp
 	return out, nil
 }
 
-func (c *devicePluginClient) ListAndWatch(ctx context.Context, in *Empty, opts ...grpc.CallOption) (DevicePlugin_ListAndWatchClient, error) {
+// caller:
+// 	1. pkg/kubelet/cm/devicemanager/endpoint.go -> endpointImpl.run()
+func (c *devicePluginClient) ListAndWatch(
+	ctx context.Context, in *Empty, opts ...grpc.CallOption,
+) (DevicePlugin_ListAndWatchClient, error) {
 	stream, err := c.cc.NewStream(ctx, &_DevicePlugin_serviceDesc.Streams[0], "/v1beta1.DevicePlugin/ListAndWatch", opts...)
 	if err != nil {
 		return nil, err

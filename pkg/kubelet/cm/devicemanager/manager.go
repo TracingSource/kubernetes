@@ -156,7 +156,12 @@ func newManagerImpl(
 	return manager, nil
 }
 
-func (m *ManagerImpl) genericDeviceUpdateCallback(resourceName string, devices []pluginapi.Device) {
+// caller:
+// 	1. pkg/kubelet/cm/devicemanager/endpoint.go -> endpointImpl.callback()
+// 	作为 endpointImpl 的 cb() 成员方法被调用.
+func (m *ManagerImpl) genericDeviceUpdateCallback(
+	resourceName string, devices []pluginapi.Device,
+) {
 	m.mutex.Lock()
 	m.healthyDevices[resourceName] = sets.NewString()
 	m.unhealthyDevices[resourceName] = sets.NewString()
