@@ -248,6 +248,10 @@ func (r *Resource) SetMaxResource(rl v1.ResourceList) {
 	}
 }
 
+// caller:
+// 	1. pkg/kubelet/lifecycle/predicate.go -> predicateAdmitHandler.Admit()
+//  kubelet 在处理调度当自身所在 Node 节点上的新 Pod 时调用.
+//
 // NewNodeInfo returns a ready to use empty NodeInfo object.
 // If any pods are given in arguments, their information will be aggregated in
 // the returned object.
@@ -377,6 +381,10 @@ func (n *NodeInfo) AllocatableResource() Resource {
 	return *n.allocatableResource
 }
 
+// caller:
+// 	1. pkg/kubelet/cm/devicemanager/manager.go -> ManagerImpl.sanitizeNodeAllocatable()
+// 	只有这一处
+//
 // SetAllocatableResource sets the allocatableResource information of given node.
 func (n *NodeInfo) SetAllocatableResource(allocatableResource *Resource) {
 	n.allocatableResource = allocatableResource

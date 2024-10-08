@@ -674,6 +674,8 @@ func (cm *containerManagerImpl) GetPluginRegistrationHandler() cache.PluginHandl
 	return cm.deviceManager.GetWatcherHandler()
 }
 
+// 获取要启动 runc 容器时, device 扩展资源/虚拟设备的启动选项.
+//
 // caller:
 // 	1. pkg/kubelet/kubelet_pods.go -> Kubelet.GenerateRunContainerOptions()
 //
@@ -697,7 +699,12 @@ func (cm *containerManagerImpl) GetResources(
 	return opts, nil
 }
 
-func (cm *containerManagerImpl) UpdatePluginResources(node *schedulernodeinfo.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
+// caller:
+// 	1. pkg/kubelet/lifecycle/predicate.go -> predicateAdmitHandler.Admit()
+// 	作为 pluginResourceUpdateFunc 成员方法被调用
+func (cm *containerManagerImpl) UpdatePluginResources(
+	node *schedulernodeinfo.NodeInfo, attrs *lifecycle.PodAdmitAttributes,
+) error {
 	return cm.deviceManager.Allocate(node, attrs)
 }
 

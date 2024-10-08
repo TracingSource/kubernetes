@@ -517,10 +517,15 @@ func (kl *Kubelet) rejectPod(pod *v1.Pod, reason, message string) {
 		Message: "Pod " + message})
 }
 
-// canAdmitPod determines if a pod can be admitted, and gives a reason if it
-// cannot. "pod" is new pod, while "pods" are all admitted pods
-// The function returns a boolean value indicating whether the pod
-// can be admitted, a brief single-word reason and a message explaining why
+// caller:
+// 	1. Kubelet.HandlePodAdditions() 处理常规的 Pod 新增事件(已被调度到当前 Node)
+// 	2. pkg/kubelet/runonce.go -> Kubelet.runOnce() kubelet 一次性运行, 一般不会用到
+//
+// canAdmitPod determines if a pod can be admitted(被承认), and gives a reason
+// if it cannot.
+// "pod" is new pod, while "pods" are all admitted pods
+// The function returns a boolean value indicating whether the pod can be admitted,
+// a brief single-word reason and a message explaining why
 // the pod cannot be admitted.
 func (kl *Kubelet) canAdmitPod(pods []*v1.Pod, pod *v1.Pod) (bool, string, string) {
 	// the kubelet will invoke each pod admit handler in sequence

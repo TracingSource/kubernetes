@@ -29,7 +29,10 @@ func (pdev podDevices) pods() sets.String {
 	return ret
 }
 
-func (pdev podDevices) insert(podUID, contName, resource string, devices sets.String, resp *pluginapi.ContainerAllocateResponse) {
+func (pdev podDevices) insert(
+	podUID, contName, resource string, devices sets.String, 
+	resp *pluginapi.ContainerAllocateResponse,
+) {
 	if _, podExists := pdev[podUID]; !podExists {
 		pdev[podUID] = make(containerDevices)
 	}
@@ -101,6 +104,8 @@ func (pdev podDevices) removeContainerAllocatedResources(
 	}
 }
 
+// 	@return ret: key 为扩展资源名称(与 cpu/memory 同级)
+//
 // Returns all of devices allocated to the pods being tracked, keyed by resourceName.
 func (pdev podDevices) devices() map[string]sets.String {
 	ret := make(map[string]sets.String)
@@ -127,13 +132,19 @@ func (pdev podDevices) toCheckpointData() []checkpoint.PodDevicesEntry {
 			for resource, devices := range resources {
 				devIds := devices.deviceIds.UnsortedList()
 				if devices.allocResp == nil {
-					klog.Errorf("Can't marshal allocResp for %v %v %v: allocation response is missing", podUID, conName, resource)
+					klog.Errorf(
+						"Can't marshal allocResp for %v %v %v: allocation response is missing", 
+						podUID, conName, resource,
+					)
 					continue
 				}
 
 				allocResp, err := devices.allocResp.Marshal()
 				if err != nil {
-					klog.Errorf("Can't marshal allocResp for %v %v %v: %v", podUID, conName, resource, err)
+					klog.Errorf(
+						"Can't marshal allocResp for %v %v %v: %v", 
+						podUID, conName, resource, err,
+					)
 					continue
 				}
 				data = append(data, checkpoint.PodDevicesEntry{
@@ -151,8 +162,11 @@ func (pdev podDevices) toCheckpointData() []checkpoint.PodDevicesEntry {
 // Populates podDevices from the passed in checkpointData.
 func (pdev podDevices) fromCheckpointData(data []checkpoint.PodDevicesEntry) {
 	for _, entry := range data {
-		klog.V(2).Infof("Get checkpoint entry: %v %v %v %v %v\n",
-			entry.PodUID, entry.ContainerName, entry.ResourceName, entry.DeviceIDs, entry.AllocResp)
+		klog.V(2).Infof(
+			"Get checkpoint entry: %v %v %v %v %v\n",
+			entry.PodUID, entry.ContainerName, 
+			entry.ResourceName, entry.DeviceIDs, entry.AllocResp,
+		)
 		devIDs := sets.NewString()
 		for _, devID := range entry.DeviceIDs {
 			devIDs.Insert(devID)
@@ -160,7 +174,10 @@ func (pdev podDevices) fromCheckpointData(data []checkpoint.PodDevicesEntry) {
 		allocResp := &pluginapi.ContainerAllocateResponse{}
 		err := allocResp.Unmarshal(entry.AllocResp)
 		if err != nil {
-			klog.Errorf("Can't unmarshal allocResp for %v %v %v: %v", entry.PodUID, entry.ContainerName, entry.ResourceName, err)
+			klog.Errorf(
+				"Can't unmarshal allocResp for %v %v %v: %v", 
+				entry.PodUID, entry.ContainerName, entry.ResourceName, err,
+			)
 			continue
 		}
 		pdev.insert(entry.PodUID, entry.ContainerName, entry.ResourceName, devIDs, allocResp)
@@ -168,7 +185,9 @@ func (pdev podDevices) fromCheckpointData(data []checkpoint.PodDevicesEntry) {
 }
 
 // Returns combined container runtime settings to consume the container's allocated devices.
-func (pdev podDevices) deviceRunContainerOptions(podUID, contName string) *DeviceRunContainerOptions {
+func (pdev podDevices) deviceRunContainerOptions(
+	podUID, contName string,
+) *DeviceRunContainerOptions {
 	containers, exists := pdev[podUID]
 	if !exists {
 		return nil
@@ -211,8 +230,10 @@ func (pdev podDevices) deviceRunContainerOptions(podUID, contName string) *Devic
 			if d, ok := devsMap[dev.ContainerPath]; ok {
 				klog.V(4).Infof("Skip existing device %s %s", dev.ContainerPath, dev.HostPath)
 				if d != dev.HostPath {
-					klog.Errorf("Container device %s has conflicting mapping host devices: %s and %s",
-						dev.ContainerPath, d, dev.HostPath)
+					klog.Errorf(
+						"Container device %s has conflicting mapping host devices: %s and %s",
+						dev.ContainerPath, d, dev.HostPath,
+					)
 				}
 				continue
 			}

@@ -121,12 +121,12 @@ var (
 		CheckNodeUnschedulablePred,
 		GeneralPred, HostNamePred, PodFitsHostPortsPred,
 		MatchNodeSelectorPred, PodFitsResourcesPred, NoDiskConflictPred,
-		PodToleratesNodeTaintsPred, PodToleratesNodeNoExecuteTaintsPred, 
+		PodToleratesNodeTaintsPred, PodToleratesNodeNoExecuteTaintsPred,
 		CheckNodeLabelPresencePred,
-		CheckServiceAffinityPred, MaxEBSVolumeCountPred, 
-		MaxGCEPDVolumeCountPred, 
+		CheckServiceAffinityPred, MaxEBSVolumeCountPred,
+		MaxGCEPDVolumeCountPred,
 		MaxCSIVolumeCountPred,
-		MaxAzureDiskVolumeCountPred, MaxCinderVolumeCountPred, 
+		MaxAzureDiskVolumeCountPred, MaxCinderVolumeCountPred,
 		CheckVolumeBindingPred, NoVolumeZoneConflictPred,
 		EvenPodsSpreadPred, MatchInterPodAffinityPred,
 	}
@@ -776,10 +776,20 @@ func podName(pod *v1.Pod) string {
 	return pod.Namespace + "/" + pod.Name
 }
 
-// PodFitsResources checks if a node has sufficient resources, such as cpu, memory, gpu, opaque int resources etc to run a pod.
-// First return value indicates whether a node has sufficient resources to run a pod while the second return value indicates the
+// PodFitsResources 判断目标 Node 是否满足待调度 Pod 的资源申请需要.
+// 不管是 cpu/memory, 临时存储, 还是扩展资源.
+//
+// 	@param pod: 待调度的 Pod 对象
+// 	@param nodeInfo: 备选的 Node 节点对象
+//
+// PodFitsResources checks if a node has sufficient resources,
+// such as cpu, memory, gpu, opaque int resources etc to run a pod.
+// First return value indicates whether a node has sufficient resources to
+// run a pod while the second return value indicates the
 // predicate failure reasons if the node has insufficient resources to run the pod.
-func PodFitsResources(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
+func PodFitsResources(
+	pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.NodeInfo,
+) (bool, []PredicateFailureReason, error) {
 	node := nodeInfo.Node()
 	if node == nil {
 		return false, nil, fmt.Errorf("node not found")
@@ -788,7 +798,9 @@ func PodFitsResources(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.No
 	var predicateFails []PredicateFailureReason
 	allowedPodNumber := nodeInfo.AllowedPodNumber()
 	if len(nodeInfo.Pods())+1 > allowedPodNumber {
-		predicateFails = append(predicateFails, NewInsufficientResourceError(v1.ResourcePods, 1, int64(len(nodeInfo.Pods())), int64(allowedPodNumber)))
+		predicateFails = append(predicateFails, NewInsufficientResourceError(
+			v1.ResourcePods, 1, int64(len(nodeInfo.Pods())), int64(allowedPodNumber),
+		))
 	}
 
 	// No extended resources should be ignored by default.
@@ -813,13 +825,23 @@ func PodFitsResources(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.No
 
 	allocatable := nodeInfo.AllocatableResource()
 	if allocatable.MilliCPU < podRequest.MilliCPU+nodeInfo.RequestedResource().MilliCPU {
-		predicateFails = append(predicateFails, NewInsufficientResourceError(v1.ResourceCPU, podRequest.MilliCPU, nodeInfo.RequestedResource().MilliCPU, allocatable.MilliCPU))
+		predicateFails = append(predicateFails, NewInsufficientResourceError(
+			v1.ResourceCPU, podRequest.MilliCPU, 
+			nodeInfo.RequestedResource().MilliCPU, allocatable.MilliCPU,
+		))
 	}
 	if allocatable.Memory < podRequest.Memory+nodeInfo.RequestedResource().Memory {
-		predicateFails = append(predicateFails, NewInsufficientResourceError(v1.ResourceMemory, podRequest.Memory, nodeInfo.RequestedResource().Memory, allocatable.Memory))
+		predicateFails = append(predicateFails, NewInsufficientResourceError(
+			v1.ResourceMemory, podRequest.Memory, 
+			nodeInfo.RequestedResource().Memory, allocatable.Memory,
+		))
 	}
 	if allocatable.EphemeralStorage < podRequest.EphemeralStorage+nodeInfo.RequestedResource().EphemeralStorage {
-		predicateFails = append(predicateFails, NewInsufficientResourceError(v1.ResourceEphemeralStorage, podRequest.EphemeralStorage, nodeInfo.RequestedResource().EphemeralStorage, allocatable.EphemeralStorage))
+		predicateFails = append(predicateFails, NewInsufficientResourceError(
+			v1.ResourceEphemeralStorage, podRequest.EphemeralStorage, 
+			nodeInfo.RequestedResource().EphemeralStorage, 
+			allocatable.EphemeralStorage,
+		))
 	}
 
 	for rName, rQuant := range podRequest.ScalarResources {
@@ -830,17 +852,27 @@ func PodFitsResources(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.No
 				continue
 			}
 		}
+		// 比较当前节点上该类扩展资源的逻辑分配值 + 当前 Pod 的申请值, 是否在 allocatable 可分配范围内.
+		// 如已超出, 则返回失败.
 		if allocatable.ScalarResources[rName] < rQuant+nodeInfo.RequestedResource().ScalarResources[rName] {
-			predicateFails = append(predicateFails, NewInsufficientResourceError(rName, podRequest.ScalarResources[rName], nodeInfo.RequestedResource().ScalarResources[rName], allocatable.ScalarResources[rName]))
+			predicateFails = append(predicateFails, NewInsufficientResourceError(
+				rName, 
+				podRequest.ScalarResources[rName], 
+				nodeInfo.RequestedResource().ScalarResources[rName], 
+				allocatable.ScalarResources[rName],
+			))
 		}
 	}
 
 	if klog.V(10) {
 		if len(predicateFails) == 0 {
-			// We explicitly don't do klog.V(10).Infof() to avoid computing all the parameters if this is
-			// not logged. There is visible performance gain from it.
-			klog.Infof("Schedule Pod %+v on Node %+v is allowed, Node is running only %v out of %v Pods.",
-				podName(pod), node.Name, len(nodeInfo.Pods()), allowedPodNumber)
+			// We explicitly don't do klog.V(10).Infof() to avoid computing
+			// all the parameters if this is not logged.
+			// There is visible performance gain from it.
+			klog.Infof(
+				"Schedule Pod %+v on Node %+v is allowed, Node is running only %v out of %v Pods.",
+				podName(pod), node.Name, len(nodeInfo.Pods()), allowedPodNumber,
+			)
 		}
 	}
 	return len(predicateFails) == 0, predicateFails, nil
@@ -853,7 +885,9 @@ func nodeMatchesNodeSelectorTerms(node *v1.Node, nodeSelectorTerms []v1.NodeSele
 	for k, f := range algorithm.NodeFieldSelectorKeys {
 		nodeFields[k] = f(node)
 	}
-	return v1helper.MatchNodeSelectorTerms(nodeSelectorTerms, labels.Set(node.Labels), fields.Set(nodeFields))
+	return v1helper.MatchNodeSelectorTerms(
+		nodeSelectorTerms, labels.Set(node.Labels), fields.Set(nodeFields),
+	)
 }
 
 // PodMatchesNodeSelectorAndAffinityTerms checks whether the pod is schedulable onto nodes according to

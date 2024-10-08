@@ -30,7 +30,17 @@ type predicateAdmitHandler struct {
 
 var _ PodAdmitHandler = &predicateAdmitHandler{}
 
-func NewPredicateAdmitHandler(getNodeAnyWayFunc getNodeAnyWayFuncType, admissionFailureHandler AdmissionFailureHandler, pluginResourceUpdateFunc pluginResourceUpdateFuncType) *predicateAdmitHandler {
+// 	@param getNodeAnyWayFunc: pkg/kubelet/kubelet_getters.go -> Kubelet.getNodeAnyWay()
+// 	@param pluginResourceUpdateFunc: pkg/kubelet/cm/container_manager_linux.go -> containerManagerImpl.UpdatePluginResources()
+// 
+// caller:
+// 	1. pkg/kubelet/kubelet__new.go -> NewMainKubelet()
+func NewPredicateAdmitHandler(
+	getNodeAnyWayFunc getNodeAnyWayFuncType, 
+	admissionFailureHandler AdmissionFailureHandler, 
+	pluginResourceUpdateFunc pluginResourceUpdateFuncType,
+) *predicateAdmitHandler {
+	// ...注意这里参数 2, 3 写反了
 	return &predicateAdmitHandler{
 		getNodeAnyWayFunc,
 		pluginResourceUpdateFunc,
@@ -39,6 +49,7 @@ func NewPredicateAdmitHandler(getNodeAnyWayFunc getNodeAnyWayFuncType, admission
 }
 
 func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
+	// 获取 kubelet 所在的当前 Node 对象.
 	node, err := w.getNodeAnyWayFunc()
 	if err != nil {
 		klog.Errorf("Cannot get Node info: %v", err)
@@ -54,7 +65,9 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	nodeInfo.SetNode(node)
 	// ensure the node has enough plugin resources for that required in pods
 	if err = w.pluginResourceUpdateFunc(nodeInfo, attrs); err != nil {
-		message := fmt.Sprintf("Update plugin resources failed due to %v, which is unexpected.", err)
+		message := fmt.Sprintf(
+			"Update plugin resources failed due to %v, which is unexpected.", err,
+		)
 		klog.Warningf("Failed to admit pod %v - %s", format.Pod(admitPod), message)
 		return PodAdmitResult{
 			Admit:   false,
@@ -64,8 +77,8 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	}
 
 	// Remove the requests of the extended resources that are missing in the
-	// node info. This is required to support cluster-level resources, which
-	// are extended resources unknown to nodes.
+	// node info. This is required to support cluster-level resources,
+	// which are extended resources unknown to nodes.
 	//
 	// Caveat: If a pod was manually bound to a node (e.g., static pod) where a
 	// node-level extended resource it requires is not found, then kubelet will
@@ -73,7 +86,9 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	// the Resource Class API in the future.
 	podWithoutMissingExtendedResources := removeMissingExtendedResources(admitPod, nodeInfo)
 
-	fit, reasons, err := predicates.GeneralPredicates(podWithoutMissingExtendedResources, nil, nodeInfo)
+	fit, reasons, err := predicates.GeneralPredicates(
+		podWithoutMissingExtendedResources, nil, nodeInfo,
+	)
 	if err != nil {
 		message := fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", err)
 		klog.Warningf("Failed to admit pod %v - %s", format.Pod(admitPod), message)
@@ -86,7 +101,9 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	if !fit {
 		fit, reasons, err = w.admissionFailureHandler.HandleAdmissionFailure(admitPod, reasons)
 		if err != nil {
-			message := fmt.Sprintf("Unexpected error while attempting to recover from admission failure: %v", err)
+			message := fmt.Sprintf(
+				"Unexpected error while attempting to recover from admission failure: %v", err,
+			)
 			klog.Warningf("Failed to admit pod %v - %s", format.Pod(admitPod), message)
 			return PodAdmitResult{
 				Admit:   fit,
@@ -99,7 +116,9 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		var reason string
 		var message string
 		if len(reasons) == 0 {
-			message = fmt.Sprint("GeneralPredicates failed due to unknown reason, which is unexpected.")
+			message = fmt.Sprint(
+				"GeneralPredicates failed due to unknown reason, which is unexpected.",
+			)
 			klog.Warningf("Failed to admit pod %v - %s", format.Pod(admitPod), message)
 			return PodAdmitResult{
 				Admit:   fit,

@@ -161,7 +161,9 @@ func ApplyPredicatesAndPriorities(s *Snapshot) {
 // RegisterFitPredicate registers a fit predicate with the algorithm
 // registry. Returns the name with which the predicate was registered.
 func RegisterFitPredicate(name string, predicate predicates.FitPredicate) string {
-	return RegisterFitPredicateFactory(name, func(AlgorithmFactoryArgs) predicates.FitPredicate { return predicate })
+	return RegisterFitPredicateFactory(
+		name, func(AlgorithmFactoryArgs) predicates.FitPredicate { return predicate },
+	)
 }
 
 // RemoveFitPredicate removes a fit predicate from factory.
@@ -245,12 +247,15 @@ func RegisterMandatoryFitPredicate(name string, predicate predicates.FitPredicat
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 	validateAlgorithmNameOrDie(name)
+	// 必选的预选算法同时写入 fitPredicateMap 和 mandatoryFitPredicates 两个地方
 	fitPredicateMap[name] = func(AlgorithmFactoryArgs) predicates.FitPredicate { return predicate }
 	mandatoryFitPredicates.Insert(name)
 	return name
 }
 
 // Fit: 合适的
+//
+// 	@param name: 预选算法名称, 如 "PodFitsResources"
 //
 // caller:
 // 	1. pkg/scheduler/algorithmprovider/defaults/register_predicates.go -> init()
@@ -559,11 +564,11 @@ func GetAlgorithmProvider(name string) (*AlgorithmProviderConfig, error) {
 	return &provider, nil
 }
 
-// 	@param predicateKeys: 配置文件中选配的预选插件名称列表.
+// 	@param name: 配置文件中选配的预选插件名称列表.
 //
 // caller:
 // 	1. pkg/scheduler/factory.go -> Configurator.getPredicateConfigs()
-// 	在调度器启动时被调用.
+// 	只有这一处, 在调度器启动时被调用.
 func getFitPredicateFunctions(
 	names sets.String, args AlgorithmFactoryArgs,
 ) (map[string]predicates.FitPredicate, error) {
@@ -581,6 +586,7 @@ func getFitPredicateFunctions(
 		fitPredicates[name] = factory(args)
 	}
 
+	// 必选算法需要全部加载.
 	// Always include mandatory fit predicates.
 	for name := range mandatoryFitPredicates {
 		if factory, found := fitPredicateMap[name]; found {
@@ -689,6 +695,8 @@ func validatePriorityOrDie(priority schedulerapi.PriorityPolicy) {
 	}
 }
 
+// caller: none
+//
 // ListRegisteredFitPredicates returns the registered fit predicates.
 func ListRegisteredFitPredicates() []string {
 	schedulerFactoryMutex.RLock()

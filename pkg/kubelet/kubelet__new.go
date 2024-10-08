@@ -554,7 +554,9 @@ func NewMainKubelet(
 	}
 
 	if kubeCfg.ServerTLSBootstrap && kubeDeps.TLSOptions != nil && utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
-		klet.serverCertificateManager, err = kubeletcertificate.NewKubeletServerCertificateManager(klet.kubeClient, kubeCfg, klet.nodeName, klet.getLastObservedNodeAddresses, certDirectory)
+		klet.serverCertificateManager, err = kubeletcertificate.NewKubeletServerCertificateManager(
+			klet.kubeClient, kubeCfg, klet.nodeName, klet.getLastObservedNodeAddresses, certDirectory,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize certificate manager: %v", err)
 		}
@@ -670,8 +672,17 @@ func NewMainKubelet(
 	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyManager) {
 		klet.admitHandlers.AddPodAdmitHandler(klet.containerManager.GetTopologyPodAdmitHandler())
 	}
-	criticalPodAdmissionHandler := preemption.NewCriticalPodAdmissionHandler(klet.GetActivePods, killPodNow(klet.podWorkers, kubeDeps.Recorder), kubeDeps.Recorder)
-	klet.admitHandlers.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(klet.getNodeAnyWay, criticalPodAdmissionHandler, klet.containerManager.UpdatePluginResources))
+	criticalPodAdmissionHandler := preemption.NewCriticalPodAdmissionHandler(
+		klet.GetActivePods, killPodNow(klet.podWorkers, kubeDeps.Recorder), 
+		kubeDeps.Recorder,
+	)
+	klet.admitHandlers.AddPodAdmitHandler(
+		lifecycle.NewPredicateAdmitHandler(
+			klet.getNodeAnyWay, 
+			criticalPodAdmissionHandler, 
+			klet.containerManager.UpdatePluginResources,
+		),
+	)
 	// apply functional Option's
 	for _, opt := range kubeDeps.Options {
 		opt(klet)

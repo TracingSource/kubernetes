@@ -223,6 +223,10 @@ func (kl *Kubelet) GetNode() (*v1.Node, error) {
 	return kl.nodeLister.Get(string(kl.nodeName))
 }
 
+// caller:
+// 	1. pkg/kubelet/lifecycle/predicate.go -> predicateAdmitHandler.Admit()
+// 	作为 getNodeAnyWayFunc 成员方法被调用
+//
 // getNodeAnyWay() must return a *v1.Node which is required by RunGeneralPredicates().
 // The *v1.Node is obtained as follows:
 // Return kubelet's nodeInfo for this node, except on error or if in standalone mode,

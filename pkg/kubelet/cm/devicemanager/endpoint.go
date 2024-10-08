@@ -126,6 +126,9 @@ func (e *endpointImpl) setStopTime(t time.Time) {
 	e.stopTime = t
 }
 
+// allocate 在 kubelet 为某个 Pod 分配好扩展资源的 deviceID 列表后, 需要额外调用
+// device plugin 获取这些 device 的详细规格, 用于创建 runc 容器时指定 device 设备列表,
+// 以及 mount 挂载列表.
 //
 // 	@param devs: 将要分配给目标 pod 的设备列表.
 //

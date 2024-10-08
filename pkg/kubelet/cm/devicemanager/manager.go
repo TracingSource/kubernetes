@@ -62,7 +62,8 @@ type ManagerImpl struct {
 	// could be counted when updating allocated devices
 	activePods ActivePodsFunc
 
-	// sourcesReady provides the readiness of kubelet configuration sources such as apiserver update readiness.
+	// sourcesReady provides the readiness of kubelet configuration sources
+	// such as apiserver update readiness.
 	// We use it to determine when we can purge inactive pods from checkpointed state.
 	sourcesReady config.SourcesReady
 
@@ -79,10 +80,13 @@ type ManagerImpl struct {
 	// unhealthyDevices contains all of the unhealthy devices and their exported device IDs.
 	unhealthyDevices map[string]sets.String
 
+	// 当前 node 节点上已分配给 Pod 的 deviceID 设备集合.
+	// key 为扩展资源的名称(与 cpu/memory 同级), value 为设备列表(deviceID 列表)
+	//
 	// allocatedDevices contains allocated deviceIds, keyed by resourceName.
 	allocatedDevices map[string]sets.String
 
-	// podDevices 存储着已分配给某个pod的某个container的设备列表, 作为缓存.
+	// podDevices 存储着已分配给所有pod的所有container的设备列表, 作为缓存.
 	//
 	// podDevices contains pod to allocated device mapping.
 	podDevices        podDevices
@@ -352,6 +356,10 @@ func (m *ManagerImpl) isVersionCompatibleWithPlugin(versions []string) bool {
 	return false
 }
 
+// caller:
+// 	1. ManagerImpl.Allocate()
+// 	2. ManagerImpl.GetDeviceRunContainerOptions()
+// 	kubelet 在调用 docker/cri 接口创建容器前会调用到这里.
 func (m *ManagerImpl) allocatePodResources(pod *v1.Pod) error {
 	devicesToReuse := make(map[string]sets.String)
 	for _, container := range pod.Spec.InitContainers {
@@ -369,10 +377,17 @@ func (m *ManagerImpl) allocatePodResources(pod *v1.Pod) error {
 	return nil
 }
 
+// caller:
+// 	1. pkg/kubelet/cm/container_manager_linux.go -> containerManagerImpl.UpdatePluginResources()
+// 	实际创建容器时被调用, 用于为其分配确定的 deviceID 资源列表.
+//
 // Allocate is the call that you can use to allocate a set of devices
 // from the registered device plugins.
-func (m *ManagerImpl) Allocate(node *schedulernodeinfo.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
+func (m *ManagerImpl) Allocate(
+	node *schedulernodeinfo.NodeInfo, attrs *lifecycle.PodAdmitAttributes,
+) error {
 	pod := attrs.Pod
+	// 调用 device plugin 为 pod 分配设备列表
 	err := m.allocatePodResources(pod)
 	if err != nil {
 		klog.Errorf("Failed to allocate device plugin resource for pod %s: %v", string(pod.UID), err)
@@ -896,9 +911,12 @@ func (m *ManagerImpl) allocateContainerResources(
 	return m.writeCheckpoint()
 }
 
+// 返回目标 container 传入 runc 的启动选项(尤其是 device, mount 信息)
+//
 // caller:
 // 	1. pkg/kubelet/cm/container_manager_linux.go -> containerManagerImpl.GetResources()
 // 	kubelet 在调用 docker/cri 接口创建容器前会调用到这里.
+//  只有这一处
 //
 // GetDeviceRunContainerOptions checks whether we have cached containerDevices
 // for the passed-in <pod, container> and returns its DeviceRunContainerOptions
@@ -939,6 +957,7 @@ func (m *ManagerImpl) GetDeviceRunContainerOptions(
 	// 分配完成后, 绑定信息被储存到 podDevices 缓存中, 需要从里面读取.
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
+	// 返回目标 container 传入 runc 的启动选项
 	return m.podDevices.deviceRunContainerOptions(string(pod.UID), container.Name), nil
 }
 
@@ -978,16 +997,28 @@ func (m *ManagerImpl) callPreStartContainerIfNeeded(podUID, contName, resource s
 	return nil
 }
 
+// 更新 node.status.allocatable 字段
+//
+// 	@param node: 本次调度的 Pod 所在的 Node 节点对象.
+//
+// caller:
+// 	1. ManagerImpl.Allocate()
+//
 // sanitizeNodeAllocatable scans through allocatedDevices in the device manager
 // and if necessary, updates allocatableResource in nodeInfo to at least equal to
 // the allocated capacity. This allows pods that have already been scheduled on
 // the node to pass GeneralPredicates admission checking even upon device plugin failure.
 func (m *ManagerImpl) sanitizeNodeAllocatable(node *schedulernodeinfo.NodeInfo) {
 	var newAllocatableResource *schedulernodeinfo.Resource
+	// allocatableResource node.status.allocatable{} 块的内容
 	allocatableResource := node.AllocatableResource()
 	if allocatableResource.ScalarResources == nil {
 		allocatableResource.ScalarResources = make(map[v1.ResourceName]int64)
 	}
+	// 这个更新策略应该不常见.
+	// 这个循环的意思是, 在 node.status.allocatable 中,
+	// 扩展资源值原本为 10, 但是 device manager 检测到已分配给 Pod 的设备数量为 15,
+	// 这种情况下需要将 node.status.allocatable 中的扩展资源值至少设置为 15...
 	for resource, devices := range m.allocatedDevices {
 		needed := devices.Len()
 		quant, ok := allocatableResource.ScalarResources[v1.ResourceName(resource)]
