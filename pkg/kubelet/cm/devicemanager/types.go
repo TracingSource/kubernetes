@@ -56,7 +56,8 @@ type Manager interface {
 	GetTopologyHints(pod v1.Pod, container v1.Container) map[string][]topologymanager.TopologyHint
 }
 
-// DeviceRunContainerOptions contains the combined container runtime settings to consume its allocated devices.
+// DeviceRunContainerOptions contains the combined container runtime settings
+// to consume its allocated devices.
 type DeviceRunContainerOptions struct {
 	// The environment variables list.
 	Envs []kubecontainer.EnvVar

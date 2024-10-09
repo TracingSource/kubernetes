@@ -16,9 +16,12 @@ type Checkpoint interface {
 	VerifyChecksum() error
 }
 
+// 	@implementBy: impl{}
+//
 // CheckpointManager provides the interface to manage checkpoint
 type CheckpointManager interface {
-	// CreateCheckpoint persists checkpoint in CheckpointStore. checkpointKey is the key for utilstore to locate checkpoint.
+	// CreateCheckpoint persists checkpoint in CheckpointStore.
+	// checkpointKey is the key for utilstore to locate checkpoint.
 	// For file backed utilstore, checkpointKey is the file name to write the checkpoint data.
 	CreateCheckpoint(checkpointKey string, checkpoint Checkpoint) error
 	// GetCheckpoint retrieves checkpoint from CheckpointStore.
@@ -29,7 +32,8 @@ type CheckpointManager interface {
 	ListCheckpoints() ([]string, error)
 }
 
-// impl is an implementation of CheckpointManager. It persists checkpoint in CheckpointStore
+// impl is an implementation of CheckpointManager.
+// It persists checkpoint in CheckpointStore
 type impl struct {
 	path  string
 	store utilstore.Store

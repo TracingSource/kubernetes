@@ -252,7 +252,10 @@ func NewContainerManager(
 	if nodeConfig.CgroupsPerQOS {
 		// this does default to / when enabled, but this tests against regressions.
 		if nodeConfig.CgroupRoot == "" {
-			return nil, fmt.Errorf("invalid configuration: cgroups-per-qos was specified and cgroup-root was not specified. To enable the QoS cgroup hierarchy you need to specify a valid cgroup-root")
+			return nil, fmt.Errorf(
+				"invalid configuration: cgroups-per-qos was specified and cgroup-root was not specified. "+
+				"To enable the QoS cgroup hierarchy you need to specify a valid cgroup-root",
+			)
 		}
 
 		// we need to check that the cgroup root actually exists for each subsystem
@@ -297,7 +300,10 @@ func NewContainerManager(
 			return nil, err
 		}
 
-		klog.Infof("[topologymanager] Initializing Topology Manager with %s policy", nodeConfig.ExperimentalTopologyManagerPolicy)
+		klog.Infof(
+			"[topologymanager] Initializing Topology Manager with %s policy", 
+			nodeConfig.ExperimentalTopologyManagerPolicy,
+		)
 	} else {
 		cm.topologyManager = topologymanager.NewFakeManager()
 	}
@@ -674,7 +680,9 @@ func (cm *containerManagerImpl) GetPluginRegistrationHandler() cache.PluginHandl
 	return cm.deviceManager.GetWatcherHandler()
 }
 
-// 获取要启动 runc 容器时, device 扩展资源/虚拟设备的启动选项.
+// 调用 device plugin, 获取要启动 runc 容器时, device 扩展资源/虚拟设备的启动选项.
+// 此时 kubelet 已经选择好要为目标 Pod 下各个 container 分配的设备列表了,
+// 调用 device plugin 只是为了获取设备的详细规格, 用于 device/mount 参数.
 //
 // caller:
 // 	1. pkg/kubelet/kubelet_pods.go -> Kubelet.GenerateRunContainerOptions()

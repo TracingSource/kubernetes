@@ -90,11 +90,15 @@ type ManagerImpl struct {
 	//
 	// podDevices contains pod to allocated device mapping.
 	podDevices        podDevices
+	// kubelet 会在 /var/lib/kubelet/device-plugins/kubelet_internal_checkpoint 文件中,
+	// 存放所有分配给 pod/container 的设备信息, 防止 kubelet 自身发生重启后数据丢失.
 	checkpointManager checkpointmanager.CheckpointManager
 
 	// List of NUMA Nodes available on the underlying machine
 	numaNodes []int
 
+	// topologyAffinityStore: pkg/kubelet/cm/topologymanager/topology_manager.go -> manager{}
+	//
 	// Store of Topology Affinties that the Device Manager can query.
 	topologyAffinityStore topologymanager.Store
 }
@@ -109,6 +113,8 @@ type sourcesReadyStub struct{}
 func (s *sourcesReadyStub) AddSource(source string) {}
 func (s *sourcesReadyStub) AllReady() bool          { return true }
 
+// 	@param topologyAffinityStore: pkg/kubelet/cm/topologymanager/topology_manager.go -> manager{}
+//
 // NewManagerImpl creates a new manager.
 func NewManagerImpl(
 	numaNodeInfo cputopology.NUMANodeInfo, topologyAffinityStore topologymanager.Store,
@@ -737,7 +743,9 @@ func (m *ManagerImpl) devicesToAllocate(
 	return devices, nil
 }
 
-func (m *ManagerImpl) takeByTopology(resource string, available sets.String, affinity bitmask.BitMask, request int) []string {
+func (m *ManagerImpl) takeByTopology(
+	resource string, available sets.String, affinity bitmask.BitMask, request int,
+) []string {
 	// Build a map of NUMA Nodes to the devices associated with them. A
 	// device may be associated to multiple NUMA nodes at the same time. If an
 	// available device does not have any NUMA Nodes associated with it, add it

@@ -99,9 +99,18 @@ func (th *TopologyHint) LessThan(other TopologyHint) bool {
 
 var _ Manager = &manager{}
 
+// caller:
+// 	1. pkg/kubelet/cm/container_manager_linux.go -> NewContainerManager
+// 	只有这一处
+//
 //NewManager creates a new TopologyManager based on provided policy
-func NewManager(numaNodeInfo cputopology.NUMANodeInfo, topologyPolicyName string) (Manager, error) {
-	klog.Infof("[topologymanager] Creating topology manager with %s policy", topologyPolicyName)
+func NewManager(
+	numaNodeInfo cputopology.NUMANodeInfo, topologyPolicyName string,
+) (Manager, error) {
+	klog.Infof(
+		"[topologymanager] Creating topology manager with %s policy", 
+		topologyPolicyName,
+	)
 
 	var numaNodes []int
 	for node := range numaNodeInfo {
@@ -109,7 +118,10 @@ func NewManager(numaNodeInfo cputopology.NUMANodeInfo, topologyPolicyName string
 	}
 
 	if len(numaNodes) > maxAllowableNUMANodes {
-		return nil, fmt.Errorf("unsupported on machines with more than %v NUMA Nodes", maxAllowableNUMANodes)
+		return nil, fmt.Errorf(
+			"unsupported on machines with more than %v NUMA Nodes", 
+			maxAllowableNUMANodes,
+		)
 	}
 
 	var policy Policy
@@ -148,14 +160,19 @@ func (m *manager) GetAffinity(podUID string, containerName string) TopologyHint 
 	return m.podTopologyHints[podUID][containerName]
 }
 
-func (m *manager) accumulateProvidersHints(pod v1.Pod, container v1.Container) (providersHints []map[string][]TopologyHint) {
+func (m *manager) accumulateProvidersHints(
+	pod v1.Pod, container v1.Container,
+) (providersHints []map[string][]TopologyHint) {
 	// Loop through all hint providers and save an accumulated list of the
 	// hints returned by each hint provider.
 	for _, provider := range m.hintProviders {
 		// Get the TopologyHints from a provider.
 		hints := provider.GetTopologyHints(pod, container)
 		providersHints = append(providersHints, hints)
-		klog.Infof("[topologymanager] TopologyHints for pod '%v', container '%v': %v", pod.Name, container.Name, hints)
+		klog.Infof(
+			"[topologymanager] TopologyHints for pod '%v', container '%v': %v", 
+			pod.Name, container.Name, hints,
+		)
 	}
 	return providersHints
 }

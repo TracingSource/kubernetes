@@ -23,6 +23,9 @@ type FileStore struct {
 	filesystem utilfs.Filesystem
 }
 
+// caller:
+// 	1. pkg/kubelet/checkpointmanager/checkpoint_manager.go -> NewCheckpointManager()
+//
 // NewFileStore returns an instance of FileStore.
 func NewFileStore(path string, fs utilfs.Filesystem) (Store, error) {
 	if err := ensureDirectory(fs, path); err != nil {

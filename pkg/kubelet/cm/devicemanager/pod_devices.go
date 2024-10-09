@@ -19,6 +19,8 @@ type deviceAllocateInfo struct {
 
 type resourceAllocateInfo map[string]deviceAllocateInfo // Keyed by resourceName.
 type containerDevices map[string]resourceAllocateInfo   // Keyed by containerName.
+// podDevices 中存储着所有已分配的 devices 信息, 并按 pod/container 进行分级归类,
+// 作为 kubelet 的本地缓存.
 type podDevices map[string]containerDevices             // Keyed by podUID.
 
 func (pdev podDevices) pods() sets.String {
@@ -104,7 +106,11 @@ func (pdev podDevices) removeContainerAllocatedResources(
 	}
 }
 
-// 	@return ret: key 为扩展资源名称(与 cpu/memory 同级)
+// devices 从 podDevices 中取出所有的设备信息, 作为集合返回.
+// (这些设备都是已分配的设备, 属于某个 Pod)
+//
+// 	@return ret: key 为扩展资源名称(与 cpu/memory 同级), value 为 podDevices 中
+// 所有的设备的 ID 集合.
 //
 // Returns all of devices allocated to the pods being tracked, keyed by resourceName.
 func (pdev podDevices) devices() map[string]sets.String {
