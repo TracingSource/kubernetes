@@ -166,6 +166,11 @@ func newManagerImpl(
 	return manager, nil
 }
 
+// 宿主机上的设备状态或数量发生变动时, 由 device plugin 上报最新的设备列表信息,
+// kubelet 最终会运行到这里进行更新.
+//
+// 	@param devices: 当前节点上全量的设备列表信息.
+//
 // caller:
 // 	1. pkg/kubelet/cm/devicemanager/endpoint.go -> endpointImpl.callback()
 // 	作为 endpointImpl 的 cb() 成员方法被调用.

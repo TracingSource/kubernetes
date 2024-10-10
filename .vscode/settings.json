@@ -45,6 +45,10 @@
         "pkg/volume/flocker/": true,
         "pkg/volume/vsphere_volume": true,
         "pkg/windows/": true,
+        "**/*_windows.go": true,
+        "**/*_windows_test.go": true,
+        "**/*_darwin.go": true,
+        "**/*_darwin_test.go": true,
     },
     // 全局搜索不搜索如下目录内容
     "search.exclude": {
@@ -84,5 +88,9 @@
         "pkg/volume/flocker/": true,
         "pkg/volume/vsphere_volume": true,
         "pkg/windows/": true,
+        "**/*_windows.go": true,
+        "**/*_windows_test.go": true,
+        "**/*_darwin.go": true,
+        "**/*_darwin_test.go": true,
     }
 }
