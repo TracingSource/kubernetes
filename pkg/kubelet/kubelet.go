@@ -947,6 +947,8 @@ func (kl *Kubelet) LatestLoopEntryTime() time.Time {
 	return val.(time.Time)
 }
 
+// updateRuntimeUp 检测 docker/containerd 的运行状态, 并更新到 runtimeState 成员.
+//
 // caller:
 // 	1. Kubelet.Run()
 //

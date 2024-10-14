@@ -12,6 +12,8 @@ import (
 	"k8s.io/klog"
 )
 
+// 	@implementBy: desiredStateOfWorld{}
+//
 // DesiredStateOfWorld defines a set of thread-safe operations for the kubelet
 // plugin manager's desired state of the world cache.
 // This cache contains a map of socket file path to plugin information of
@@ -104,6 +106,8 @@ func errSuffix(err error) string {
 	return errStr
 }
 
+// caller:
+// 	1. pkg/kubelet/pluginmanager/pluginwatcher/plugin_watcher.go -> Watcher.handlePluginRegistration()
 func (dsw *desiredStateOfWorld) AddOrUpdatePlugin(socketPath string) error {
 	dsw.Lock()
 	defer dsw.Unlock()

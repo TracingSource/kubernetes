@@ -14,6 +14,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/reconciler"
 )
 
+// 	@implementBy: pluginManager{}
+//
 // PluginManager runs a set of asynchronous loops that figure out which plugins
 // need to be registered/deregistered and makes it so.
 type PluginManager interface {
@@ -33,11 +35,16 @@ const (
 	loopSleepDuration = 1 * time.Second
 )
 
+// 	@param sockDir: /var/lib/kubelet/plugins_registry
+//
+// caller:
+// 	1. pkg/kubelet/kubelet__new.go -> NewMainKubelet()
+//
 // NewPluginManager returns a new concrete instance implementing the
 // PluginManager interface.
 func NewPluginManager(
-	sockDir string,
-	recorder record.EventRecorder) PluginManager {
+	sockDir string, recorder record.EventRecorder,
+) PluginManager {
 	asw := cache.NewActualStateOfWorld()
 	dsw := cache.NewDesiredStateOfWorld()
 	reconciler := reconciler.NewReconciler(
@@ -103,6 +110,10 @@ func (pm *pluginManager) Run(sourcesReady config.SourcesReady, stopCh <-chan str
 	klog.Infof("Shutting down Kubelet Plugin Manager")
 }
 
+// 	@param pluginType: 可以是 CSIPlugin、DevicePlugin
+//
+// caller:
+// 	1. pkg/kubelet/kubelet__init.go -> Kubelet.initializeRuntimeDependentModules()
 func (pm *pluginManager) AddHandler(pluginType string, handler cache.PluginHandler) {
 	pm.reconciler.AddHandler(pluginType, handler)
 }

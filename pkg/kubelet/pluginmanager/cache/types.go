@@ -1,5 +1,7 @@
 package cache
 
+// 	@implementBy: pkg/kubelet/cm/devicemanager/manager.go -> ManagerImpl{}
+//
 // PluginHandler is an interface a client of the pluginwatcher API needs to implement in
 // order to consume plugins
 // The PluginHandler follows the simple following state machine:

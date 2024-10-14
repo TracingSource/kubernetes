@@ -17,6 +17,7 @@ import (
 
 // Watcher is the plugin watcher
 type Watcher struct {
+	// path /var/lib/kubelet/plugins_registry
 	path                string
 	fs                  utilfs.Filesystem
 	fsWatcher           *fsnotify.Watcher
@@ -24,6 +25,11 @@ type Watcher struct {
 	desiredStateOfWorld cache.DesiredStateOfWorld
 }
 
+// 	@param sockDir: /var/lib/kubelet/plugins_registry
+//
+// caller: 
+// 	1. pkg/kubelet/pluginmanager/plugin_manager.go -> NewPluginManager()
+//
 // NewWatcher provides a new watcher for socket registration
 func NewWatcher(sockDir string, desiredStateOfWorld cache.DesiredStateOfWorld) *Watcher {
 	return &Watcher{
@@ -171,10 +177,9 @@ func (w *Watcher) handleCreateEvent(event fsnotify.Event) error {
 	return w.traversePluginDir(event.Name)
 }
 
+// caller:
+// 	1. Watcher.handleCreateEvent()
 func (w *Watcher) handlePluginRegistration(socketPath string) error {
-	if runtime.GOOS == "windows" {
-		socketPath = util.NormalizePath(socketPath)
-	}
 	//TODO: Implement rate limiting to mitigate any DOS kind of attacks.
 	// Update desired state of world list of plugins
 	// If the socket path does exist in the desired world cache, there's still

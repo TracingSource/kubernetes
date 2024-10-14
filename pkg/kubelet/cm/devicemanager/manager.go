@@ -297,20 +297,31 @@ func (m *ManagerImpl) GetWatcherHandler() cache.PluginHandler {
 		f.Close()
 		klog.V(4).Infof("created deprecation file %s", f.Name())
 	}
-
+	// 类型转换, 而非函数调用
 	return cache.PluginHandler(m)
 }
 
 // ValidatePlugin validates a plugin if the version is correct and the name has the format of an extended resource
-func (m *ManagerImpl) ValidatePlugin(pluginName string, endpoint string, versions []string) error {
-	klog.V(2).Infof("Got Plugin %s at endpoint %s with versions %v", pluginName, endpoint, versions)
+func (m *ManagerImpl) ValidatePlugin(
+	pluginName string, endpoint string, versions []string,
+) error {
+	klog.V(2).Infof(
+		"Got Plugin %s at endpoint %s with versions %v", 
+		pluginName, endpoint, versions,
+	)
 
 	if !m.isVersionCompatibleWithPlugin(versions) {
-		return fmt.Errorf("manager version, %s, is not among plugin supported versions %v", pluginapi.Version, versions)
+		return fmt.Errorf(
+			"manager version, %s, is not among plugin supported versions %v", 
+			pluginapi.Version, versions,
+		)
 	}
 
 	if !v1helper.IsExtendedResourceName(v1.ResourceName(pluginName)) {
-		return fmt.Errorf("invalid name of device plugin socket: %s", fmt.Sprintf(errInvalidResourceName, pluginName))
+		return fmt.Errorf(
+			"invalid name of device plugin socket: %s", 
+			fmt.Sprintf(errInvalidResourceName, pluginName),
+		)
 	}
 
 	return nil

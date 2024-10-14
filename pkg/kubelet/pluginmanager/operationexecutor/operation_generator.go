@@ -60,7 +60,8 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 	socketPath string,
 	timestamp time.Time,
 	pluginHandlers map[string]cache.PluginHandler,
-	actualStateOfWorldUpdater ActualStateOfWorldUpdater) func() error {
+	actualStateOfWorldUpdater ActualStateOfWorldUpdater,
+) func() error {
 
 	registerPluginFunc := func() error {
 		client, conn, err := dial(socketPath, dialTimeoutDuration)
@@ -171,7 +172,8 @@ func (og *operationGenerator) notifyPlugin(client registerapi.RegistrationClient
 	return nil
 }
 
-// Dial establishes the gRPC communication with the picked up plugin socket. https://godoc.org/google.golang.org/grpc#Dial
+// Dial establishes the gRPC communication with the picked up plugin socket.
+// https://godoc.org/google.golang.org/grpc#Dial
 func dial(unixSocketPath string, timeout time.Duration) (registerapi.RegistrationClient, *grpc.ClientConn, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()

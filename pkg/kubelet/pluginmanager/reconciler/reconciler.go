@@ -15,6 +15,8 @@ import (
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
 )
 
+// 	@implementBy: reconciler{}
+//
 // Reconciler runs a periodic loop to reconcile the desired state of the world
 // with the actual state of the world by triggering register and unregister
 // operations.
@@ -59,18 +61,15 @@ type reconciler struct {
 	loopSleepDuration   time.Duration
 	desiredStateOfWorld cache.DesiredStateOfWorld
 	actualStateOfWorld  cache.ActualStateOfWorld
-	handlers            map[string]cache.PluginHandler
+	// key 可以是 CSIPlugin、DevicePlugin
+	handlers map[string]cache.PluginHandler
 	sync.RWMutex
 }
 
 var _ Reconciler = &reconciler{}
 
 func (rc *reconciler) Run(stopCh <-chan struct{}) {
-	wait.Until(func() {
-		rc.reconcile()
-	},
-		rc.loopSleepDuration,
-		stopCh)
+	wait.Until(func() { rc.reconcile() }, rc.loopSleepDuration, stopCh)
 }
 
 func (rc *reconciler) AddHandler(pluginType string, pluginHandler cache.PluginHandler) {
@@ -102,7 +101,9 @@ func (rc *reconciler) reconcile() {
 			// with the same socket path but different timestamp.
 			for _, dswPlugin := range rc.desiredStateOfWorld.GetPluginsToRegister() {
 				if dswPlugin.SocketPath == registeredPlugin.SocketPath && dswPlugin.Timestamp != registeredPlugin.Timestamp {
-					klog.V(5).Infof(registeredPlugin.GenerateMsgDetailed("An updated version of plugin has been found, unregistering the plugin first before reregistering", ""))
+					klog.V(5).Infof(registeredPlugin.GenerateMsgDetailed(
+						"An updated version of plugin has been found, unregistering the plugin first before reregistering", "",
+					))
 					unregisterPlugin = true
 					break
 				}
@@ -128,16 +129,24 @@ func (rc *reconciler) reconcile() {
 	// Ensure plugins that should be registered are registered
 	for _, pluginToRegister := range rc.desiredStateOfWorld.GetPluginsToRegister() {
 		if !rc.actualStateOfWorld.PluginExistsWithCorrectTimestamp(pluginToRegister) {
-			klog.V(5).Infof(pluginToRegister.GenerateMsgDetailed("Starting operationExecutor.RegisterPlugin", ""))
-			err := rc.operationExecutor.RegisterPlugin(pluginToRegister.SocketPath, pluginToRegister.Timestamp, rc.getHandlers(), rc.actualStateOfWorld)
+			klog.V(5).Infof(pluginToRegister.GenerateMsgDetailed(
+				"Starting operationExecutor.RegisterPlugin", "",
+			))
+			err := rc.operationExecutor.RegisterPlugin(
+				pluginToRegister.SocketPath, pluginToRegister.Timestamp, rc.getHandlers(), rc.actualStateOfWorld,
+			)
 			if err != nil &&
 				!goroutinemap.IsAlreadyExists(err) &&
 				!exponentialbackoff.IsExponentialBackoff(err) {
 				// Ignore goroutinemap.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
-				klog.Errorf(pluginToRegister.GenerateErrorDetailed("operationExecutor.RegisterPlugin failed", err).Error())
+				klog.Errorf(pluginToRegister.GenerateErrorDetailed(
+					"operationExecutor.RegisterPlugin failed", err,
+				).Error())
 			}
 			if err == nil {
-				klog.V(1).Infof(pluginToRegister.GenerateMsgDetailed("operationExecutor.RegisterPlugin started", ""))
+				klog.V(1).Infof(pluginToRegister.GenerateMsgDetailed(
+					"operationExecutor.RegisterPlugin started", "",
+				))
 			}
 		}
 	}

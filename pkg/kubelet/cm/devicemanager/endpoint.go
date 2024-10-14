@@ -75,9 +75,12 @@ func (e *endpointImpl) callback(resourceName string, devices []pluginapi.Device)
 	e.cb(resourceName, devices)
 }
 
+// caller:
+// 	1. pkg/kubelet/cm/devicemanager/manager.go -> ManagerImpl.runEndpoint()
+//
 // run initializes ListAndWatch gRPC call for the device plugin and
-// blocks on receiving ListAndWatch gRPC stream updates. Each ListAndWatch
-// stream update contains a new list of device states.
+// blocks on receiving ListAndWatch gRPC stream updates.
+// Each ListAndWatch stream update contains a new list of device states.
 // It then issues a callback to pass this information to the device manager which
 // will adjust the resource available information accordingly.
 func (e *endpointImpl) run() {

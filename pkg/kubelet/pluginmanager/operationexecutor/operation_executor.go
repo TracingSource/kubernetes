@@ -11,6 +11,8 @@ import (
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 )
 
+// 	@implementBy: operationExecutor{}
+//
 // OperationExecutor defines a set of operations for registering and unregistering
 // a plugin that are executed with a NewGoRoutineMap which
 // prevents more than one operation from being triggered on the same socket path.
@@ -81,20 +83,20 @@ func (oe *operationExecutor) RegisterPlugin(
 	timestamp time.Time,
 	pluginHandlers map[string]cache.PluginHandler,
 	actualStateOfWorld ActualStateOfWorldUpdater) error {
-	generatedOperation :=
-		oe.operationGenerator.GenerateRegisterPluginFunc(socketPath, timestamp, pluginHandlers, actualStateOfWorld)
+	generatedOperation := oe.operationGenerator.GenerateRegisterPluginFunc(
+		socketPath, timestamp, pluginHandlers, actualStateOfWorld,
+	)
 
-	return oe.pendingOperations.Run(
-		socketPath, generatedOperation)
+	return oe.pendingOperations.Run(socketPath, generatedOperation)
 }
 
 func (oe *operationExecutor) UnregisterPlugin(
 	socketPath string,
 	pluginHandlers map[string]cache.PluginHandler,
 	actualStateOfWorld ActualStateOfWorldUpdater) error {
-	generatedOperation :=
-		oe.operationGenerator.GenerateUnregisterPluginFunc(socketPath, pluginHandlers, actualStateOfWorld)
+	generatedOperation := oe.operationGenerator.GenerateUnregisterPluginFunc(
+		socketPath, pluginHandlers, actualStateOfWorld,
+	)
 
-	return oe.pendingOperations.Run(
-		socketPath, generatedOperation)
+	return oe.pendingOperations.Run(socketPath, generatedOperation)
 }

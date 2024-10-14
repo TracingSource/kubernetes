@@ -120,6 +120,8 @@ func (kl *Kubelet) initializeModules() error {
 	return nil
 }
 
+// initializeRuntimeDependentModules 启动各类子系统, ta们需要 docker/containerd 处于运行状态.
+//
 // caller: 
 // 	1. pkg/kubelet/kubelet.go -> kl.updateRuntimeUp()
 //  其实也是在 Kubelet.Run() 中调用的.

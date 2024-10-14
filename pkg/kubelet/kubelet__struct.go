@@ -99,7 +99,7 @@ type Kubelet struct {
 
 	// Needed to observe and respond to situations that could impact node stability
 	evictionManager eviction.Manager
-	// logServer 默认为 true
+	// logServer 默认为 true, 提供宿主机上 /var/log 目录的访问能力.
 	//
 	// Optional, defaults to /logs/ from /var/log
 	logServer http.Handler

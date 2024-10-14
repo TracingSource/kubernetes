@@ -24,7 +24,11 @@ var (
 	ethtoolOutputRegex = regexp.MustCompile(`peer_ifindex: (\d+)`)
 )
 
-func findPairInterfaceOfContainerInterface(e exec.Interface, containerInterfaceName, containerDesc string, nsenterArgs []string) (string, error) {
+// caller: none
+func findPairInterfaceOfContainerInterface(
+	e exec.Interface, containerInterfaceName, containerDesc string, 
+	nsenterArgs []string,
+) (string, error) {
 	nsenterPath, err := e.LookPath("nsenter")
 	if err != nil {
 		return "", err
