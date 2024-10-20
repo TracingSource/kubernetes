@@ -95,7 +95,8 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 	// Parameter "obj" is a table from server; print it.
 	// display tables following the rules of options
 	if table, ok := obj.(*metav1beta1.Table); ok {
-		// Do not print headers if this table has no column definitions, or they are the same as the last ones we printed
+		// Do not print headers if this table has no column definitions,
+		// or they are the same as the last ones we printed
 		localOptions := h.options
 		if h.printedHeaders && (len(table.ColumnDefinitions) == 0 || reflect.DeepEqual(table.ColumnDefinitions, h.lastColumns)) {
 			localOptions.NoHeaders = true

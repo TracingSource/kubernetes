@@ -990,6 +990,9 @@ func (kl *Kubelet) GetKubeletContainerLogs(ctx context.Context, podFullName, con
 	return kl.containerRuntime.GetContainerLogs(ctx, pod, containerID, logOptions, stdout, stderr)
 }
 
+// caller:
+// 	1. Kubelet.generateAPIPodStatus() 只有这一处
+//
 // getPhase returns the phase of a pod given its container info.
 func getPhase(spec *v1.PodSpec, info []v1.ContainerStatus) v1.PodPhase {
 	pendingInitialization := 0
@@ -1094,7 +1097,9 @@ func getPhase(spec *v1.PodSpec, info []v1.ContainerStatus) v1.PodPhase {
 
 // generateAPIPodStatus creates the final API pod status for a pod, given the
 // internal pod status.
-func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.PodStatus) v1.PodStatus {
+func (kl *Kubelet) generateAPIPodStatus(
+	pod *v1.Pod, podStatus *kubecontainer.PodStatus,
+) v1.PodStatus {
 	klog.V(3).Infof("Generating status for %q", format.Pod(pod))
 
 	s := kl.convertStatusToAPIStatus(pod, podStatus)

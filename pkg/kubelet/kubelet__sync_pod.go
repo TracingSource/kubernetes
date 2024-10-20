@@ -263,7 +263,10 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 
 	// Make data directories for the pod
 	if err := kl.makePodDataDirs(pod); err != nil {
-		kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedToMakePodDataDirectories, "error making pod data directories: %v", err)
+		kl.recorder.Eventf(
+			pod, v1.EventTypeWarning, events.FailedToMakePodDataDirectories, 
+			"error making pod data directories: %v", err,
+		)
 		klog.Errorf("Unable to make pod data directories for pod %q: %v", format.Pod(pod), err)
 		return err
 	}
@@ -272,8 +275,14 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	if !kl.podIsTerminated(pod) {
 		// Wait for volumes to attach/mount
 		if err := kl.volumeManager.WaitForAttachAndMount(pod); err != nil {
-			kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedMountVolume, "Unable to attach or mount volumes: %v", err)
-			klog.Errorf("Unable to attach or mount volumes for pod %q: %v; skipping pod", format.Pod(pod), err)
+			kl.recorder.Eventf(
+				pod, v1.EventTypeWarning, events.FailedMountVolume, 
+				"Unable to attach or mount volumes: %v", err,
+			)
+			klog.Errorf(
+				"Unable to attach or mount volumes for pod %q: %v; skipping pod", 
+				format.Pod(pod), err,
+			)
 			return err
 		}
 	}

@@ -48,8 +48,8 @@ type monitorCallback func(resourceName string, devices []pluginapi.Device)
 //
 // ManagerImpl is the structure in charge of managing Device Plugins.
 type ManagerImpl struct {
-	socketname string
-	socketdir  string
+	socketname string // kubelet.sock
+	socketdir  string // /var/lib/kubelet/device-plugins
 
 	endpoints map[string]endpointInfo // Key is ResourceName
 	mutex     sync.Mutex
@@ -89,7 +89,7 @@ type ManagerImpl struct {
 	// podDevices 存储着已分配给所有pod的所有container的设备列表, 作为缓存.
 	//
 	// podDevices contains pod to allocated device mapping.
-	podDevices        podDevices
+	podDevices podDevices
 	// kubelet 会在 /var/lib/kubelet/device-plugins/kubelet_internal_checkpoint 文件中,
 	// 存放所有分配给 pod/container 的设备信息, 防止 kubelet 自身发生重启后数据丢失.
 	checkpointManager checkpointmanager.CheckpointManager
@@ -122,6 +122,7 @@ func NewManagerImpl(
 	return newManagerImpl(pluginapi.KubeletSocket, numaNodeInfo, topologyAffinityStore)
 }
 
+// 	@param socketPath: /var/lib/kubelet/device-plugins/kubelet.sock
 func newManagerImpl(
 	socketPath string, numaNodeInfo cputopology.NUMANodeInfo,
 	topologyAffinityStore topologymanager.Store,
@@ -166,8 +167,8 @@ func newManagerImpl(
 	return manager, nil
 }
 
-// 宿主机上的设备状态或数量发生变动时, 由 device plugin 上报最新的设备列表信息,
-// kubelet 最终会运行到这里进行更新.
+// device plugin 初次注册自身或宿主机上的设备状态或数量发生变动时,
+// 由 device plugin 上报最新的设备列表信息, kubelet 最终会运行到这里进行更新.
 //
 // 	@param devices: 当前节点上全量的设备列表信息.
 //
@@ -306,20 +307,20 @@ func (m *ManagerImpl) ValidatePlugin(
 	pluginName string, endpoint string, versions []string,
 ) error {
 	klog.V(2).Infof(
-		"Got Plugin %s at endpoint %s with versions %v", 
+		"Got Plugin %s at endpoint %s with versions %v",
 		pluginName, endpoint, versions,
 	)
 
 	if !m.isVersionCompatibleWithPlugin(versions) {
 		return fmt.Errorf(
-			"manager version, %s, is not among plugin supported versions %v", 
+			"manager version, %s, is not among plugin supported versions %v",
 			pluginapi.Version, versions,
 		)
 	}
 
 	if !v1helper.IsExtendedResourceName(v1.ResourceName(pluginName)) {
 		return fmt.Errorf(
-			"invalid name of device plugin socket: %s", 
+			"invalid name of device plugin socket: %s",
 			fmt.Sprintf(errInvalidResourceName, pluginName),
 		)
 	}
@@ -424,13 +425,20 @@ func (m *ManagerImpl) Allocate(
 		return nil
 	}
 
+	// 更新 node.status.allocatable 字段
 	m.sanitizeNodeAllocatable(node)
 	return nil
 }
 
+// Register 由某个 device plugin 通过 grpc 调用, 注册一个扩展资源
+// 比如 pkg/kubelet/cm/devicemanager/device_plugin_stub.go -> Stub.Register
+//
 // Register registers a device plugin.
 func (m *ManagerImpl) Register(ctx context.Context, r *pluginapi.RegisterRequest) (*pluginapi.Empty, error) {
-	klog.Infof("Got registration request from device plugin with resource name %q", r.ResourceName)
+	klog.Infof(
+		"Got registration request from device plugin with resource name %q",
+		r.ResourceName,
+	)
 	metrics.DevicePluginRegistrationCount.WithLabelValues(r.ResourceName).Inc()
 	metrics.DeprecatedDevicePluginRegistrationCount.WithLabelValues(r.ResourceName).Inc()
 	var versionCompatible bool
@@ -442,7 +450,10 @@ func (m *ManagerImpl) Register(ctx context.Context, r *pluginapi.RegisterRequest
 	}
 	if !versionCompatible {
 		errorString := fmt.Sprintf(errUnsupportedVersion, r.Version, pluginapi.SupportedVersions)
-		klog.Infof("Bad registration request from device plugin with resource name %q: %s", r.ResourceName, errorString)
+		klog.Infof(
+			"Bad registration request from device plugin with resource name %q: %s",
+			r.ResourceName, errorString,
+		)
 		return &pluginapi.Empty{}, fmt.Errorf(errorString)
 	}
 
@@ -480,7 +491,9 @@ func (m *ManagerImpl) Stop() error {
 	return nil
 }
 
-func (m *ManagerImpl) registerEndpoint(resourceName string, options *pluginapi.DevicePluginOptions, e endpoint) {
+func (m *ManagerImpl) registerEndpoint(
+	resourceName string, options *pluginapi.DevicePluginOptions, e endpoint,
+) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -489,7 +502,7 @@ func (m *ManagerImpl) registerEndpoint(resourceName string, options *pluginapi.D
 }
 
 func (m *ManagerImpl) runEndpoint(resourceName string, e endpoint) {
-	e.run()
+	e.run() // 启动 ListAndWatch() 函数进行监听
 	e.stop()
 
 	m.mutex.Lock()
@@ -502,6 +515,8 @@ func (m *ManagerImpl) runEndpoint(resourceName string, e endpoint) {
 	klog.V(2).Infof("Endpoint (%s, %v) became unhealthy", resourceName, e)
 }
 
+// caller:
+// 	1. ManagerImpl.Register() kubelet 接收到来自 device plugin 的注册请求时被调用
 func (m *ManagerImpl) addEndpoint(r *pluginapi.RegisterRequest) {
 	new, err := newEndpointImpl(filepath.Join(m.socketdir, r.Endpoint), r.ResourceName, m.callback)
 	if err != nil {

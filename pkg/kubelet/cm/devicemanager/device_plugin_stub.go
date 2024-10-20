@@ -15,6 +15,8 @@ import (
 	watcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 )
 
+// 这是一个 device plugin 的模拟实现, 示例而已.
+//
 // Stub implementation for DevicePlugin.
 type Stub struct {
 	devs                  []*pluginapi.Device

@@ -13,6 +13,8 @@ import (
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 )
 
+// 	@implementBy: endpointImpl{}
+//
 // endpoint maps to a single registered device plugin. It is responsible
 // for managing gRPC communications with the device plugin and caching
 // device states reported by the device plugin.
@@ -38,11 +40,19 @@ type endpointImpl struct {
 	cb    monitorCallback
 }
 
+// 	@param socketPath: device plugin 的 socket 路径, 在 /var/lib/kubelet/device-plugins 目录下
+// 	@param resourceName: device plugin 提供的扩展资源名称
 // 	@param callback: pkg/kubelet/cm/devicemanager/manager.go -> ManagerImpl.genericDeviceUpdateCallback()
+//
+// caller:
+// 	1. pkg/kubelet/cm/devicemanager/manager.go -> ManagerImpl.addEndpoint()
+//  kubelet 接收到来自 device plugin 的注册请求时被调用
 //
 // newEndpointImpl creates a new endpoint for the given resourceName.
 // This is to be used during normal device plugin registration.
-func newEndpointImpl(socketPath, resourceName string, callback monitorCallback) (*endpointImpl, error) {
+func newEndpointImpl(
+	socketPath, resourceName string, callback monitorCallback,
+) (*endpointImpl, error) {
 	client, c, err := dial(socketPath)
 	if err != nil {
 		klog.Errorf("Can't create new endpoint with path %s err %v", socketPath, err)
