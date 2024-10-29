@@ -18,6 +18,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
+// SyncPod 维持目标 Pod 处于期望状态
+//
 // caller: 
 // 	1. kubelet.go -> kl.syncPod() 只有这一处.
 //
@@ -190,8 +192,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(
 			)
 			klog.Errorf(
 				"Failed to get pod sandbox status: %v; Skipping pod %q", 
-				err, 
-				format.Pod(pod),
+				err, format.Pod(pod),
 			)
 			result.Fail(err)
 			return
@@ -205,8 +206,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(
 			podIPs = m.determinePodSandboxIPs(pod.Namespace, pod.Name, podSandboxStatus)
 			klog.V(4).Infof(
 				"Determined the ip %v for pod %q after sandbox changed", 
-				podIPs, 
-				format.Pod(pod),
+				podIPs, format.Pod(pod),
 			)
 		}
 	}
@@ -221,13 +221,11 @@ func (m *kubeGenericRuntimeManager) SyncPod(
 
 	// Get podSandboxConfig for containers to start.
 	configPodSandboxResult := kubecontainer.NewSyncResult(
-		kubecontainer.ConfigPodSandbox, 
-		podSandboxID,
+		kubecontainer.ConfigPodSandbox, podSandboxID,
 	)
 	result.AddSyncResult(configPodSandboxResult)
 	podSandboxConfig, err := m.generatePodSandboxConfig(
-		pod, 
-		podContainerChanges.Attempt,
+		pod, podContainerChanges.Attempt,
 	)
 	if err != nil {
 		message := fmt.Sprintf(

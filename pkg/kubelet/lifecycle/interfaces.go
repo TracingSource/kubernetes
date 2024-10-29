@@ -5,8 +5,12 @@ import "k8s.io/api/core/v1"
 // PodAdmitAttributes is the context for a pod admission decision.
 // The member fields of this struct should never be mutated.
 type PodAdmitAttributes struct {
+	// Pod 等待在当前节点上运行的 pod(已被调度到当前 Node)
+	//
 	// the pod to evaluate for admission
 	Pod *v1.Pod
+	// 所有运行在当前节点上的 pod 列表
+	//
 	// all pods bound to the kubelet excluding the pod being evaluated
 	OtherPods []*v1.Pod
 }
@@ -21,6 +25,8 @@ type PodAdmitResult struct {
 	Message string
 }
 
+// 	@implementBy: pkg/kubelet/lifecycle/predicate.go -> predicateAdmitHandler{}
+//
 // PodAdmitHandler is notified during pod admission.
 type PodAdmitHandler interface {
 	// Admit evaluates if a pod can be admitted.

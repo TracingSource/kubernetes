@@ -48,6 +48,9 @@ func NewPredicateAdmitHandler(
 	}
 }
 
+// caller:
+// 	1. pkg/kubelet/kubelet.go -> Kubelet.canAdmitPod()
+//  只有这一处, 作为 podAdmitHandler 的成员方法被调用, 准入判断在真正运行一个 Pod 之前执行.
 func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
 	// 获取 kubelet 所在的当前 Node 对象.
 	node, err := w.getNodeAnyWayFunc()

@@ -162,7 +162,10 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	//
 	// If the network plugin is not ready, only start the pod if it uses the host network
 	if err := kl.runtimeState.networkErrors(); err != nil && !kubecontainer.IsHostNetworkPod(pod) {
-		kl.recorder.Eventf(pod, v1.EventTypeWarning, events.NetworkNotReady, "%s: %v", NetworkNotReadyErrorMsg, err)
+		kl.recorder.Eventf(
+			pod, v1.EventTypeWarning, events.NetworkNotReady, 
+			"%s: %v", NetworkNotReadyErrorMsg, err,
+		)
 		return fmt.Errorf("%s: %v", NetworkNotReadyErrorMsg, err)
 	}
 

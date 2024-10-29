@@ -707,9 +707,12 @@ func (cm *containerManagerImpl) GetResources(
 	return opts, nil
 }
 
+// 	@param node: kubelet 所在当前主机的 node 信息
+// 	@param attrs: 包含待调度到当前 node 的 pod 信息
+//
 // caller:
 // 	1. pkg/kubelet/lifecycle/predicate.go -> predicateAdmitHandler.Admit()
-// 	作为 pluginResourceUpdateFunc 成员方法被调用
+// 	作为 pluginResourceUpdateFunc 成员方法被调用, 准入判断在真正运行一个 Pod 之前执行.
 func (cm *containerManagerImpl) UpdatePluginResources(
 	node *schedulernodeinfo.NodeInfo, attrs *lifecycle.PodAdmitAttributes,
 ) error {

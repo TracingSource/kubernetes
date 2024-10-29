@@ -517,6 +517,9 @@ func (kl *Kubelet) rejectPod(pod *v1.Pod, reason, message string) {
 		Message: "Pod " + message})
 }
 
+// 	@param pod: 等待在当前节点上运行的 pod(已被调度到当前 Node)
+// 	@param pods: 所有运行在当前节点上的 pod 列表
+//
 // caller:
 // 	1. Kubelet.HandlePodAdditions() 处理常规的 Pod 新增事件(已被调度到当前 Node)
 // 	2. pkg/kubelet/runonce.go -> Kubelet.runOnce() kubelet 一次性运行, 一般不会用到
@@ -525,8 +528,7 @@ func (kl *Kubelet) rejectPod(pod *v1.Pod, reason, message string) {
 // if it cannot.
 // "pod" is new pod, while "pods" are all admitted pods
 // The function returns a boolean value indicating whether the pod can be admitted,
-// a brief single-word reason and a message explaining why
-// the pod cannot be admitted.
+// a brief single-word reason and a message explaining why the pod cannot be admitted.
 func (kl *Kubelet) canAdmitPod(pods []*v1.Pod, pod *v1.Pod) (bool, string, string) {
 	// the kubelet will invoke each pod admit handler in sequence
 	// if any handler rejects, the pod is rejected.
@@ -542,6 +544,8 @@ func (kl *Kubelet) canAdmitPod(pods []*v1.Pod, pod *v1.Pod) (bool, string, strin
 	return true, "", ""
 }
 
+// caller:
+//	1. pkg/kubelet/kubelet__sync_pod.go -> Kubelet.syncPod()
 func (kl *Kubelet) canRunPod(pod *v1.Pod) lifecycle.PodAdmitResult {
 	attrs := &lifecycle.PodAdmitAttributes{Pod: pod}
 	// Get "OtherPods". Rejected pods are failed, so only include admitted pods that are alive.
@@ -664,8 +668,7 @@ func (kl *Kubelet) syncLoopIteration(
 ) bool {
 	select {
 	case u, open := <-configCh:
-		// Update from a config source; dispatch it to the right handler
-		// callback.
+		// Update from a config source; dispatch it to the right handler callback.
 		if !open {
 			klog.Errorf("Update channel is closed. Exiting the sync loop.")
 			return false
@@ -704,8 +707,8 @@ func (kl *Kubelet) syncLoopIteration(
 
 		if u.Op != kubetypes.RESTORE {
 			// If the update type is RESTORE, it means that the update is from
-			// the pod checkpoints and may be incomplete. Do not mark the
-			// source as ready.
+			// the pod checkpoints and may be incomplete.
+			// Do not mark the source as ready.
 
 			// Mark the source ready after receiving at least one update from the
 			// source. Once all the sources are marked ready, various cleanup
@@ -844,8 +847,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 		}
 
 		if !kl.podIsTerminated(pod) {
-			// Only go through the admission process if the pod is not
-			// terminated.
+			// Only go through the admission process if the pod is not terminated.
 
 			// We failed pods that we rejected, so activePods include all admitted
 			// pods that are alive.

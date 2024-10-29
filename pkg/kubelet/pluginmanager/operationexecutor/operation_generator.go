@@ -47,13 +47,15 @@ type OperationGenerator interface {
 		socketPath string,
 		timestamp time.Time,
 		pluginHandlers map[string]cache.PluginHandler,
-		actualStateOfWorldUpdater ActualStateOfWorldUpdater) func() error
+		actualStateOfWorldUpdater ActualStateOfWorldUpdater,
+	) func() error
 
 	// Generates the UnregisterPlugin function needed to perform the unregistration of a plugin
 	GenerateUnregisterPluginFunc(
 		socketPath string,
 		pluginHandlers map[string]cache.PluginHandler,
-		actualStateOfWorldUpdater ActualStateOfWorldUpdater) func() error
+		actualStateOfWorldUpdater ActualStateOfWorldUpdater,
+	) func() error
 }
 
 func (og *operationGenerator) GenerateRegisterPluginFunc(
@@ -66,7 +68,10 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 	registerPluginFunc := func() error {
 		client, conn, err := dial(socketPath, dialTimeoutDuration)
 		if err != nil {
-			return fmt.Errorf("RegisterPlugin error -- dial failed at socket %s, err: %v", socketPath, err)
+			return fmt.Errorf(
+				"RegisterPlugin error -- dial failed at socket %s, err: %v", 
+				socketPath, err,
+			)
 		}
 		defer conn.Close()
 
@@ -95,8 +100,10 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 			}
 			return fmt.Errorf("RegisterPlugin error -- pluginHandler.ValidatePluginFunc failed")
 		}
-		// We add the plugin to the actual state of world cache before calling a plugin consumer's Register handle
-		// so that if we receive a delete event during Register Plugin, we can process it as a DeRegister call.
+		// We add the plugin to the actual state of world cache before
+		// calling a plugin consumer's Register handle
+		// so that if we receive a delete event during Register Plugin,
+		// we can process it as a DeRegister call.
 		err = actualStateOfWorldUpdater.AddPlugin(cache.PluginInfo{
 			SocketPath: socketPath,
 			Timestamp:  timestamp,

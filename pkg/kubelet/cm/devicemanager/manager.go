@@ -302,7 +302,8 @@ func (m *ManagerImpl) GetWatcherHandler() cache.PluginHandler {
 	return cache.PluginHandler(m)
 }
 
-// ValidatePlugin validates a plugin if the version is correct and the name has the format of an extended resource
+// ValidatePlugin validates a plugin if the version is correct and the name has
+// the format of an extended resource
 func (m *ManagerImpl) ValidatePlugin(
 	pluginName string, endpoint string, versions []string,
 ) error {
@@ -331,7 +332,9 @@ func (m *ManagerImpl) ValidatePlugin(
 // RegisterPlugin starts the endpoint and registers it
 // TODO: Start the endpoint and wait for the First ListAndWatch call
 //       before registering the plugin
-func (m *ManagerImpl) RegisterPlugin(pluginName string, endpoint string, versions []string) error {
+func (m *ManagerImpl) RegisterPlugin(
+	pluginName string, endpoint string, versions []string,
+) error {
 	klog.V(2).Infof("Registering Plugin %s at endpoint %s", pluginName, endpoint)
 
 	e, err := newEndpointImpl(endpoint, pluginName, m.callback)
@@ -395,11 +398,17 @@ func (m *ManagerImpl) allocatePodResources(pod *v1.Pod) error {
 		if err := m.allocateContainerResources(pod, &container, devicesToReuse); err != nil {
 			return err
 		}
+		// TODO 啥意思?
 		m.podDevices.removeContainerAllocatedResources(string(pod.UID), container.Name, devicesToReuse)
 	}
 	return nil
 }
 
+// Allocate 在一个 Pod 已被调度到当前节点, 但还没有运行时, kubelet 需要为其做准入判断,
+// device manager 会尝试为其分配扩展资源并写入本地 podDevice 缓存.
+//
+// 之后在启动 Pod 前, kubelet 会调用 ManagerImpl.GetDeviceRunContainerOptions()
+//
 // caller:
 // 	1. pkg/kubelet/cm/container_manager_linux.go -> containerManagerImpl.UpdatePluginResources()
 // 	实际创建容器时被调用, 用于为其分配确定的 deviceID 资源列表.
@@ -410,10 +419,13 @@ func (m *ManagerImpl) Allocate(
 	node *schedulernodeinfo.NodeInfo, attrs *lifecycle.PodAdmitAttributes,
 ) error {
 	pod := attrs.Pod
-	// 调用 device plugin 为 pod 分配设备列表
+	// 调用 device plugin 为 pod 分配设备列表, 会写入 kubelet 本地的 podDevice 缓存中.
 	err := m.allocatePodResources(pod)
 	if err != nil {
-		klog.Errorf("Failed to allocate device plugin resource for pod %s: %v", string(pod.UID), err)
+		klog.Errorf(
+			"Failed to allocate device plugin resource for pod %s: %v", 
+			string(pod.UID), err,
+		)
 		return err
 	}
 
@@ -434,7 +446,9 @@ func (m *ManagerImpl) Allocate(
 // 比如 pkg/kubelet/cm/devicemanager/device_plugin_stub.go -> Stub.Register
 //
 // Register registers a device plugin.
-func (m *ManagerImpl) Register(ctx context.Context, r *pluginapi.RegisterRequest) (*pluginapi.Empty, error) {
+func (m *ManagerImpl) Register(
+	ctx context.Context, r *pluginapi.RegisterRequest,
+) (*pluginapi.Empty, error) {
 	klog.Infof(
 		"Got registration request from device plugin with resource name %q",
 		r.ResourceName,
@@ -672,10 +686,10 @@ func (m *ManagerImpl) updateAllocatedDevices(activePods []*v1.Pod) {
 	m.allocatedDevices = m.podDevices.devices()
 }
 
-// 	@param: podUID: 待分配扩展资源的 pod 的 uid
-// 	@param: podUID 表示的 pod 中的某一 container 名称(resources{}字段都是配置在 container 中的).
-// 	@param: resource 扩展资源名称, 与 cpu/memory 平级
-// 	@param: 需要分配的数量
+// 	@param podUID: 待分配扩展资源的 pod 的 uid
+// 	@param podUID: 表示的 pod 中的某一 container 名称(resources{}字段都是配置在 container 中的).
+// 	@param resource: 扩展资源名称, 与 cpu/memory 平级
+// 	@param required: 需要分配的数量
 //
 // Returns list of device Ids we need to allocate with Allocate rpc call.
 // Returns empty list in case we don't need to issue the Allocate rpc call.
@@ -965,6 +979,7 @@ func (m *ManagerImpl) GetDeviceRunContainerOptions(
 ) (*DeviceRunContainerOptions, error) {
 	podUID := string(pod.UID)
 	contName := container.Name
+	// 一般来说, Pod 在被创建前的准入阶段, kubelet 就已经分配过设备了, 不需要重新分配.
 	needsReAllocate := false
 	// 注意: k 的值不只可以是 cpu, memory, 还可以是 storage 和 ephemeral-storage.
 	// 其中, 后两者就可能是 device 类型, 因为这两个是可能需要从宿主机上挂载的设备.
@@ -977,8 +992,8 @@ func (m *ManagerImpl) GetDeviceRunContainerOptions(
 		if err != nil {
 			return nil, err
 		}
-		// 如果 podDevices 缓存中已经为该 pod/container 分配过设备, 则直接从缓存中读取,
-		// 不必重新调用 device plugin 再进行分配.
+		// 如果从本地缓存中没找到对应的设备信息, 则需要重新分配.
+		//
 		// This is a device plugin resource yet we don't have cached resource state.
 		// This is likely due to a race during node restart.
 		// We re-issue allocate request to cover this race.

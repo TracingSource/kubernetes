@@ -663,7 +663,9 @@ func NewMainKubelet(
 	}
 
 	// enable active deadline handler
-	activeDeadlineHandler, err := newActiveDeadlineHandler(klet.statusManager, kubeDeps.Recorder, klet.clock)
+	activeDeadlineHandler, err := newActiveDeadlineHandler(
+		klet.statusManager, kubeDeps.Recorder, klet.clock,
+	)
 	if err != nil {
 		return nil, err
 	}

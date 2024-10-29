@@ -357,10 +357,14 @@ type Kubelet struct {
 	// the list of handlers to call during pod admission.
 	admitHandlers lifecycle.PodAdmitHandlers
 
-	// softAdmithandlers are applied to the pod after it is admitted by the Kubelet, but before it is
-	// run. A pod rejected by a softAdmitHandler will be left in a Pending state indefinitely. If a
-	// rejected pod should not be recreated, or the scheduler is not aware of the rejection rule, the
-	// admission rule should be applied by a softAdmitHandler.
+	// softAdmithandlers 在 pod 通过准入但真正运行前执行.
+	//
+	// softAdmithandlers are applied to the pod after it is admitted by the Kubelet,
+	// but before it is run. 
+	// A pod rejected by a softAdmitHandler will be left in a Pending state indefinitely.
+	// If a rejected pod should not be recreated, or the scheduler is not aware
+	// of the rejection rule, 
+	// the admission rule should be applied by a softAdmitHandler.
 	softAdmitHandlers lifecycle.PodAdmitHandlers
 
 	// the list of handlers to call during pod sync loop.
