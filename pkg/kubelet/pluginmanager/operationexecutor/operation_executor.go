@@ -78,6 +78,7 @@ func (oe *operationExecutor) IsOperationPending(socketPath string) bool {
 	return oe.pendingOperations.IsOperationPending(socketPath)
 }
 
+// 	@param socketPath: /var/lib/kubelet/plugins_registry 目录下的 .sock 文件, 每个文件表示一种扩展资源.
 func (oe *operationExecutor) RegisterPlugin(
 	socketPath string,
 	timestamp time.Time,

@@ -49,6 +49,7 @@
         "**/*_windows_test.go": true,
         "**/*_darwin.go": true,
         "**/*_darwin_test.go": true,
+        "**/winstats/": true,
     },
     // 全局搜索不搜索如下目录内容
     "search.exclude": {
@@ -92,5 +93,6 @@
         "**/*_windows_test.go": true,
         "**/*_darwin.go": true,
         "**/*_darwin_test.go": true,
+        "**/winstats/": true,
     }
 }

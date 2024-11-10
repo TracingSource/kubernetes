@@ -190,6 +190,13 @@ func (pdev podDevices) fromCheckpointData(data []checkpoint.PodDevicesEntry) {
 	}
 }
 
+// 在 kubelet 启动 runc 真正创建容器时, 调用该方法获取 env, device, mount 信息,
+// 不同的 device plugin 会选择不同的依据, 将目标设备加载到容器里.
+// 比如, sriov-device-plugin 就是返回 env 信息, 然后对应的 cni 插件从 env 信息中,
+// 将主机上的 vf 设备移入容器的 namespace 中.
+//
+// 注意: 这些信息只会写到 container 的信息中, 不会影响到 Pod 的内容, 可用 crictl inspect 查看.
+//
 // Returns combined container runtime settings to consume the container's allocated devices.
 func (pdev podDevices) deviceRunContainerOptions(
 	podUID, contName string,

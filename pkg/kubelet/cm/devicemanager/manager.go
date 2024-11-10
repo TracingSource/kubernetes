@@ -290,6 +290,9 @@ func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.Sourc
 	return nil
 }
 
+// caller:
+// 	1. pkg/kubelet/cm/container_manager_linux.go -> containerManagerImpl.GetPluginRegistrationHandler()
+//
 // GetWatcherHandler returns the plugin handler
 func (m *ManagerImpl) GetWatcherHandler() cache.PluginHandler {
 	if f, err := os.Create(m.socketdir + "DEPRECATION"); err != nil {
@@ -964,7 +967,12 @@ func (m *ManagerImpl) allocateContainerResources(
 	return m.writeCheckpoint()
 }
 
-// 返回目标 container 传入 runc 的启动选项(尤其是 device, mount 信息)
+// 在 kubelet 启动 runc 真正创建容器时, 调用该方法获取 env, device, mount 信息,
+// 不同的 device plugin 会选择不同的依据, 将目标设备加载到容器里.
+// 比如, sriov-device-plugin 就是返回 env 信息, 然后对应的 cni 插件从 env 信息中,
+// 将主机上的 vf 设备移入容器的 namespace 中.
+//
+// 注意: 这些信息只会写到 container 的信息中, 不会影响到 Pod 的内容, 可用 crictl inspect 查看.
 //
 // caller:
 // 	1. pkg/kubelet/cm/container_manager_linux.go -> containerManagerImpl.GetResources()

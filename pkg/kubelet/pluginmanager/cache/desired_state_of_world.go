@@ -46,7 +46,9 @@ func NewDesiredStateOfWorld() DesiredStateOfWorld {
 }
 
 type desiredStateOfWorld struct {
-
+	// key 为 /var/lib/kubelet/plugins_registry 目录下的 .sock 文件, 每个文件表示一种扩展资源.
+	// value 为该 .sock 的相关信息, 如注册时间.
+	//
 	// socketFileToInfo is a map containing the set of successfully registered plugins
 	// The keys are plugin socket file paths. The values are PluginInfo objects
 	socketFileToInfo map[string]PluginInfo
@@ -106,6 +108,9 @@ func errSuffix(err error) string {
 	return errStr
 }
 
+// 主调函数监听 /var/lib/kubelet/plugins_registry 目录下的文件创建事件,
+// 如果有 .sock 文件创建, 说明有 device-plugin 扩展资源注册, 每个 .sock 文件表示一种扩展资源.
+//
 // caller:
 // 	1. pkg/kubelet/pluginmanager/pluginwatcher/plugin_watcher.go -> Watcher.handlePluginRegistration()
 func (dsw *desiredStateOfWorld) AddOrUpdatePlugin(socketPath string) error {
@@ -120,8 +125,9 @@ func (dsw *desiredStateOfWorld) AddOrUpdatePlugin(socketPath string) error {
 	}
 
 	// Update the PluginInfo object.
-	// Note that we only update the timestamp in the desired state of world, not the actual state of world
-	// because in the reconciler, we need to check if the plugin in the actual state of world is the same
+	// Note that we only update the timestamp in the desired state of world,
+	// not the actual state of world because in the reconciler,
+	// we need to check if the plugin in the actual state of world is the same
 	// version as the plugin in the desired state of world
 	dsw.socketFileToInfo[socketPath] = PluginInfo{
 		SocketPath: socketPath,

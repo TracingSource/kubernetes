@@ -62,6 +62,10 @@ type reconciler struct {
 	desiredStateOfWorld cache.DesiredStateOfWorld
 	actualStateOfWorld  cache.ActualStateOfWorld
 	// key 可以是 CSIPlugin、DevicePlugin
+	// value 的值根据 key 分为
+	// 1. pkg/volume/csi/csi_plugin.go -> RegistrationHandler{}
+	// 2. pkg/kubelet/cm/devicemanager/manager.go -> ManagerImpl{}
+	//
 	handlers map[string]cache.PluginHandler
 	sync.RWMutex
 }
@@ -72,6 +76,11 @@ func (rc *reconciler) Run(stopCh <-chan struct{}) {
 	wait.Until(func() { rc.reconcile() }, rc.loopSleepDuration, stopCh)
 }
 
+// 	@param pluginType: 可以是 CSIPlugin、DevicePlugin
+// 	@param handler:
+// 	1. pkg/volume/csi/csi_plugin.go -> RegistrationHandler{}
+// 	2. pkg/kubelet/cm/devicemanager/manager.go -> ManagerImpl{}
+//
 func (rc *reconciler) AddHandler(pluginType string, pluginHandler cache.PluginHandler) {
 	rc.Lock()
 	defer rc.Unlock()

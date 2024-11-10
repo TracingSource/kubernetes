@@ -3,7 +3,6 @@ package pluginwatcher
 import (
 	"fmt"
 	"os"
-	"runtime"
 	"strings"
 	"time"
 
@@ -27,7 +26,7 @@ type Watcher struct {
 
 // 	@param sockDir: /var/lib/kubelet/plugins_registry
 //
-// caller: 
+// caller:
 // 	1. pkg/kubelet/pluginmanager/plugin_manager.go -> NewPluginManager()
 //
 // NewWatcher provides a new watcher for socket registration
@@ -177,6 +176,11 @@ func (w *Watcher) handleCreateEvent(event fsnotify.Event) error {
 	return w.traversePluginDir(event.Name)
 }
 
+// handlePluginRegistration 监听 /var/lib/kubelet/plugins_registry 目录下的文件创建事件,
+// 如果有 .sock 文件创建, 说明有 device-plugin 扩展资源注册, 每个 .sock 文件表示一种扩展资源.
+//
+// 	@param socketPath: /var/lib/
+//
 // caller:
 // 	1. Watcher.handleCreateEvent()
 func (w *Watcher) handlePluginRegistration(socketPath string) error {
@@ -189,7 +193,10 @@ func (w *Watcher) handlePluginRegistration(socketPath string) error {
 	klog.V(2).Infof("Adding socket path or updating timestamp %s to desired state cache", socketPath)
 	err := w.desiredStateOfWorld.AddOrUpdatePlugin(socketPath)
 	if err != nil {
-		return fmt.Errorf("error adding socket path %s or updating timestamp to desired state cache: %v", socketPath, err)
+		return fmt.Errorf(
+			"error adding socket path %s or updating timestamp to desired state cache: %v",
+			socketPath, err,
+		)
 	}
 	return nil
 }

@@ -253,8 +253,8 @@ func NewContainerManager(
 		// this does default to / when enabled, but this tests against regressions.
 		if nodeConfig.CgroupRoot == "" {
 			return nil, fmt.Errorf(
-				"invalid configuration: cgroups-per-qos was specified and cgroup-root was not specified. "+
-				"To enable the QoS cgroup hierarchy you need to specify a valid cgroup-root",
+				"invalid configuration: cgroups-per-qos was specified and cgroup-root was not specified. " +
+					"To enable the QoS cgroup hierarchy you need to specify a valid cgroup-root",
 			)
 		}
 
@@ -301,7 +301,7 @@ func NewContainerManager(
 		}
 
 		klog.Infof(
-			"[topologymanager] Initializing Topology Manager with %s policy", 
+			"[topologymanager] Initializing Topology Manager with %s policy",
 			nodeConfig.ExperimentalTopologyManagerPolicy,
 		)
 	} else {
@@ -676,6 +676,11 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 	return nil
 }
 
+// 	在 kubelet 启动时被调用, 作为 device plugin manager, 与 csi plugin manager
+// 一起被注册, 处理所有 device plugin 插件的行为.
+//
+// caller:
+// 	1. pkg/kubelet/kubelet__init.go -> Kubelet.initializeRuntimeDependentModules()
 func (cm *containerManagerImpl) GetPluginRegistrationHandler() cache.PluginHandler {
 	return cm.deviceManager.GetWatcherHandler()
 }

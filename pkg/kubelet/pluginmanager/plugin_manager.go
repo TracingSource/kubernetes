@@ -111,6 +111,9 @@ func (pm *pluginManager) Run(sourcesReady config.SourcesReady, stopCh <-chan str
 }
 
 // 	@param pluginType: 可以是 CSIPlugin、DevicePlugin
+// 	@param handler:
+// 	1. pkg/volume/csi/csi_plugin.go -> RegistrationHandler{}
+// 	2. pkg/kubelet/cm/devicemanager/manager.go -> ManagerImpl{}
 //
 // caller:
 // 	1. pkg/kubelet/kubelet__init.go -> Kubelet.initializeRuntimeDependentModules()

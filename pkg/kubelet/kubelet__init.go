@@ -165,6 +165,8 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 	// retrieve information from container runtime
 	// and inform container to reopen log file after log rotation.
 	kl.containerLogManager.Start()
+	// 注意: 这里 plugincache.PluginHandler() 为类型转换, 而非函数调用.
+	//
 	// Adding Registration Callback function for CSI Driver
 	kl.pluginManager.AddHandler(
 		pluginwatcherapi.CSIPlugin, plugincache.PluginHandler(csi.PluginHandler),

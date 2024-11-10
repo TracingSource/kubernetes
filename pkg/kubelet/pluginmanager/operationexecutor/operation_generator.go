@@ -58,6 +58,7 @@ type OperationGenerator interface {
 	) func() error
 }
 
+// 	@param socketPath: /var/lib/kubelet/plugins_registry 目录下的 .sock 文件, 每个文件表示一种扩展资源.
 func (og *operationGenerator) GenerateRegisterPluginFunc(
 	socketPath string,
 	timestamp time.Time,
