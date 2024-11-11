@@ -57,6 +57,11 @@ type ManagerImpl struct {
 	server *grpc.Server
 	wg     sync.WaitGroup
 
+	// activePods 获取当前 Node 上非 terminating 状态的 pod 列表并返回.
+	//
+	// 	@initAt: ManagerImpl.Start()
+	// 	@assignAt: pkg/kubelet/kubelet_pods.go -> Kubelet.GetActivePods()
+	//
 	// activePods is a method for listing active pods on the node
 	// so the amount of pluginResources requested by existing pods
 	// could be counted when updating allocated devices
@@ -67,14 +72,19 @@ type ManagerImpl struct {
 	// We use it to determine when we can purge inactive pods from checkpointed state.
 	sourcesReady config.SourcesReady
 
+	// device plugin 初次注册自身或宿主机上的设备状态或数量发生变动时,
+	// 由 device plugin 上报最新的设备列表信息, kubelet 最终会调用此函数进行更新.
+	//
 	// callback is used for updating devices' states in one time call.
 	// e.g. a new device is advertised, two old devices are deleted and a running device fails.
 	callback monitorCallback
 
-	// allDevices is a map by resource name of all the devices currently registered to the device manager
+	// allDevices is a map by resource name of all the devices currently
+	// registered to the device manager
 	allDevices map[string]map[string]pluginapi.Device
 
-	// healthyDevices contains all of the registered healthy resourceNames and their exported device IDs.
+	// healthyDevices contains all of the registered healthy resourceNames
+	// and their exported device IDs.
 	healthyDevices map[string]sets.String
 
 	// unhealthyDevices contains all of the unhealthy devices and their exported device IDs.
@@ -142,8 +152,8 @@ func newManagerImpl(
 	manager := &ManagerImpl{
 		endpoints: make(map[string]endpointInfo),
 
-		socketname:            file,
-		socketdir:             dir,
+		socketname:            file, // kubelet.sock
+		socketdir:             dir,  // /var/lib/kubelet/device-plugins
 		allDevices:            make(map[string]map[string]pluginapi.Device),
 		healthyDevices:        make(map[string]sets.String),
 		unhealthyDevices:      make(map[string]sets.String),
@@ -194,6 +204,13 @@ func (m *ManagerImpl) genericDeviceUpdateCallback(
 	m.writeCheckpoint()
 }
 
+// removeContents 移除所有注册的扩展资源的 socket 文件, 这对 device plugin 来说,
+// 并不是毁灭性的, 而是需要监听这种情况, 尝试重新注册.
+//
+// 	@param dir: /var/lib/kubelet/device-plugins
+//
+// caller:
+// 	1. ManagerImpl.Start() 在 kubelet 启动时被调用, 用做初始化工作, 防止残留的 sock 资源.
 func (m *ManagerImpl) removeContents(dir string) error {
 	d, err := os.Open(dir)
 	if err != nil {
@@ -233,6 +250,9 @@ func (m *ManagerImpl) checkpointFile() string {
 	return filepath.Join(m.socketdir, kubeletDeviceManagerCheckpoint)
 }
 
+// 	@param activePods: pkg/kubelet/kubelet_pods.go -> Kubelet.GetActivePods()
+// 	获取当前 Node 上非 terminating 状态的 pod 列表并返回.
+//
 // caller:
 // 	1. pkg/kubelet/cm/container_manager_linux.go -> containerManagerImpl.Start()
 //
@@ -260,7 +280,11 @@ func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.Sourc
 	}
 	if selinux.SELinuxEnabled() {
 		if err := selinux.SetFileLabel(m.socketdir, config.KubeletPluginsDirSELinuxLabel); err != nil {
-			klog.Warningf("Unprivileged containerized plugins might not work. Could not set selinux context on %s: %v", m.socketdir, err)
+			klog.Warningf(
+				"Unprivileged containerized plugins might not work. "+
+					"Could not set selinux context on %s: %v",
+				m.socketdir, err,
+			)
 		}
 	}
 
@@ -426,7 +450,7 @@ func (m *ManagerImpl) Allocate(
 	err := m.allocatePodResources(pod)
 	if err != nil {
 		klog.Errorf(
-			"Failed to allocate device plugin resource for pod %s: %v", 
+			"Failed to allocate device plugin resource for pod %s: %v",
 			string(pod.UID), err,
 		)
 		return err
@@ -619,6 +643,13 @@ func (m *ManagerImpl) GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
 	return capacity, allocatable, deletedResources.UnsortedList()
 }
 
+// caller:
+// 	1. ManagerImpl.genericDeviceUpdateCallback()
+// 	device plugin 通过 listWatch 初次注册或更新设备健康状态时被调用.
+// 	2. ManagerImpl.GetCapacity()
+// 	3. ManagerImpl.allocateContainerResources()
+// 	每次为 container 分配设备完成后被调用.
+//
 // Checkpoints device to container allocation information to disk.
 func (m *ManagerImpl) writeCheckpoint() error {
 	m.mutex.Lock()
@@ -646,7 +677,10 @@ func (m *ManagerImpl) readCheckpoint() error {
 	err := m.checkpointManager.GetCheckpoint(kubeletDeviceManagerCheckpoint, cp)
 	if err != nil {
 		if err == errors.ErrCheckpointNotFound {
-			klog.Warningf("Failed to retrieve checkpoint for %q: %v", kubeletDeviceManagerCheckpoint, err)
+			klog.Warningf(
+				"Failed to retrieve checkpoint for %q: %v",
+				kubeletDeviceManagerCheckpoint, err,
+			)
 			return nil
 		}
 		return err
@@ -666,8 +700,13 @@ func (m *ManagerImpl) readCheckpoint() error {
 	return nil
 }
 
-// updateAllocatedDevices gets a list of active pods and then frees any Devices that are bound to
-// terminated pods. Returns error on failure.
+// 	@param activePods: 当前 Node 上所有非 terminating 状态的 pod 列表.
+//
+// caller:
+// 	1. ManagerImpl.allocateContainerResources()
+//
+// updateAllocatedDevices gets a list of active pods and then frees any Devices
+// that are bound to terminated pods. Returns error on failure.
 func (m *ManagerImpl) updateAllocatedDevices(activePods []*v1.Pod) {
 	if !m.sourcesReady.AllReady() {
 		return
@@ -680,7 +719,7 @@ func (m *ManagerImpl) updateAllocatedDevices(activePods []*v1.Pod) {
 	}
 	allocatedPodUids := m.podDevices.pods()
 	podsToBeRemoved := allocatedPodUids.Difference(activePodUids)
-	if len(podsToBeRemoved) <= 0 {
+	if len(podsToBeRemoved) <= 0 { // 不需要更新则直接返回.
 		return
 	}
 	klog.V(3).Infof("pods to be removed: %v", podsToBeRemoved.List())
@@ -690,7 +729,7 @@ func (m *ManagerImpl) updateAllocatedDevices(activePods []*v1.Pod) {
 }
 
 // 	@param podUID: 待分配扩展资源的 pod 的 uid
-// 	@param podUID: 表示的 pod 中的某一 container 名称(resources{}字段都是配置在 container 中的).
+// 	@param contName: 表示的 pod 中的某一 container 名称(resources{} 属于 container{} 级别).
 // 	@param resource: 扩展资源名称, 与 cpu/memory 平级
 // 	@param required: 需要分配的数量
 //
@@ -886,6 +925,8 @@ func (m *ManagerImpl) allocateContainerResources(
 		if !m.isDevicePluginResource(resource) {
 			continue
 		}
+		// 在真正进行分配前, 更新本地缓存, 避免出现有些 Pod 被强删但分配给ta的 deviceID 仍未被释放的情况.
+		//
 		// allocatedDevicesUpdated 是一个开关, updateAllocatedDevices 只执行一次.
 		//
 		// Updates allocatedDevices to garbage collect any stranded resources

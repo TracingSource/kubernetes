@@ -601,19 +601,22 @@ func (cm *containerManagerImpl) Status() Status {
 //
 // ...其实就是在 kubelet.Run() 方法的一系列调用过程中的.
 //
-func (cm *containerManagerImpl) Start(node *v1.Node,
+func (cm *containerManagerImpl) Start(
+	node *v1.Node,
 	activePods ActivePodsFunc,
 	sourcesReady config.SourcesReady,
 	podStatusProvider status.PodStatusProvider,
-	runtimeService internalapi.RuntimeService) error {
-
+	runtimeService internalapi.RuntimeService,
+) error {
 	// Initialize CPU manager
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
-		cm.cpuManager.Start(cpumanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService)
+		cm.cpuManager.Start(
+			cpumanager.ActivePodsFunc(activePods), sourcesReady, 
+			podStatusProvider, runtimeService,
+		)
 	}
 
-	// cache the node Info including resource capacity and
-	// allocatable of the node
+	// cache the node Info including resource capacity and allocatable of the node
 	cm.nodeInfo = node
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.LocalStorageCapacityIsolation) {
@@ -668,6 +671,7 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 		}, 5*time.Minute, wait.NeverStop)
 	}
 
+	// 注意: 这里的 ActivePodsFunc() 是类型转换行为, 而非函数调用.
 	// Starts device manager.
 	if err := cm.deviceManager.Start(devicemanager.ActivePodsFunc(activePods), sourcesReady); err != nil {
 		return err

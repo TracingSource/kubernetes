@@ -65,7 +65,7 @@ func (kl *Kubelet) listPodsFromDisk() ([]types.UID, error) {
 	return pods, nil
 }
 
-// GetActivePods 返回非 terminating 状态的 pod 列表.
+// GetActivePods 获取当前 Node 上非 terminating 状态的 pod 列表并返回.
 //
 // GetActivePods returns non-terminal pods
 func (kl *Kubelet) GetActivePods() []*v1.Pod {
@@ -76,17 +76,29 @@ func (kl *Kubelet) GetActivePods() []*v1.Pod {
 
 // makeBlockVolumes maps the raw block devices specified in the path of the container
 // Experimental
-func (kl *Kubelet) makeBlockVolumes(pod *v1.Pod, container *v1.Container, podVolumes kubecontainer.VolumeMap, blkutil volumepathhandler.BlockVolumePathHandler) ([]kubecontainer.DeviceInfo, error) {
+func (kl *Kubelet) makeBlockVolumes(
+	pod *v1.Pod, container *v1.Container, podVolumes kubecontainer.VolumeMap,
+	blkutil volumepathhandler.BlockVolumePathHandler,
+) ([]kubecontainer.DeviceInfo, error) {
 	var devices []kubecontainer.DeviceInfo
 	for _, device := range container.VolumeDevices {
 		// check path is absolute
 		if !filepath.IsAbs(device.DevicePath) {
-			return nil, fmt.Errorf("error DevicePath `%s` must be an absolute path", device.DevicePath)
+			return nil, fmt.Errorf(
+				"error DevicePath `%s` must be an absolute path", device.DevicePath,
+			)
 		}
 		vol, ok := podVolumes[device.Name]
 		if !ok || vol.BlockVolumeMapper == nil {
-			klog.Errorf("Block volume cannot be satisfied for container %q, because the volume is missing or the volume mapper is nil: %+v", container.Name, device)
-			return nil, fmt.Errorf("cannot find volume %q to pass into container %q", device.Name, container.Name)
+			klog.Errorf(
+				"Block volume cannot be satisfied for container %q, "+
+					"because the volume is missing or the volume mapper is nil: %+v",
+				container.Name, device,
+			)
+			return nil, fmt.Errorf(
+				"cannot find volume %q to pass into container %q",
+				device.Name, container.Name,
+			)
 		}
 		// Get a symbolic link associated to a block device under pod device path
 		dirPath, volName := vol.BlockVolumeMapper.GetPodDeviceMapPath()
@@ -99,8 +111,17 @@ func (kl *Kubelet) makeBlockVolumes(pod *v1.Pod, container *v1.Container, podVol
 			if vol.ReadOnly {
 				permission = "r"
 			}
-			klog.V(4).Infof("Device will be attached to container %q. Path on host: %v", container.Name, symlinkPath)
-			devices = append(devices, kubecontainer.DeviceInfo{PathOnHost: symlinkPath, PathInContainer: device.DevicePath, Permissions: permission})
+			klog.V(4).Infof(
+				"Device will be attached to container %q. Path on host: %v",
+				container.Name, symlinkPath,
+			)
+			devices = append(
+				devices, kubecontainer.DeviceInfo{
+					PathOnHost:      symlinkPath,
+					PathInContainer: device.DevicePath,
+					Permissions:     permission,
+				},
+			)
 		}
 	}
 
@@ -143,7 +164,7 @@ func (kl *Kubelet) GetPodCgroupParent(pod *v1.Pod) string {
 	return cgroupParent
 }
 
-// GenerateRunContainerOptions 返回一个 opt 对象, 包含该 Pod 的 env 环境变量, 
+// GenerateRunContainerOptions 返回一个 opt 对象, 包含该 Pod 的 env 环境变量,
 // volume 卷列表(同时创建 hostPath 类型的目录), 端口映射信息, hostname 等.
 //
 // caller: pkg/kubelet/kuberuntime/kuberuntime_container.go ->
@@ -189,7 +210,7 @@ func (kl *Kubelet) GenerateRunContainerOptions(
 	// only podIPs is sent to makeMounts, as podIPs is populated
 	// even if dual-stack feature flag is not enabled.
 	mounts, cleanupAction, err := makeMounts(
-		pod, kl.getPodDir(pod.UID), container, hostname, hostDomainName, podIPs, 
+		pod, kl.getPodDir(pod.UID), container, hostname, hostDomainName, podIPs,
 		volumes, kl.hostutil, kl.subpather, opts.Envs,
 	)
 	if err != nil {
@@ -561,7 +582,7 @@ func containerResourceRuntimeValue(fs *v1.ResourceFieldSelector, pod *v1.Pod, co
 // One of the following arguments must be non-nil: runningPod, status.
 // TODO: Modify containerRuntime.KillPod() to accept the right arguments.
 func (kl *Kubelet) killPod(
-	pod *v1.Pod, runningPod *kubecontainer.Pod, status *kubecontainer.PodStatus, 
+	pod *v1.Pod, runningPod *kubecontainer.Pod, status *kubecontainer.PodStatus,
 	gracePeriodOverride *int64,
 ) error {
 	var p kubecontainer.Pod
@@ -662,7 +683,7 @@ func (kl *Kubelet) IsPodDeleted(uid types.UID) bool {
 }
 
 // PodResourcesAreReclaimed returns true if all required node-level resources
-// that a pod was consuming have been reclaimed by the kubelet. 
+// that a pod was consuming have been reclaimed by the kubelet.
 // Reclaiming resources is a prerequisite to deleting a pod from the API server.
 func (kl *Kubelet) PodResourcesAreReclaimed(pod *v1.Pod, status v1.PodStatus) bool {
 	if !notRunning(status.ContainerStatuses) {

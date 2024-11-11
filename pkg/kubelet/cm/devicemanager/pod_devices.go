@@ -106,8 +106,7 @@ func (pdev podDevices) removeContainerAllocatedResources(
 	}
 }
 
-// devices 从 podDevices 中取出所有的设备信息, 作为集合返回.
-// (这些设备都是已分配的设备, 属于某个 Pod)
+// devices 从 podDevices 中取出所有已分配的设备信息, 作为集合返回.
 //
 // 	@return ret: key 为扩展资源名称(与 cpu/memory 同级), value 为 podDevices 中
 // 所有的设备的 ID 集合.
@@ -130,6 +129,9 @@ func (pdev podDevices) devices() map[string]sets.String {
 	return ret
 }
 
+// caller:
+// 	1. pkg/kubelet/cm/devicemanager/manager.go -> ManagerImpl.writeCheckpoint()
+//
 // Turns podDevices to checkpointData.
 func (pdev podDevices) toCheckpointData() []checkpoint.PodDevicesEntry {
 	var data []checkpoint.PodDevicesEntry
@@ -165,6 +167,9 @@ func (pdev podDevices) toCheckpointData() []checkpoint.PodDevicesEntry {
 	return data
 }
 
+// caller:
+// 	1. pkg/kubelet/cm/devicemanager/manager.go -> ManagerImpl.readCheckpoint()
+//
 // Populates podDevices from the passed in checkpointData.
 func (pdev podDevices) fromCheckpointData(data []checkpoint.PodDevicesEntry) {
 	for _, entry := range data {

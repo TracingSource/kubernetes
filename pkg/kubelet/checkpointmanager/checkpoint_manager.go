@@ -9,6 +9,8 @@ import (
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 )
 
+// 	@implementBy: pkg/kubelet/cm/devicemanager/checkpoint/checkpoint.go -> Data{}
+//
 // Checkpoint provides the process checkpoint data
 type Checkpoint interface {
 	MarshalCheckpoint() ([]byte, error)
@@ -40,6 +42,11 @@ type impl struct {
 	mutex sync.Mutex
 }
 
+// 	@param checkpointDir: /var/lib/kubelet/device-plugins
+//
+// caller:
+// 	1. pkg/kubelet/cm/devicemanager/manager.go -> newManagerImpl()
+//
 // NewCheckpointManager returns a new instance of a checkpoint manager
 func NewCheckpointManager(checkpointDir string) (CheckpointManager, error) {
 	fstore, err := utilstore.NewFileStore(checkpointDir, utilfs.DefaultFs{})
@@ -50,6 +57,11 @@ func NewCheckpointManager(checkpointDir string) (CheckpointManager, error) {
 	return &impl{path: checkpointDir, store: fstore}, nil
 }
 
+// 	@param checkpointKey: 如 kubelet_internal_checkpoint (在 /var/lib/kubelet/device-plugins )
+//
+// caller:
+// 	1. pkg/kubelet/cm/devicemanager/manager.go -> ManagerImpl.writeCheckpoint()
+//
 // CreateCheckpoint persists checkpoint in CheckpointStore.
 func (manager *impl) CreateCheckpoint(checkpointKey string, checkpoint Checkpoint) error {
 	manager.mutex.Lock()
@@ -61,6 +73,8 @@ func (manager *impl) CreateCheckpoint(checkpointKey string, checkpoint Checkpoin
 	return manager.store.Write(checkpointKey, blob)
 }
 
+// 	@param checkpointKey: 如 kubelet_internal_checkpoint (在 /var/lib/kubelet/device-plugins )
+//
 // GetCheckpoint retrieves checkpoint from CheckpointStore.
 func (manager *impl) GetCheckpoint(checkpointKey string, checkpoint Checkpoint) error {
 	manager.mutex.Lock()

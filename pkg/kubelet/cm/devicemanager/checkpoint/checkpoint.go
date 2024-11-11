@@ -36,6 +36,9 @@ type Data struct {
 	Checksum checksum.Checksum
 }
 
+// caller:
+// 	1. pkg/kubelet/cm/devicemanager/manager.go -> ManagerImpl.readCheckpoint()
+// 	2. pkg/kubelet/cm/devicemanager/manager.go -> ManagerImpl.writeCheckpoint()
 // New returns an instance of Checkpoint
 func New(devEntries []PodDevicesEntry,
 	devices map[string][]string) DeviceManagerCheckpoint {

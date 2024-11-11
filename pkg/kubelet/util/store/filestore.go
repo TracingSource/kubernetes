@@ -23,6 +23,8 @@ type FileStore struct {
 	filesystem utilfs.Filesystem
 }
 
+// 	@param path: /var/lib/kubelet/device-plugins
+//
 // caller:
 // 	1. pkg/kubelet/checkpointmanager/checkpoint_manager.go -> NewCheckpointManager()
 //  只有这一处
@@ -34,6 +36,12 @@ func NewFileStore(path string, fs utilfs.Filesystem) (Store, error) {
 	return &FileStore{directoryPath: path, filesystem: fs}, nil
 }
 
+// 	@param key: 如 kubelet_internal_checkpoint (在 /var/lib/kubelet/device-plugins )
+//
+// caller:
+// 	1. pkg/kubelet/checkpointmanager/checkpoint_manager.go -> impl.CreateCheckpoint()
+// 	只有这一处
+//
 // Write writes the given data to a file named key.
 func (f *FileStore) Write(key string, data []byte) error {
 	if err := ValidateKey(key); err != nil {
@@ -46,6 +54,11 @@ func (f *FileStore) Write(key string, data []byte) error {
 	return writeFile(f.filesystem, f.getPathByKey(key), data)
 }
 
+// 	@param key: 如 kubelet_internal_checkpoint (在 /var/lib/kubelet/device-plugins )
+//
+// caller:
+// 	1. pkg/kubelet/checkpointmanager/checkpoint_manager.go -> impl.GetCheckpoint()
+//
 // Read reads the data from the file named key.
 func (f *FileStore) Read(key string) ([]byte, error) {
 	if err := ValidateKey(key); err != nil {
@@ -95,6 +108,8 @@ func ensureDirectory(fs utilfs.Filesystem, path string) error {
 	return nil
 }
 
+// 	@param path: /var/lib/kubelet/device-plugins/kubelet_internal_checkpoint
+//
 // writeFile writes data to path in a single transaction.
 func writeFile(fs utilfs.Filesystem, path string, data []byte) (retErr error) {
 	// Create a temporary file in the base directory of `path` with a prefix.
@@ -113,7 +128,9 @@ func writeFile(fs utilfs.Filesystem, path string, data []byte) (retErr error) {
 				if retErr == nil {
 					retErr = fmt.Errorf("close error: %v", err)
 				} else {
-					retErr = fmt.Errorf("failed to close temp file after error %v; close error: %v", retErr, err)
+					retErr = fmt.Errorf(
+						"failed to close temp file after error %v; close error: %v", retErr, err,
+					)
 				}
 			}
 		}
@@ -121,7 +138,10 @@ func writeFile(fs utilfs.Filesystem, path string, data []byte) (retErr error) {
 		// Clean up the temp file on error.
 		if retErr != nil && tmpPath != "" {
 			if err := removePath(fs, tmpPath); err != nil {
-				retErr = fmt.Errorf("failed to remove the temporary file (%q) after error %v; remove error: %v", tmpPath, retErr, err)
+				retErr = fmt.Errorf(
+					"failed to remove the temporary file (%q) after error %v; remove error: %v", 
+					tmpPath, retErr, err,
+				)
 			}
 		}
 	}()
