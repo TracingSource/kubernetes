@@ -108,7 +108,7 @@ var (
 type joinOptions struct {
 	cfgPath               string
 	token                 string // kubeadm join 命令中的 --token 参数值
-	controlPlane          bool
+	controlPlane          bool   // --control-plane 是否为master节点
 	ignorePreflightErrors []string
 	externalcfg           *kubeadmapiv1beta2.JoinConfiguration
 	kustomizeDir          string
@@ -197,9 +197,13 @@ func NewCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 
 	// sets the data builder function, that will be used by the runner
 	// both when running the entire workflow or single phases
-	joinRunner.SetDataInitializer(func(cmd *cobra.Command, args []string) (workflow.RunData, error) {
-		return newJoinData(cmd, args, joinOptions, out)
-	})
+	joinRunner.SetDataInitializer(
+		// caller: cmd/kubeadm/app/cmd/phases/workflow/runner.go -> Runner.InitData()
+		// 	作为 runDataInitializer 被调用
+		func(cmd *cobra.Command, args []string) (workflow.RunData, error) {
+			return newJoinData(cmd, args, joinOptions, out)
+		},
+	)
 
 	// binds the Runner to kubeadm join command by altering
 	// command help, adding --skip-phases flag and by adding phases subcommands
@@ -233,7 +237,8 @@ func addJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta2.JoinConfig
 		&cfg.ControlPlane.LocalAPIEndpoint.BindPort,
 		options.APIServerBindPort,
 		cfg.ControlPlane.LocalAPIEndpoint.BindPort,
-		"If the node should host a new control plane instance, the port for the API Server to bind to.",
+		"If the node should host a new control plane instance, "+
+			"the port for the API Server to bind to.",
 	)
 	// adds bootstrap token specific discovery flags to the specified flagset
 	flagSet.StringVar(

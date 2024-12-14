@@ -160,6 +160,9 @@ func (e *Runner) SetDataInitializer(builder func(cmd *cobra.Command, args []stri
 	e.runDataInitializer = builder
 }
 
+// caller:
+// 	1. cmd/kubeadm/app/cmd/join.go -> NewCmdJoin.RunE()
+// 
 // InitData triggers the creation of runtime data shared among all the phases included in the workflow.
 // This action can be executed explicitly out, when it is necessary to get the RunData
 // before actually executing Run, or implicitly when invoking Run.

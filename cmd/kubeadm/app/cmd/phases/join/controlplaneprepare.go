@@ -41,7 +41,7 @@ func NewControlPlanePreparePhase() workflow.Phase {
 			newControlPlanePrepareDownloadCertsSubphase(),
 			newControlPlanePrepareCertsSubphase(),
 			newControlPlanePrepareKubeconfigSubphase(),
-			newControlPlanePrepareControlPlaneSubphase(),
+			newControlPlanePrepareControlPlaneSubphase(), // 为三大件(不包括 etcd)生成 manifest.
 		},
 	}
 }
@@ -149,6 +149,7 @@ func newControlPlanePrepareKubeconfigSubphase() workflow.Phase {
 	}
 }
 
+// newControlPlanePrepareControlPlaneSubphase 为三大件(不包括 etcd)生成 manifest.
 func newControlPlanePrepareControlPlaneSubphase() workflow.Phase {
 	return workflow.Phase{
 		Name:          "control-plane",
@@ -175,8 +176,11 @@ func runControlPlanePrepareControlPlaneSubphase(c workflow.RunData) error {
 	if err != nil {
 		return err
 	}
-
-	fmt.Printf("[control-plane] Using manifest folder %q\n", kubeadmconstants.GetStaticPodDirectory())
+	// 注意: 三大件中不包括 etcd
+	fmt.Printf(
+		"[control-plane] Using manifest folder %q\n", 
+		kubeadmconstants.GetStaticPodDirectory(),
+	)
 	for _, component := range kubeadmconstants.ControlPlaneComponents {
 		fmt.Printf("[control-plane] Creating static Pod manifest for %q\n", component)
 		err := controlplane.CreateStaticPodFiles(

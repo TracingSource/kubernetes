@@ -1475,7 +1475,9 @@ func (kl *Kubelet) GetPortForward(podName, podNamespace string, podUID types.UID
 
 // cleanupOrphanedPodCgroups removes cgroups that should no longer exist.
 // it reconciles the cached state of cgroupPods with the specified list of runningPods
-func (kl *Kubelet) cleanupOrphanedPodCgroups(cgroupPods map[types.UID]cm.CgroupName, activePods []*v1.Pod) {
+func (kl *Kubelet) cleanupOrphanedPodCgroups(
+	cgroupPods map[types.UID]cm.CgroupName, activePods []*v1.Pod,
+) {
 	// Add all running pods to the set that we want to preserve
 	podSet := sets.NewString()
 	for _, pod := range activePods {
@@ -1496,7 +1498,10 @@ func (kl *Kubelet) cleanupOrphanedPodCgroups(cgroupPods map[types.UID]cm.CgroupN
 		// process in the cgroup to the minimum value while we wait.  if the kubelet
 		// is configured to keep terminated volumes, we will delete the cgroup and not block.
 		if podVolumesExist := kl.podVolumesExist(uid); podVolumesExist && !kl.keepTerminatedPodVolumes {
-			klog.V(3).Infof("Orphaned pod %q found, but volumes not yet removed.  Reducing cpu to minimum", uid)
+			klog.V(3).Infof(
+				"Orphaned pod %q found, but volumes not yet removed. "+
+					"Reducing cpu to minimum", uid,
+			)
 			if err := pcm.ReduceCPULimits(val); err != nil {
 				klog.Warningf("Failed to reduce cpu time for pod %q pending volume cleanup due to %v", uid, err)
 			}

@@ -71,6 +71,7 @@ func NewControlPlanePhase() workflow.Phase {
 	return phase
 }
 
+// 	@param component: 三大件中不包括 etcd
 func newControlPlaneSubphase(component string) workflow.Phase {
 	phase := workflow.Phase{
 		Name:         controlPlanePhaseProperties[component].name,
@@ -81,6 +82,7 @@ func newControlPlaneSubphase(component string) workflow.Phase {
 	return phase
 }
 
+// 	@param name: 三大件中不包括 etcd
 func getControlPlanePhaseFlags(name string) []string {
 	flags := []string{
 		options.CfgPath,
@@ -123,6 +125,7 @@ func runControlPlanePhase(c workflow.RunData) error {
 	return nil
 }
 
+// 	@param component: 三大件中不包括 etcd
 func runControlPlaneSubphase(component string) func(c workflow.RunData) error {
 	return func(c workflow.RunData) error {
 		data, ok := c.(InitData)
