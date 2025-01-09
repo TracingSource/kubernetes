@@ -58,6 +58,7 @@ func (Protocol) EnumDescriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{0}
 }
 
+// @usedAt: [containerd]pkg/cri/opts/spec_linux.go -> WithMounts()
 type MountPropagation int32
 
 const (

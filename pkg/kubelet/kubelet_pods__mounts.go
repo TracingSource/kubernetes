@@ -30,7 +30,9 @@ import (
 //
 // 	@return cleanupAction: Pod移除时, 这些卷的移除方法, 做为回调函数.
 //
-// caller: pkg/kubelet/kubelet_pods.go -> Kubelet.GenerateRunContainerOptions()
+// caller:
+// 	1. pkg/kubelet/kubelet_pods.go -> Kubelet.GenerateRunContainerOptions()
+//  只有这一处
 //
 // makeMounts determines the mount points for the given container.
 func makeMounts(
@@ -66,7 +68,10 @@ func makeMounts(
 				"because the volume is missing or the volume mounter is nil: %+v", 
 				container.Name, mount,
 			)
-			return nil, cleanupAction, fmt.Errorf("cannot find volume %q to mount into container %q", mount.Name, container.Name)
+			return nil, cleanupAction, fmt.Errorf(
+				"cannot find volume %q to mount into container %q", 
+				mount.Name, container.Name,
+			)
 		}
 
 		relabelVolume := false
@@ -107,12 +112,16 @@ func makeMounts(
 			}
 
 			if filepath.IsAbs(subPath) {
-				return nil, cleanupAction, fmt.Errorf("error SubPath `%s` must not be an absolute path", subPath)
+				return nil, cleanupAction, fmt.Errorf(
+					"error SubPath `%s` must not be an absolute path", subPath,
+				)
 			}
 
 			err = volumevalidation.ValidatePathNoBacksteps(subPath)
 			if err != nil {
-				return nil, cleanupAction, fmt.Errorf("unable to provision SubPath `%s`: %v", subPath, err)
+				return nil, cleanupAction, fmt.Errorf(
+					"unable to provision SubPath `%s`: %v", subPath, err,
+				)
 			}
 
 			volumePath := hostPath
@@ -140,8 +149,14 @@ func makeMounts(
 				if err := subpather.SafeMakeDir(subPath, volumePath, perm); err != nil {
 					// Don't pass detailed error back to the user 
 					// because it could give information about host filesystem
-					klog.Errorf("failed to create subPath directory for volumeMount %q of container %q: %v", mount.Name, container.Name, err)
-					return nil, cleanupAction, fmt.Errorf("failed to create subPath directory for volumeMount %q of container %q", mount.Name, container.Name)
+					klog.Errorf(
+						"failed to create subPath directory for volumeMount %q of container %q: %v", 
+						mount.Name, container.Name, err,
+					)
+					return nil, cleanupAction, fmt.Errorf(
+						"failed to create subPath directory for volumeMount %q of container %q", 
+						mount.Name, container.Name,
+					)
 				}
 			}
 			hostPath, cleanupAction, err = subpather.PrepareSafeSubpath(subpath.Subpath{
@@ -153,28 +168,28 @@ func makeMounts(
 				ContainerName:    container.Name,
 			})
 			if err != nil {
-				// Don't pass detailed error back to the user because it could give information about host filesystem
-				klog.Errorf("failed to prepare subPath for volumeMount %q of container %q: %v", mount.Name, container.Name, err)
-				return nil, cleanupAction, fmt.Errorf("failed to prepare subPath for volumeMount %q of container %q", mount.Name, container.Name)
+				// Don't pass detailed error back to the user because it could
+				// give information about host filesystem
+				klog.Errorf(
+					"failed to prepare subPath for volumeMount %q of container %q: %v", 
+					mount.Name, container.Name, err,
+				)
+				return nil, cleanupAction, fmt.Errorf(
+					"failed to prepare subPath for volumeMount %q of container %q", 
+					mount.Name, container.Name,
+				)
 			}
 		}
 
-		// Docker Volume Mounts fail on Windows if it is not of the form C:/
-		if volumeutil.IsWindowsLocalPath(runtime.GOOS, hostPath) {
-			hostPath = volumeutil.MakeAbsolutePath(runtime.GOOS, hostPath)
-		}
-
 		containerPath := mount.MountPath
-		// IsAbs returns false for UNC path/SMB shares/named pipes in Windows. So check for those specifically and skip MakeAbsolutePath
-		if !volumeutil.IsWindowsUNCPath(runtime.GOOS, containerPath) && !filepath.IsAbs(containerPath) {
-			containerPath = volumeutil.MakeAbsolutePath(runtime.GOOS, containerPath)
-		}
-
 		propagation, err := translateMountPropagation(mount.MountPropagation)
 		if err != nil {
 			return nil, cleanupAction, err
 		}
-		klog.V(5).Infof("Pod %q container %q mount %q has propagation %q", format.Pod(pod), container.Name, mount.Name, propagation)
+		klog.V(5).Infof(
+			"Pod %q container %q mount %q has propagation %q", 
+			format.Pod(pod), container.Name, mount.Name, propagation,
+		)
 
 		mustMountRO := vol.Mounter.GetAttributes().ReadOnly
 
@@ -189,7 +204,9 @@ func makeMounts(
 	}
 	if mountEtcHostsFile {
 		hostAliases := pod.Spec.HostAliases
-		hostsMount, err := makeHostsMount(podDir, podIPs, hostName, hostDomain, hostAliases, pod.Spec.HostNetwork)
+		hostsMount, err := makeHostsMount(
+			podDir, podIPs, hostName, hostDomain, hostAliases, pod.Spec.HostNetwork,
+		)
 		if err != nil {
 			return nil, cleanupAction, err
 		}
@@ -201,12 +218,6 @@ func makeMounts(
 // translateMountPropagation transforms v1.MountPropagationMode to
 // runtimeapi.MountPropagation.
 func translateMountPropagation(mountMode *v1.MountPropagationMode) (runtimeapi.MountPropagation, error) {
-	if runtime.GOOS == "windows" {
-		// Windows containers doesn't support mount propagation, use private for it.
-		// Refer https://docs.docker.com/storage/bind-mounts/#configure-bind-propagation.
-		return runtimeapi.MountPropagation_PROPAGATION_PRIVATE, nil
-	}
-
 	switch {
 	case mountMode == nil:
 		// PRIVATE is the default
