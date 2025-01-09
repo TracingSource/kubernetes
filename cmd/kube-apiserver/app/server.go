@@ -162,8 +162,8 @@ func CreateServerChain(
 		return nil, err
 	}
 	// 1. 创建kubeAPIServerConfig配置
-	kubeAPIServerConfig, insecureServingInfo, serviceResolver, pluginInitializer, 
-	err := CreateKubeAPIServerConfig(completedOptions, nodeTunneler, proxyTransport)
+	kubeAPIServerConfig, insecureServingInfo, serviceResolver, pluginInitializer,
+		err := CreateKubeAPIServerConfig(completedOptions, nodeTunneler, proxyTransport)
 	if err != nil {
 		return nil, err
 	}
@@ -171,11 +171,11 @@ func CreateServerChain(
 	// 2. 判断是否配置了扩展API server, 创建apiExtensionsConfig配置
 	// If additional API servers are added, they should be gated.
 	apiExtensionsConfig, err := createAPIExtensionsConfig(
-		*kubeAPIServerConfig.GenericConfig, 
-		kubeAPIServerConfig.ExtraConfig.VersionedInformers, pluginInitializer, 
-		completedOptions.ServerRunOptions, 
+		*kubeAPIServerConfig.GenericConfig,
+		kubeAPIServerConfig.ExtraConfig.VersionedInformers, pluginInitializer,
+		completedOptions.ServerRunOptions,
 		completedOptions.MasterCount,
-		serviceResolver, 
+		serviceResolver,
 		webhook.NewDefaultAuthenticationInfoResolverWrapper(
 			proxyTransport, kubeAPIServerConfig.GenericConfig.LoopbackClientConfig,
 		),
@@ -187,7 +187,7 @@ func CreateServerChain(
 	// 3. 创建扩展的API server
 	// apiExtensionsServer 是一个 CRD 对象, 可以附加到核心 apiserver,
 	// 单独处理 crd 相关的请求, 主要是 apiExtensionsServer.GenericAPIServer
-	// 
+	//
 	apiExtensionsServer, err := createAPIExtensionsServer(
 		apiExtensionsConfig, genericapiserver.NewEmptyDelegate(),
 	)
@@ -206,8 +206,8 @@ func CreateServerChain(
 	// 5. 聚合层的配置aggregatorConfig
 	// aggregator comes last in the chain
 	aggregatorConfig, err := createAggregatorConfig(
-		*kubeAPIServerConfig.GenericConfig, completedOptions.ServerRunOptions, 
-		kubeAPIServerConfig.ExtraConfig.VersionedInformers, serviceResolver, 
+		*kubeAPIServerConfig.GenericConfig, completedOptions.ServerRunOptions,
+		kubeAPIServerConfig.ExtraConfig.VersionedInformers, serviceResolver,
 		proxyTransport, pluginInitializer,
 	)
 	if err != nil {
@@ -219,7 +219,7 @@ func CreateServerChain(
 		aggregatorConfig, kubeAPIServer.GenericAPIServer, apiExtensionsServer.Informers,
 	)
 	if err != nil {
-		// we don't need special handling for innerStopCh because 
+		// we don't need special handling for innerStopCh because
 		// the aggregator server doesn't create any go routines
 		return nil, err
 	}
@@ -227,7 +227,7 @@ func CreateServerChain(
 	// 7. 启动非安全端口的server(额外的)
 	if insecureServingInfo != nil {
 		insecureHandlerChain := kubeserver.BuildInsecureHandlerChain(
-			aggregatorServer.GenericAPIServer.UnprotectedHandler(), 
+			aggregatorServer.GenericAPIServer.UnprotectedHandler(),
 			kubeAPIServerConfig.GenericConfig,
 		)
 		err := insecureServingInfo.Serve(
@@ -253,7 +253,7 @@ func CreateServerChain(
 //
 // CreateKubeAPIServer creates and wires a workable kube-apiserver
 func CreateKubeAPIServer(
-	kubeAPIServerConfig *master.Config, 
+	kubeAPIServerConfig *master.Config,
 	delegateAPIServer genericapiserver.DelegationTarget,
 ) (*master.Master, error) {
 	// kubeAPIServer 是一个 Master{} 对象.
@@ -303,17 +303,17 @@ func CreateNodeDialer(s completedServerRunOptions) (tunneler.Tunneler, *http.Tra
 		// kubelet listen-addresses, we need to plumb through options.
 		healthCheckPath := &url.URL{
 			Scheme: "http",
-			Host:   net.JoinHostPort(
+			Host: net.JoinHostPort(
 				"127.0.0.1", strconv.FormatUint(uint64(s.KubeletConfig.ReadOnlyPort), 10),
 			),
-			Path:   "healthz",
+			Path: "healthz",
 		}
 		nodeTunneler = tunneler.New(s.SSHUser, s.SSHKeyfile, healthCheckPath, installSSHKey)
 
 		// Use the nodeTunneler's dialer when proxying to pods, services, and nodes
 		proxyDialerFn = nodeTunneler.Dial
 	}
-	// Proxying to pods and services is IP-based... 
+	// Proxying to pods and services is IP-based...
 	// don't expect to be able to verify the hostname
 	proxyTLSClientConfig := &tls.Config{InsecureSkipVerify: true}
 	proxyTransport := utilnet.SetTransportDefaults(&http.Transport{
@@ -345,16 +345,16 @@ func CreateKubeAPIServerConfig(
 	[]admission.PluginInitializer,
 	error,
 ) {
-	genericConfig, versionedInformers, insecureServingInfo, serviceResolver, 
-	pluginInitializers, admissionPostStartHook, storageFactory, 
-	err := buildGenericConfig(s.ServerRunOptions, proxyTransport)
+	genericConfig, versionedInformers, insecureServingInfo, serviceResolver,
+		pluginInitializers, admissionPostStartHook, storageFactory,
+		err := buildGenericConfig(s.ServerRunOptions, proxyTransport)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
 	_, port, err := net.SplitHostPort(s.Etcd.StorageConfig.Transport.ServerList[0])
 	if err == nil && port != "0" && len(port) != 0 {
 		err := utilwait.PollImmediate(
-			etcdRetryInterval, etcdRetryLimit*etcdRetryInterval, 
+			etcdRetryInterval, etcdRetryLimit*etcdRetryInterval,
 			preflight.EtcdConnection{
 				ServerList: s.Etcd.StorageConfig.Transport.ServerList,
 			}.CheckEtcdServers,
@@ -379,7 +379,9 @@ func CreateKubeAPIServerConfig(
 		metrics.SetShowHidden()
 	}
 
-	serviceIPRange, apiServerServiceIP, err := master.ServiceIPRange(s.PrimaryServiceClusterIPRange)
+	serviceIPRange, apiServerServiceIP, err := master.ServiceIPRange(
+		s.PrimaryServiceClusterIPRange,
+	)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -388,7 +390,9 @@ func CreateKubeAPIServerConfig(
 	var secondaryServiceIPRange net.IPNet
 	// process secondary range only if provided by user
 	if s.SecondaryServiceClusterIPRange.IP != nil {
-		secondaryServiceIPRange, _, err = master.ServiceIPRange(s.SecondaryServiceClusterIPRange)
+		secondaryServiceIPRange, _, err = master.ServiceIPRange(
+			s.SecondaryServiceClusterIPRange,
+		)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
@@ -465,7 +469,7 @@ func CreateKubeAPIServerConfig(
 // caller:
 // 	1. CreateKubeAPIServerConfig()
 //
-// BuildGenericConfig takes the master server options and 
+// BuildGenericConfig takes the master server options and
 // produces the genericapiserver.Config associated with it
 func buildGenericConfig(
 	s *options.ServerRunOptions,
@@ -513,7 +517,7 @@ func buildGenericConfig(
 	}
 
 	genericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(
-		generatedopenapi.GetOpenAPIDefinitions, 
+		generatedopenapi.GetOpenAPIDefinitions,
 		openapinamer.NewDefinitionNamer(
 			legacyscheme.Scheme, extensionsapiserver.Scheme, aggregatorscheme.Scheme,
 		),
@@ -632,14 +636,14 @@ func buildGenericConfig(
 //
 // BuildAuthenticator constructs the authenticator
 func BuildAuthenticator(
-	s *options.ServerRunOptions, extclient clientgoclientset.Interface, 
+	s *options.ServerRunOptions, extclient clientgoclientset.Interface,
 	versionedInformer clientgoinformers.SharedInformerFactory,
 ) (authenticator.Request, *spec.SecurityDefinitions, error) {
 	authenticatorConfig, err := s.Authentication.ToAuthenticationConfig()
 	if err != nil {
 		return nil, nil, err
 	}
-	if s.Authentication.ServiceAccounts.Lookup || 
+	if s.Authentication.ServiceAccounts.Lookup ||
 		utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
 		// 这里得到的 Getter 对象可以用来查询下面的3种资源: secret, sa, pod.
 		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromClient(
@@ -696,16 +700,16 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 
 	// process s.ServiceClusterIPRange from list to Primary and Secondary
 	// we process secondary only if provided by user
-	apiServerServiceIP, primaryServiceIPRange, secondaryServiceIPRange, 
-	err := getServiceIPAndRanges(s.ServiceClusterIPRanges)
+	apiServerServiceIP, primaryServiceIPRange, secondaryServiceIPRange,
+		err := getServiceIPAndRanges(s.ServiceClusterIPRanges)
 	if err != nil {
 		return options, err
 	}
 	s.PrimaryServiceClusterIPRange = primaryServiceIPRange
 	s.SecondaryServiceClusterIPRange = secondaryServiceIPRange
 	err = s.SecureServing.MaybeDefaultWithSelfSignedCerts(
-		s.GenericServerRunOptions.AdvertiseAddress.String(), 
-		[]string{"kubernetes.default.svc", "kubernetes.default", "kubernetes"}, 
+		s.GenericServerRunOptions.AdvertiseAddress.String(),
+		[]string{"kubernetes.default.svc", "kubernetes.default", "kubernetes"},
 		[]net.IP{apiServerServiceIP},
 	)
 	if err != nil {
@@ -802,7 +806,7 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 // 	@param informer: 一个 SharedInformerFactory 对象.
 //
 func buildServiceResolver(
-	enabledAggregatorRouting bool, hostname string, 
+	enabledAggregatorRouting bool, hostname string,
 	informer clientgoinformers.SharedInformerFactory,
 ) webhook.ServiceResolver {
 	var serviceResolver webhook.ServiceResolver

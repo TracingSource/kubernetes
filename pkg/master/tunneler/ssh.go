@@ -55,7 +55,8 @@ func TunnelSyncHealthChecker(tunneler Tunneler) func(req *http.Request) error {
 }
 
 type SSHTunneler struct {
-	// Important: Since these two int64 fields are using sync/atomic, they have to be at the top of the struct due to a bug on 32-bit platforms
+	// Important: Since these two int64 fields are using sync/atomic,
+	// they have to be at the top of the struct due to a bug on 32-bit platforms
 	// See: https://golang.org/pkg/sync/atomic/ for more information
 	lastSync       int64 // Seconds since Epoch
 	lastSSHKeySync int64 // Seconds since Epoch
