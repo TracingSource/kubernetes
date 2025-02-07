@@ -298,8 +298,9 @@ func (d *namespacedResourcesDeleter) deleteCollection(gvr schema.GroupVersionRes
 		return false, nil
 	}
 
-	// namespace controller does not want the garbage collector to insert the orphan finalizer since it calls
-	// resource deletions generically.  it will ensure all resources in the namespace are purged prior to releasing
+	// namespace controller does not want the garbage collector to insert the
+	// orphan finalizer since it calls resource deletions generically. 
+	// it will ensure all resources in the namespace are purged prior to releasing
 	// namespace itself.
 	background := metav1.DeletePropagationBackground
 	opts := &metav1.DeleteOptions{PropagationPolicy: &background}

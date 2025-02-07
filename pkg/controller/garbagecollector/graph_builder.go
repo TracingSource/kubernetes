@@ -203,7 +203,10 @@ func (gb *GraphBuilder) syncMonitors(resources map[schema.GroupVersionResource]s
 		}
 	}
 
-	klog.V(4).Infof("synced monitors; added %d, kept %d, removed %d", added, kept, len(toRemove))
+	klog.V(4).Infof(
+		"synced monitors; added %d, kept %d, removed %d", 
+		added, kept, len(toRemove),
+	)
 	// NewAggregate returns nil if errs is 0-length
 	return utilerrors.NewAggregate(errs)
 }
@@ -221,8 +224,8 @@ func (gb *GraphBuilder) startMonitors() {
 		return
 	}
 
-	// we're waiting until after the informer start that happens once all the controllers are initialized.  This ensures
-	// that they don't get unexpected events on their work queues.
+	// we're waiting until after the informer start that happens once all the controllers are initialized. 
+	// This ensures that they don't get unexpected events on their work queues.
 	<-gb.informersStarted
 
 	monitors := gb.monitors

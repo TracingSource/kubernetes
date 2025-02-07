@@ -55,6 +55,7 @@
 
         "staging/src/k8s.io/cloud-provider/": true,
         "staging/src/k8s.io/legacy-cloud-providers/": true,
+        "pkg/controller/cloud/": true,
     },
     // 全局搜索不搜索如下目录内容
     "search.exclude": {
@@ -103,5 +104,6 @@
 
         "staging/src/k8s.io/cloud-provider/": true,
         "staging/src/k8s.io/legacy-cloud-providers/": true,
+        "pkg/controller/cloud/": true,
     }
 }
