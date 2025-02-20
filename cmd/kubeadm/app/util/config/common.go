@@ -144,7 +144,8 @@ func ChooseAPIServerBindAddress(bindAddress net.IP) (net.IP, error) {
 	return ip, nil
 }
 
-// MigrateOldConfig migrates an old configuration from a byte slice into a new one (returned again as a byte slice).
+// MigrateOldConfig migrates an old configuration from a byte slice into a new one
+// (returned again as a byte slice).
 // Only kubeadm kinds are migrated. Others are silently ignored.
 func MigrateOldConfig(oldConfig []byte) ([]byte, error) {
 	newConfig := [][]byte{}

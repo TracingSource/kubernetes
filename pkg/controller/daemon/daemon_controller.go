@@ -178,7 +178,8 @@ func NewDaemonSetsController(
 	})
 	dsc.podLister = podInformer.Lister()
 
-	// This custom indexer will index pods based on their NodeName which will decrease the amount of pods we need to get in simulate() call.
+	// This custom indexer will index pods based on their NodeName which will
+	// decrease the amount of pods we need to get in simulate() call.
 	podInformer.Informer().GetIndexer().AddIndexers(cache.Indexers{
 		"nodeName": indexByPodNodeName,
 	})

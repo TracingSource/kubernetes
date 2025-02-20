@@ -7,6 +7,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+// 	@implementBy: pkg/master/reconcilers/lease.go -> leaseEndpointReconciler{}
+//
 // EndpointReconciler knows how to reconcile the endpoints for the apiserver service.
 type EndpointReconciler interface {
 	// ReconcileEndpoints sets the endpoints for the given apiserver service (ro or rw).

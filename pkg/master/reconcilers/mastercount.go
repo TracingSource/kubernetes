@@ -43,7 +43,9 @@ func NewMasterCountEndpointReconciler(masterCount int, epAdapter EndpointsAdapte
 //  * All apiservers MUST know and agree on the number of apiservers expected
 //      to be running (c.masterCount).
 //  * ReconcileEndpoints is called periodically from all apiservers.
-func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
+func (r *masterCountEndpointReconciler) ReconcileEndpoints(
+	serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort, reconcilePorts bool,
+) error {
 	r.reconcilingLock.Lock()
 	defer r.reconcilingLock.Unlock()
 
@@ -72,7 +74,9 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 
 	// First, determine if the endpoint is in the format we expect (one
 	// subset, ports matching endpointPorts, N IP addresses).
-	formatCorrect, ipCorrect, portsCorrect := checkEndpointSubsetFormat(e, ip.String(), endpointPorts, r.masterCount, reconcilePorts)
+	formatCorrect, ipCorrect, portsCorrect := checkEndpointSubsetFormat(
+		e, ip.String(), endpointPorts, r.masterCount, reconcilePorts,
+	)
 	if !formatCorrect {
 		// Something is egregiously wrong, just re-make the endpoints record.
 		e.Subsets = []corev1.EndpointSubset{{
@@ -120,7 +124,9 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 	return err
 }
 
-func (r *masterCountEndpointReconciler) RemoveEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort) error {
+func (r *masterCountEndpointReconciler) RemoveEndpoints(
+	serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort,
+) error {
 	r.reconcilingLock.Lock()
 	defer r.reconcilingLock.Unlock()
 

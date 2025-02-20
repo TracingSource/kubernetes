@@ -120,6 +120,9 @@ func NewLeaseEndpointReconciler(epAdapter EndpointsAdapter, masterLeases Leases)
 	}
 }
 
+// caller:
+// 	1. pkg/master/controller.go -> Controller.UpdateKubernetesService()
+//
 // ReconcileEndpoints lists keys in a special etcd directory.
 // Each key is expected to have a TTL of R+n, where R is the refresh interval
 // at which this function is called, and n is some small value.  If an
@@ -127,7 +130,9 @@ func NewLeaseEndpointReconciler(epAdapter EndpointsAdapter, masterLeases Leases)
 // expire. ReconcileEndpoints will notice that the endpoints object is
 // different from the directory listing, and update the endpoints object
 // accordingly.
-func (r *leaseEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
+func (r *leaseEndpointReconciler) ReconcileEndpoints(
+	serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort, reconcilePorts bool,
+) error {
 	r.reconcilingLock.Lock()
 	defer r.reconcilingLock.Unlock()
 
@@ -145,7 +150,11 @@ func (r *leaseEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.
 	return r.doReconcile(serviceName, endpointPorts, reconcilePorts)
 }
 
-func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
+// doReconcile 没有选主, 所有 apiserver 服务都会对更新 default/kubernetes endpoint
+// 不过貌似只会在 ready 后, 执行一次(把自己注册上), 也算合理. ???
+func (r *leaseEndpointReconciler) doReconcile(
+	serviceName string, endpointPorts []corev1.EndpointPort, reconcilePorts bool,
+) error {
 	e, err := r.epAdapter.Get(corev1.NamespaceDefault, serviceName, metav1.GetOptions{})
 	shouldCreate := false
 	if err != nil {
@@ -172,11 +181,15 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 	// returned from storage indicates an issue or invalid state, and thus do
 	// not update the endpoints list based on the result.
 	if len(masterIPs) == 0 {
-		return fmt.Errorf("no master IPs were listed in storage, refusing to erase all endpoints for the kubernetes service")
+		return fmt.Errorf(
+			"no master IPs were listed in storage, refusing to erase all endpoints for the kubernetes service",
+		)
 	}
 
 	// Next, we compare the current list of endpoints with the list of master IP keys
-	formatCorrect, ipCorrect, portsCorrect := checkEndpointSubsetFormatWithLease(e, masterIPs, endpointPorts, reconcilePorts)
+	formatCorrect, ipCorrect, portsCorrect := checkEndpointSubsetFormatWithLease(
+		e, masterIPs, endpointPorts, reconcilePorts,
+	)
 	if formatCorrect && ipCorrect && portsCorrect {
 		return r.epAdapter.EnsureEndpointSliceFromEndpoints(corev1.NamespaceDefault, e)
 	}
@@ -192,8 +205,8 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 	if !formatCorrect || !ipCorrect {
 		// repopulate the addresses according to the expected IPs from etcd
 		e.Subsets[0].Addresses = make([]corev1.EndpointAddress, len(masterIPs))
-		for ind, ip := range masterIPs {
-			e.Subsets[0].Addresses[ind] = corev1.EndpointAddress{IP: ip}
+		for i, ip := range masterIPs {
+			e.Subsets[0].Addresses[i] = corev1.EndpointAddress{IP: ip}
 		}
 
 		// Lexicographic order is retained by this step.
@@ -224,7 +237,10 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 // * ipsCorrect when the addresses in the endpoints match the expected addresses list
 // * portsCorrect is true when endpoint ports exactly match provided ports.
 //     portsCorrect is only evaluated when reconcilePorts is set to true.
-func checkEndpointSubsetFormatWithLease(e *corev1.Endpoints, expectedIPs []string, ports []corev1.EndpointPort, reconcilePorts bool) (formatCorrect bool, ipsCorrect bool, portsCorrect bool) {
+func checkEndpointSubsetFormatWithLease(
+	e *corev1.Endpoints, expectedIPs []string, ports []corev1.EndpointPort,
+	reconcilePorts bool,
+) (formatCorrect bool, ipsCorrect bool, portsCorrect bool) {
 	if len(e.Subsets) != 1 {
 		return false, false, false
 	}
@@ -234,6 +250,7 @@ func checkEndpointSubsetFormatWithLease(e *corev1.Endpoints, expectedIPs []strin
 		if len(sub.Ports) != len(ports) {
 			portsCorrect = false
 		} else {
+			// 顺序不同也需要更新.
 			for i, port := range ports {
 				if port != sub.Ports[i] {
 					portsCorrect = false
@@ -247,6 +264,8 @@ func checkEndpointSubsetFormatWithLease(e *corev1.Endpoints, expectedIPs []strin
 	if len(sub.Addresses) != len(expectedIPs) {
 		ipsCorrect = false
 	} else {
+		// 初始化一个 expectedIPs 的 map
+		//
 		// check the actual content of the addresses
 		// present addrs is used as a set (the keys) and to indicate if a
 		// value was already found (the values)
@@ -255,6 +274,8 @@ func checkEndpointSubsetFormatWithLease(e *corev1.Endpoints, expectedIPs []strin
 			presentAddrs[ip] = false
 		}
 
+		// 如果 sub.Addresses 中存在重复IP, 或是 presentAddrs 中没有对应的IP时 ???
+		//
 		// uniqueness is assumed amongst all Addresses.
 		for _, addr := range sub.Addresses {
 			if alreadySeen, ok := presentAddrs[addr.IP]; alreadySeen || !ok {
