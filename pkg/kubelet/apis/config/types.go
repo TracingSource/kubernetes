@@ -309,6 +309,8 @@ type KubeletConfiguration struct {
 	// features. This field modifies piecemeal the built-in default values from
 	// "k8s.io/kubernetes/pkg/features/kube_features.go".
 	FeatureGates map[string]bool
+	// 默认为 true, 即在 swap 未关闭时, kubelet 将无法启动.
+	//
 	// Tells the Kubelet to fail to start if swap is enabled on the node.
 	FailSwapOn bool
 	// A quantity defines the maximum size of the container log file before it is rotated.

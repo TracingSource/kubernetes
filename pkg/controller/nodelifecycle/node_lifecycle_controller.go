@@ -266,6 +266,7 @@ type Controller struct {
 	enterFullDisruptionFunc    func(nodeNum int) float32
 	computeZoneStateFunc       func(nodeConditions []*v1.NodeCondition) (int, ZoneState)
 
+	// 当前已知的节点信息表, 作为本地缓存, 用于标明哪些节点新增, 哪些节点被删除.
 	knownNodeSet map[string]*v1.Node
 	// per Node map storing last observed health together with a local time when it was observed.
 	nodeHealthMap *nodeHealthMap
@@ -460,7 +461,7 @@ func NewNodeLifecycleController(
 				pod, ok = deletedState.Obj.(*v1.Pod)
 				if !ok {
 					klog.Errorf(
-						"DeletedFinalStateUnknown contained non-Pod object: %v", 
+						"DeletedFinalStateUnknown contained non-Pod object: %v",
 						deletedState.Obj,
 					)
 					return
@@ -613,6 +614,9 @@ func (nc *Controller) Run(stopCh <-chan struct{}) {
 		go wait.Until(nc.doEvictionPass, scheduler.NodeEvictionPeriod, stopCh)
 	}
 
+	// nodeMonitorPeriod 绑定 kube controller manager 的 --node-monitor-period 参数, 默认为 5s.
+	// 定时检测节点状态.
+	//
 	// Incorporate the results of node health signal pushed from kubelet to master.
 	go wait.Until(func() {
 		if err := nc.monitorNodeHealth(); err != nil {
@@ -840,13 +844,18 @@ func (nc *Controller) monitorNodeHealth() error {
 			name := node.Name
 			node, err = nc.kubeClient.CoreV1().Nodes().Get(name, metav1.GetOptions{})
 			if err != nil {
-				klog.Errorf("Failed while getting a Node to retry updating node health. Probably Node %s was deleted.", name)
+				klog.Errorf(
+					"Failed while getting a Node to retry updating node health. "+
+						"Probably Node %s was deleted.", name,
+				)
 				return false, err
 			}
 			return false, nil
 		}); err != nil {
-			klog.Errorf("Update health of Node '%v' from Controller error: %v. "+
-				"Skipping - no pods will be evicted.", node.Name, err)
+			klog.Errorf(
+				"Update health of Node '%v' from Controller error: %v. "+
+					"Skipping - no pods will be evicted.", node.Name, err,
+			)
 			continue
 		}
 
@@ -1421,6 +1430,8 @@ func (nc *Controller) setLimiterInZone(zone string, zoneSize int, state ZoneStat
 	}
 }
 
+// 	@param allNodes: 当前集群中所有的 node
+//
 // classifyNodes classifies the allNodes to three categories:
 //   1. added: the nodes that in 'allNodes', but not in 'knownNodeSet'
 //   2. deleted: the nodes that in 'knownNodeSet', but not in 'allNodes'
@@ -1428,6 +1439,7 @@ func (nc *Controller) setLimiterInZone(zone string, zoneSize int, state ZoneStat
 func (nc *Controller) classifyNodes(allNodes []*v1.Node) (added, deleted, newZoneRepresentatives []*v1.Node) {
 	for i := range allNodes {
 		if _, has := nc.knownNodeSet[allNodes[i].Name]; !has {
+			// 新增节点
 			added = append(added, allNodes[i])
 		} else {
 			// Currently, we only consider new zone as updated.
@@ -1438,6 +1450,8 @@ func (nc *Controller) classifyNodes(allNodes []*v1.Node) (added, deleted, newZon
 		}
 	}
 
+	// 某些节点被移除.
+	//
 	// If there's a difference between lengths of known Nodes and observed nodes
 	// we must have removed some Node.
 	if len(nc.knownNodeSet)+len(added) != len(allNodes) {

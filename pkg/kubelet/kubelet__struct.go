@@ -295,6 +295,7 @@ type Kubelet struct {
 	// Whether or not we should have the QOS cgroup hierarchy for resource management
 	cgroupsPerQOS bool
 
+	// 一般为 ""
 	// If non-empty, pass this to the container runtime as the root cgroup.
 	cgroupRoot string
 

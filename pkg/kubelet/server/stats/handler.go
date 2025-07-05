@@ -91,13 +91,18 @@ type handler struct {
 	summaryProvider SummaryProvider
 }
 
+// 	@param rootPath: /stats/
+// 	@param provider: pkg/kubelet/kubelet__struct.go -> Kubelet{}
+//
+// caller:
+// 	1. pkg/kubelet/server/server.go -> Server.InstallDefaultHandlers()
+//
 // CreateHandlers creates the REST handlers for the stats.
 func CreateHandlers(rootPath string, provider Provider, summaryProvider SummaryProvider, enableCAdvisorJSONEndpoints bool) *restful.WebService {
 	h := &handler{provider, summaryProvider}
 
 	ws := &restful.WebService{}
-	ws.Path(rootPath).
-		Produces(restful.MIME_JSON)
+	ws.Path(rootPath).Produces(restful.MIME_JSON)
 
 	type endpoint struct {
 		path    string
@@ -119,10 +124,7 @@ func CreateHandlers(rootPath string, provider Provider, summaryProvider SummaryP
 
 	for _, e := range endpoints {
 		for _, method := range []string{"GET", "POST"} {
-			ws.Route(ws.
-				Method(method).
-				Path(e.path).
-				To(e.handler))
+			ws.Route(ws.Method(method).Path(e.path).To(e.handler))
 		}
 	}
 

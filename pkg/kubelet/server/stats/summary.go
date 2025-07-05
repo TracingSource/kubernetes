@@ -104,6 +104,8 @@ func (sp *summaryProviderImpl) Get(updateStats bool) (*statsapi.Summary, error) 
 	return &summary, nil
 }
 
+// caller:
+// 	1. pkg/kubelet/server/stats/handler.go -> handler.handleSummary()
 func (sp *summaryProviderImpl) GetCPUAndMemoryStats() (*statsapi.Summary, error) {
 	// TODO(timstclair): Consider returning a best-effort response if any of
 	// the following errors occur.

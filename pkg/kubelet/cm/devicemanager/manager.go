@@ -900,6 +900,8 @@ func (m *ManagerImpl) takeByTopology(
 	return append(append(fromAffinity, notFromAffinity...), withoutTopology...)[:request]
 }
 
+// allocateContainerResources 末尾会将 pod/container 分配的设备信息写入checkpoint文件.
+//
 // 	@param container: pod 中包含的 container (可以是 InitContainer)
 //
 // allocateContainerResources attempts to allocate all of required device
@@ -1053,6 +1055,7 @@ func (m *ManagerImpl) GetDeviceRunContainerOptions(
 	// 调用 device plugin 进行分配.
 	if needsReAllocate {
 		klog.V(2).Infof("needs re-allocate device plugin resources for pod %s", podUID)
+		// 这里会将 pod/container 分配的设备信息写入checkpoint文件.
 		if err := m.allocatePodResources(pod); err != nil {
 			return nil, err
 		}

@@ -142,7 +142,7 @@ func (r *leaseEndpointReconciler) ReconcileEndpoints(
 
 	// Refresh the TTL on our key, independently of whether any error or
 	// update conflict happens below. This makes sure that at least some of
-	// the masters will add our endpoint.
+	// the masters will add our endpoint.node-monitor-period
 	if err := r.masterLeases.UpdateLease(ip.String()); err != nil {
 		return err
 	}

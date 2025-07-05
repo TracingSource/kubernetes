@@ -191,6 +191,8 @@ type AuthInterface interface {
 	authorizer.Authorizer
 }
 
+// 	@implementBy: pkg/kubelet/kubelet__struct.go -> Kubelet{}
+//
 // HostInterface contains all the kubelet methods required by the server.
 // For testability.
 type HostInterface interface {

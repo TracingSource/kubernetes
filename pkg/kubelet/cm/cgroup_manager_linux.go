@@ -173,6 +173,9 @@ type cgroupManagerImpl struct {
 // Make sure that cgroupManagerImpl implements the CgroupManager interface
 var _ CgroupManager = &cgroupManagerImpl{}
 
+// caller:
+// 	1. pkg/kubelet/cm/container_manager_linux.go -> NewContainerManager()
+//
 // NewCgroupManager is a factory method that returns a CgroupManager
 func NewCgroupManager(cs *CgroupSubsystems, cgroupDriver string) CgroupManager {
 	managerType := libcontainerCgroupfs

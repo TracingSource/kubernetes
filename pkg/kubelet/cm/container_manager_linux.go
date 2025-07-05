@@ -184,6 +184,8 @@ func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 
 // NewContainerManager ...
 //
+// 	@param failSwapOn: 默认为 true, 即在 swap 未关闭时, kubelet 将无法启动.
+//
 // caller: cmd/kubelet/app/server.go -> run()
 //
 // TODO(vmarmol): Add limits to the system containers.
@@ -200,7 +202,8 @@ func NewContainerManager(
 	}
 
 	if failSwapOn {
-		// Check whether swap is enabled. The Kubelet does not support running with swap enabled.
+		// Check whether swap is enabled.
+		// The Kubelet does not support running with swap enabled.
 		swapData, err := ioutil.ReadFile("/proc/swaps")
 		if err != nil {
 			return nil, err
@@ -222,7 +225,8 @@ func NewContainerManager(
 	var internalCapacity = v1.ResourceList{}
 	// It is safe to invoke `MachineInfo` on cAdvisor before logically initializing cAdvisor here because
 	// machine info is computed and cached once as part of cAdvisor object creation.
-	// But `RootFsInfo` and `ImagesFsInfo` are not available at this moment so they will be called later during manager starts
+	// But `RootFsInfo` and `ImagesFsInfo` are not available at this moment
+	// so they will be called later during manager starts
 	machineInfo, err := cadvisorInterface.MachineInfo()
 	if err != nil {
 		return nil, err
@@ -242,7 +246,8 @@ func NewContainerManager(
 	if err == nil && pidlimits != nil && pidlimits.MaxPID != nil {
 		internalCapacity[pidlimit.PIDs] = *resource.NewQuantity(
 			int64(*pidlimits.MaxPID),
-			resource.DecimalSI)
+			resource.DecimalSI,
+		)
 	}
 
 	// Turn CgroupRoot from a string (in cgroupfs path format) to internal CgroupName
@@ -310,7 +315,9 @@ func NewContainerManager(
 
 	klog.Infof("Creating device plugin manager: %t", devicePluginEnabled)
 	if devicePluginEnabled {
-		cm.deviceManager, err = devicemanager.NewManagerImpl(numaNodeInfo, cm.topologyManager)
+		cm.deviceManager, err = devicemanager.NewManagerImpl(
+			numaNodeInfo, cm.topologyManager,
+		)
 		cm.topologyManager.AddHintProvider(cm.deviceManager)
 	} else {
 		cm.deviceManager, err = devicemanager.NewManagerStub()
@@ -571,6 +578,9 @@ func (cm *containerManagerImpl) GetNodeConfig() NodeConfig {
 	return cm.NodeConfig
 }
 
+// caller:
+// 	1. pkg/kubelet/kubelet_getters.go -> Kubelet.GetPodCgroupRoot()
+//
 // GetPodCgroupRoot returns the literal cgroupfs value for the cgroup containing all pods.
 func (cm *containerManagerImpl) GetPodCgroupRoot() string {
 	return cm.cgroupManager.Name(cm.cgroupRoot)
@@ -611,7 +621,7 @@ func (cm *containerManagerImpl) Start(
 	// Initialize CPU manager
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
 		cm.cpuManager.Start(
-			cpumanager.ActivePodsFunc(activePods), sourcesReady, 
+			cpumanager.ActivePodsFunc(activePods), sourcesReady,
 			podStatusProvider, runtimeService,
 		)
 	}

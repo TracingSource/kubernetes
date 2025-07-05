@@ -49,9 +49,7 @@ type ResourceStats struct {
 	MemoryStats *MemoryStats
 }
 
-// 由 pkg/kubelet/cm/cgroup_manager_linux.go -> cgroupManagerImpl{} 结构体实现.
-// 不过前者作为了 pkg/kubelet/cm/container_manager_linux.go -> containerManagerImpl{} 
-// 的一个成员, 所以其实后者也实现了这个接口.
+// 	@implementBy: pkg/kubelet/cm/cgroup_manager_linux.go -> cgroupManagerImpl{}
 //
 // CgroupManager allows for cgroup management.
 // Supports Cgroup Creation ,Deletion and Updates.

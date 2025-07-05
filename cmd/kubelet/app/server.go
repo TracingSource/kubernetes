@@ -828,7 +828,8 @@ func run(
 			},
 			kubeletServer.FailSwapOn,
 			devicePluginEnabled,
-			kubeDeps.Recorder)
+			kubeDeps.Recorder,
+		)
 
 		if err != nil {
 			return err

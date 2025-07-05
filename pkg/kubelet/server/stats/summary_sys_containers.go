@@ -45,6 +45,8 @@ func (sp *summaryProviderImpl) GetSystemContainersStats(nodeConfig cm.NodeConfig
 	return stats
 }
 
+// caller:
+// 	1. pkg/kubelet/server/stats/summary.go -> summaryProviderImpl.GetCPUAndMemoryStats()
 func (sp *summaryProviderImpl) GetSystemContainersCPUAndMemoryStats(nodeConfig cm.NodeConfig, podStats []statsapi.PodStats, updateStats bool) (stats []statsapi.ContainerStats) {
 	systemContainers := map[string]struct {
 		name             string
