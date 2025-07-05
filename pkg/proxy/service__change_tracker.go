@@ -6,11 +6,11 @@ import (
 	"strings"
 	"sync"
 
-	"k8s.io/klog"
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog"
 	apiservice "k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
@@ -58,7 +58,7 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(
 		)
 		if len(incorrectIPs) > 0 {
 			utilproxy.LogAndEmitIncorrectIPVersionEvent(
-				sct.recorder, "externalIPs", strings.Join(incorrectIPs, ","), 
+				sct.recorder, "externalIPs", strings.Join(incorrectIPs, ","),
 				service.Namespace, service.Name, service.UID,
 			)
 		}
@@ -67,8 +67,8 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(
 		)
 		if len(incorrectIPs) > 0 {
 			utilproxy.LogAndEmitIncorrectIPVersionEvent(
-				sct.recorder, "loadBalancerSourceRanges", 
-				strings.Join(incorrectIPs, ","), 
+				sct.recorder, "loadBalancerSourceRanges",
+				strings.Join(incorrectIPs, ","),
 				service.Namespace, service.Name, service.UID,
 			)
 		}
@@ -78,7 +78,7 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(
 		p := service.Spec.HealthCheckNodePort
 		if p == 0 {
 			klog.Errorf(
-				"Service %s/%s has no healthcheck nodeport", 
+				"Service %s/%s has no healthcheck nodeport",
 				service.Namespace, service.Name,
 			)
 		} else {
@@ -91,7 +91,7 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(
 
 type makeServicePortFunc func(*v1.ServicePort, *v1.Service, *BaseServiceInfo) ServicePort
 
-// serviceChange contains all changes to services that happened since proxy rules were synced. 
+// serviceChange contains all changes to services that happened since proxy rules were synced.
 // For a single object, changes are accumulated,
 // i.e. previous is state from before applying the changes,
 // current is state after applying all of the changes.
@@ -109,14 +109,15 @@ type ServiceChangeTracker struct {
 	items map[types.NamespacedName]*serviceChange
 	// makeServiceInfo allows proxier to inject customized information when processing service.
 	makeServiceInfo makeServicePortFunc
-	// isIPv6Mode indicates if change tracker is under IPv6/IPv4 mode. Nil means not applicable.
+	// isIPv6Mode indicates if change tracker is under IPv6/IPv4 mode.
+	// Nil means not applicable.
 	isIPv6Mode *bool
 	recorder   record.EventRecorder
 }
 
 // NewServiceChangeTracker initializes a ServiceChangeTracker
 func NewServiceChangeTracker(
-	makeServiceInfo makeServicePortFunc, isIPv6Mode *bool, 
+	makeServiceInfo makeServicePortFunc, isIPv6Mode *bool,
 	recorder record.EventRecorder,
 ) *ServiceChangeTracker {
 	return &ServiceChangeTracker{
@@ -127,9 +128,15 @@ func NewServiceChangeTracker(
 	}
 }
 
-// Update updates given service's change map based on the <previous, current> service pair. 
-// It returns true if items changed, otherwise return false. 
-// Update can be used to add/update/delete items of ServiceChangeMap. 
+// Update 判断目标 Service 对象是否发生变化, 是则返回 true, 否则返回 false.
+//
+// caller:
+// 	1. pkg/proxy/iptables/proxier.go -> Proxier.OnServiceUpdate()
+// 	2. pkg/proxy/ipvs/proxier.go -> Proxier.OnServiceUpdate()
+//
+// Update updates given service's change map based on the <previous, current> service pair.
+// It returns true if items changed, otherwise return false.
+// Update can be used to add/update/delete items of ServiceChangeMap.
 // For example,
 // Add item
 //   - pass <nil, service> as the <previous, current> pair.
@@ -177,6 +184,9 @@ type UpdateServiceMapResult struct {
 	UDPStaleClusterIP sets.String
 }
 
+// caller:
+// 	1. ServiceChangeTracker.Update()
+//
 // serviceToServiceMap translates a single Service object to a ServiceMap.
 //
 // NOTE: service object should NOT be modified.
@@ -193,7 +203,10 @@ func (sct *ServiceChangeTracker) serviceToServiceMap(service *v1.Service) Servic
 		// Filter out the incorrect IP version case.
 		// If ClusterIP on service has incorrect IP version, service itself will be ignored.
 		if sct.isIPv6Mode != nil && utilnet.IsIPv6String(service.Spec.ClusterIP) != *sct.isIPv6Mode {
-			utilproxy.LogAndEmitIncorrectIPVersionEvent(sct.recorder, "clusterIP", service.Spec.ClusterIP, service.Namespace, service.Name, service.UID)
+			utilproxy.LogAndEmitIncorrectIPVersionEvent(
+				sct.recorder, "clusterIP", service.Spec.ClusterIP,
+				service.Namespace, service.Name, service.UID,
+			)
 			return nil
 		}
 	}
@@ -201,7 +214,11 @@ func (sct *ServiceChangeTracker) serviceToServiceMap(service *v1.Service) Servic
 	serviceMap := make(ServiceMap)
 	for i := range service.Spec.Ports {
 		servicePort := &service.Spec.Ports[i]
-		svcPortName := ServicePortName{NamespacedName: svcName, Port: servicePort.Name, Protocol: servicePort.Protocol}
+		svcPortName := ServicePortName{
+			NamespacedName: svcName,
+			Port:           servicePort.Name,
+			Protocol:       servicePort.Protocol,
+		}
 		baseSvcInfo := sct.newBaseServiceInfo(servicePort, service)
 		if sct.makeServiceInfo != nil {
 			serviceMap[svcPortName] = sct.makeServiceInfo(servicePort, service, baseSvcInfo)

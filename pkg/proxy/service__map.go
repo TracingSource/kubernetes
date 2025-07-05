@@ -9,8 +9,11 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 )
 
-// ServiceMap 的值为当前集群中所有service的映射表,
-// key为 namespace/serviceName:portName, val为 serviceIP:port/协议
+// ServiceMap 为当前集群中所有service的映射表.
+//
+// key: namespace/serviceName:portName
+// val: serviceIP:port/协议
+//
 // 当然, key和val其实都是struct, 只不过字符串的表现形式是这样.
 //
 // ServiceMap maps a service to its ServicePort.

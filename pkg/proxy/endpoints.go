@@ -118,8 +118,17 @@ func NewEndpointChangeTracker(hostname string, makeEndpointInfo makeEndpointFunc
 	return ect
 }
 
-// Update updates given service's endpoints change map based on the <previous, current> endpoints pair.  It returns true
-// if items changed, otherwise return false.  Update can be used to add/update/delete items of EndpointsChangeMap.  For example,
+// Update endpoint informer 在监测到变动时调用该方法先进行比对,
+// 确认确实发生变动后, 返回 true, 主调函数会通知 proxier 同步 ipvs/iptables 规则.
+//
+// caller:
+// 	1. pkg/proxy/iptables/proxier.go -> Proxier.OnEndpointsUpdate()
+// 	2. pkg/proxy/ipvs/proxier.go -> Proxier.OnEndpointsUpdate()
+//
+// Update updates given service's endpoints change map based on the <previous, current> endpoints pair.
+// It returns true if items changed, otherwise return false.
+// Update can be used to add/update/delete items of EndpointsChangeMap.
+// For example,
 // Add item
 //   - pass <nil, endpoints> as the <previous, current> pair.
 // Update item
@@ -136,7 +145,9 @@ func (ect *EndpointChangeTracker) Update(previous, current *v1.Endpoints) bool {
 		return false
 	}
 	metrics.EndpointChangesTotal.Inc()
-	namespacedName := types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}
+	namespacedName := types.NamespacedName{
+		Namespace: endpoints.Namespace, Name: endpoints.Name,
+	}
 
 	ect.lock.Lock()
 	defer ect.lock.Unlock()
@@ -230,7 +241,9 @@ func (ect *EndpointChangeTracker) checkoutChanges() []*endpointsChange {
 
 // checkoutTriggerTimes applies the locally cached trigger times to a map of
 // trigger times that have been passed in and empties the local cache.
-func (ect *EndpointChangeTracker) checkoutTriggerTimes(lastChangeTriggerTimes *map[types.NamespacedName][]time.Time) {
+func (ect *EndpointChangeTracker) checkoutTriggerTimes(
+	lastChangeTriggerTimes *map[types.NamespacedName][]time.Time,
+) {
 	ect.lock.Lock()
 	defer ect.lock.Unlock()
 
@@ -289,6 +302,10 @@ type UpdateEndpointMapResult struct {
 	LastChangeTriggerTimes map[types.NamespacedName][]time.Time
 }
 
+// caller:
+// 	1. pkg/proxy/iptables/proxier__syncProxyRules.go -> Proxier.syncProxyRules()
+// 	2. pkg/proxy/ipvs/proxier__sync_proxy_rules.go -> Proxier.syncProxyRules()
+//
 // Update updates endpointsMap base on the given changes.
 func (em EndpointsMap) Update(changes *EndpointChangeTracker) (result UpdateEndpointMapResult) {
 	result.StaleEndpoints = make([]ServiceEndpoint, 0)
@@ -296,7 +313,11 @@ func (em EndpointsMap) Update(changes *EndpointChangeTracker) (result UpdateEndp
 	result.LastChangeTriggerTimes = make(map[types.NamespacedName][]time.Time)
 
 	em.apply(
-		changes, &result.StaleEndpoints, &result.StaleServiceNames, &result.LastChangeTriggerTimes)
+		changes,
+		&result.StaleEndpoints,
+		&result.StaleServiceNames,
+		&result.LastChangeTriggerTimes,
+	)
 
 	// TODO: If this will appear to be computationally expensive, consider
 	// computing this incrementally similarly to endpointsMap.
@@ -310,8 +331,8 @@ func (em EndpointsMap) Update(changes *EndpointChangeTracker) (result UpdateEndp
 }
 
 // EndpointsMap 的值为当前集群中各service对应的endpoint表(一个svc中可能存在多个port, 也就存在多个ep).
-// key为 namespace/serviceName:portName(与ServiceMap的key相同), 
-// val为成员格式 serviceIP:port 的数组.
+// key: namespace/serviceName:portName(与ServiceMap的key相同),
+// val: []serviceIP:port
 //
 // EndpointsMap maps a service name to a list of all its Endpoints.
 type EndpointsMap map[ServicePortName][]Endpoint
@@ -370,13 +391,20 @@ func (ect *EndpointChangeTracker) endpointsToEndpointsMap(endpoints *v1.Endpoint
 	return endpointsMap
 }
 
-// apply the changes to EndpointsMap and updates stale endpoints and service-endpoints pair. The `staleEndpoints` argument
-// is passed in to store the stale udp endpoints and `staleServiceNames` argument is passed in to store the stale udp service.
+// caller:
+// 	1. EndpointsMap.Update() 只有这一处
+//
+// apply the changes to EndpointsMap and updates stale endpoints and service-endpoints pair.
+// The `staleEndpoints` argument is passed in to store the stale udp endpoints
+// and `staleServiceNames` argument is passed in to store the stale udp service.
 // The changes map is cleared after applying them.
 // In addition it returns (via argument) and resets the lastChangeTriggerTimes for all endpoints
 // that were changed and will result in syncing the proxy rules.
-func (em EndpointsMap) apply(ect *EndpointChangeTracker, staleEndpoints *[]ServiceEndpoint,
-	staleServiceNames *[]ServicePortName, lastChangeTriggerTimes *map[types.NamespacedName][]time.Time) {
+func (em EndpointsMap) apply(
+	ect *EndpointChangeTracker, staleEndpoints *[]ServiceEndpoint,
+	staleServiceNames *[]ServicePortName,
+	lastChangeTriggerTimes *map[types.NamespacedName][]time.Time,
+) {
 	if ect == nil {
 		return
 	}
@@ -423,7 +451,10 @@ func (em EndpointsMap) getLocalEndpointIPs() map[types.NamespacedName]sets.Strin
 
 // detectStaleConnections modifies <staleEndpoints> and <staleServices> with detected stale connections. <staleServiceNames>
 // is used to store stale udp service in order to clear udp conntrack later.
-func detectStaleConnections(oldEndpointsMap, newEndpointsMap EndpointsMap, staleEndpoints *[]ServiceEndpoint, staleServiceNames *[]ServicePortName) {
+func detectStaleConnections(
+	oldEndpointsMap, newEndpointsMap EndpointsMap,
+	staleEndpoints *[]ServiceEndpoint, staleServiceNames *[]ServicePortName,
+) {
 	for svcPortName, epList := range oldEndpointsMap {
 		if svcPortName.Protocol != v1.ProtocolUDP {
 			continue
@@ -439,7 +470,12 @@ func detectStaleConnections(oldEndpointsMap, newEndpointsMap EndpointsMap, stale
 			}
 			if stale {
 				klog.V(4).Infof("Stale endpoint %v -> %v", svcPortName, ep.String())
-				*staleEndpoints = append(*staleEndpoints, ServiceEndpoint{Endpoint: ep.String(), ServicePortName: svcPortName})
+				*staleEndpoints = append(
+					*staleEndpoints,
+					ServiceEndpoint{
+						Endpoint: ep.String(), ServicePortName: svcPortName,
+					},
+				)
 			}
 		}
 	}
@@ -449,7 +485,8 @@ func detectStaleConnections(oldEndpointsMap, newEndpointsMap EndpointsMap, stale
 			continue
 		}
 
-		// For udp service, if its backend changes from 0 to non-0. There may exist a conntrack entry that could blackhole traffic to the service.
+		// For udp service, if its backend changes from 0 to non-0.
+		// There may exist a conntrack entry that could blackhole traffic to the service.
 		if len(epList) > 0 && len(oldEndpointsMap[svcPortName]) == 0 {
 			*staleServiceNames = append(*staleServiceNames, svcPortName)
 		}

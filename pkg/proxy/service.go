@@ -99,8 +99,13 @@ func (info *BaseServiceInfo) TopologyKeys() []string {
 	return info.topologyKeys
 }
 
+// caller:
+// 	1. pkg/proxy/iptables/proxier__syncProxyRules.go -> Proxier.syncProxyRules()
+//
 // UpdateServiceMap updates ServiceMap based on the given changes.
-func UpdateServiceMap(serviceMap ServiceMap, changes *ServiceChangeTracker) (result UpdateServiceMapResult) {
+func UpdateServiceMap(
+	serviceMap ServiceMap, changes *ServiceChangeTracker,
+) (result UpdateServiceMapResult) {
 	result.UDPStaleClusterIP = sets.NewString()
 	serviceMap.apply(changes, result.UDPStaleClusterIP)
 

@@ -124,6 +124,7 @@ func (c *EndpointsConfig) handleDeleteEndpoints(obj interface{}) {
 ////////////////////////////////////////////////////////////////////////////////
 
 // 	@implementBy: pkg/proxy/ipvs/proxier.go -> Proxier{}
+// 	@implementBy: pkg/proxy/iptables/proxier.go -> Proxier{}
 //
 // ServiceHandler is an abstract interface of objects which receive
 // notifications about service object changes.
@@ -144,7 +145,8 @@ type ServiceHandler interface {
 
 // ServiceConfig tracks a set of service configurations.
 type ServiceConfig struct {
-	listerSynced  cache.InformerSynced
+	listerSynced cache.InformerSynced
+	// eventHandlers 虽然是一个数组, 但其实只有 ipvs/iptables 的其中一个.
 	eventHandlers []ServiceHandler
 }
 
@@ -173,6 +175,8 @@ func NewServiceConfig(
 	return result
 }
 
+// RegisterEventHandler kube-proxy 只会选择一个 handler
+//
 // 	@param handler: iptables、ipvs 有各自的 handler, 如
 // 	1. pkg/proxy/ipvs/proxier.go -> Proxier{}
 // 	2. pkg/proxy/iptables/proxier.go -> Proxier{}
@@ -198,7 +202,7 @@ func (c *ServiceConfig) Run(stopCh <-chan struct{}) {
 
 	for i := range c.eventHandlers {
 		klog.V(3).Info("Calling handler.OnServiceSynced()")
-		// ...看着像是一次性调用
+		// kube-proxy 启动时进行一次性调用
 		c.eventHandlers[i].OnServiceSynced()
 	}
 }
