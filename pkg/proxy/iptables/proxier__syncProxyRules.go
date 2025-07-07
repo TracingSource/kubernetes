@@ -234,6 +234,7 @@ func (proxier *Proxier) syncProxyRules() {
 		protocol := strings.ToLower(string(svcInfo.Protocol()))
 		svcNameString := svcInfo.serviceNameString
 
+		// allEndpoints 当前 Service 名下的所有 Endpoint, 每个成员表示一个 Pod 后端.
 		allEndpoints := proxier.endpointsMap[svcName]
 
 		hasEndpoints := len(allEndpoints) > 0
@@ -550,11 +551,12 @@ func (proxier *Proxier) syncProxyRules() {
 			continue
 		}
 
-		// Generate the per-endpoint chains. 
+		// Generate the per-endpoint chains.
 		// We do this in multiple passes so we can group rules together.
 		// These two slices parallel each other - keep in sync
 		endpoints = endpoints[:0] // 确保清空?
 		endpointChains = endpointChains[:0]
+		// Endpoint 资源中, 每个后端都表示为一个 endpointChain 对象.
 		var endpointChain utiliptables.Chain
 		for _, ep := range allEndpoints {
 			epInfo, ok := ep.(*endpointsInfo)
@@ -567,6 +569,8 @@ func (proxier *Proxier) syncProxyRules() {
 			endpointChain = epInfo.endpointChain(svcNameString, protocol)
 			endpointChains = append(endpointChains, endpointChain)
 
+			// iptables 的同步策略是全量刷新, 为了保存命中次数, 会先从已有规则表中拷贝, 放入新表中.
+			//
 			// Create the endpoint chain, retaining counters if possible.
 			if chain, ok := existingNATChains[utiliptables.Chain(endpointChain)]; ok {
 				writeBytesLine(proxier.natChains, chain)
@@ -632,8 +636,8 @@ func (proxier *Proxier) syncProxyRules() {
 			// Handle traffic that loops back to the originator with SNAT.
 			writeLine(
 				proxier.natRules, append(args,
-				"-s", utilproxy.ToCIDR(net.ParseIP(epIP)),
-				"-j", string(KubeMarkMasqChain))...,
+					"-s", utilproxy.ToCIDR(net.ParseIP(epIP)),
+					"-j", string(KubeMarkMasqChain))...,
 			)
 			// Update client-affinity lists.
 			if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {

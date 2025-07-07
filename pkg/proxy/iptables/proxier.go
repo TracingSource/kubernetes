@@ -127,7 +127,9 @@ type endpointsInfo struct {
 	// The following fields we lazily compute and store here for performance
 	// reasons. If the protocol is the same as you expect it to be, then the
 	// chainName can be reused, otherwise it should be recomputed.
-	protocol  string
+	protocol string
+	// chainName Endpoint资源下的每个后端, 都拥有一个独立的转发链.
+	// 格式一般为 KUBE-SEP-XXXXXXXXXXXXXXXX
 	chainName utiliptables.Chain
 }
 
@@ -149,6 +151,7 @@ func (e *endpointsInfo) Equal(other proxy.Endpoint) bool {
 		e.chainName == o.chainName
 }
 
+// endpointChain
 // Returns the endpoint chain name for a given endpointsInfo.
 func (e *endpointsInfo) endpointChain(svcNameString, protocol string) utiliptables.Chain {
 	if e.protocol != protocol {
@@ -708,6 +711,9 @@ func serviceLBChainName(servicePortName string, protocol string) utiliptables.Ch
 	return utiliptables.Chain("KUBE-XLB-" + portProtoHash(servicePortName, protocol))
 }
 
+// caller:
+// 	1. endpointsInfo.endpointChain() 只有这一处
+//
 // This is the same as servicePortChainName but with the endpoint included.
 func servicePortEndpointChainName(servicePortName string, protocol string, endpoint string) utiliptables.Chain {
 	hash := sha256.Sum256([]byte(servicePortName + protocol + endpoint))
