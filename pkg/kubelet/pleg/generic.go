@@ -94,6 +94,9 @@ type podRecord struct {
 
 type podRecords map[types.UID]*podRecord
 
+// caller:
+// 	1. pkg/kubelet/kubelet__new.go -> NewMainKubelet() 只有这一处
+//
 // NewGenericPLEG instantiates a new GenericPLEG object and return it.
 func NewGenericPLEG(
 	runtime kubecontainer.Runtime, channelCapacity int,
@@ -140,7 +143,10 @@ func (g *GenericPLEG) Healthy() (bool, error) {
 
 // caller: 
 // 	1. computeEvents()
-func generateEvents(podID types.UID, cid string, oldState, newState plegContainerState) []*PodLifecycleEvent {
+func generateEvents(
+	podID types.UID, cid string, 
+	oldState, newState plegContainerState,
+) []*PodLifecycleEvent {
 	if newState == oldState {
 		return nil
 	}
@@ -390,6 +396,8 @@ func (g *GenericPLEG) getPodIPs(pid types.UID, status *kubecontainer.PodStatus) 
 	return oldStatus.IPs
 }
 
+// caller:
+// 	1. GenericPLEG.relist()
 func (g *GenericPLEG) updateCache(pod *kubecontainer.Pod, pid types.UID) error {
 	if pod == nil {
 		// The pod is missing in the current relist. This means that
@@ -459,7 +467,8 @@ func updateRunningPodAndContainerMetrics(pods []*kubecontainer.Pod) {
 	for _, pod := range pods {
 		containers := pod.Containers
 		for _, container := range containers {
-			// update the corresponding "container_state" in map to set value for the gaugeVec metrics
+			// update the corresponding "container_state" in map to set value
+			// for the gaugeVec metrics
 			containerStateCount[string(container.State)]++
 		}
 	}
@@ -490,7 +499,7 @@ func (pr podRecords) getCurrent(id types.UID) *kubecontainer.Pod {
 // @param pods: 当前主机上运行着的 Pod 列表.
 //
 // caller: 
-// 	1. GenericPLEG.relist() 
+// 	1. GenericPLEG.relist() 只有这一处
 func (pr podRecords) setCurrent(pods []*kubecontainer.Pod) {
 	for i := range pr {
 		pr[i].current = nil

@@ -7,6 +7,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
+// 	@implementBy: cache{}
+//
+// 生产者: pkg/kubelet/pleg/generic.go -> GenericPLEG.updateCache() 在 g.cache.Set()
+//
 // Cache stores the PodStatus for the pods. It represents *all* the visible
 // pods/containers in the container runtime. All cache entries are at least as
 // new or newer than the global timestamp (set by UpdateTime()), while
@@ -42,6 +46,8 @@ type subRecord struct {
 	ch   chan *data
 }
 
+// 	@implementOf: Cache
+//
 // cache implements Cache.
 type cache struct {
 	// Lock which guards all internal data structures.
@@ -77,6 +83,9 @@ func (c *cache) GetNewerThan(id types.UID, minTime time.Time) (*PodStatus, error
 	return d.status, d.err
 }
 
+// caller:
+// 	1. pkg/kubelet/pleg/generic.go -> GenericPLEG.updateCache()
+//
 // Set sets the PodStatus for the pod.
 func (c *cache) Set(id types.UID, status *PodStatus, err error, timestamp time.Time) {
 	c.lock.Lock()

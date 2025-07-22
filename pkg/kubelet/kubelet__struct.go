@@ -280,6 +280,8 @@ type Kubelet struct {
 	// Generates pod events.
 	pleg pleg.PodLifecycleEventGenerator
 
+	// 生产者: pkg/kubelet/pleg/generic.go -> GenericPLEG.updateCache() 在 g.cache.Set()
+	//
 	// Store kubecontainer.PodStatus for all pods.
 	podCache kubecontainer.Cache
 

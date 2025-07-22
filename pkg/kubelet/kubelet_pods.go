@@ -1239,9 +1239,20 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontaine
 	return &apiPodStatus
 }
 
+// 	@param containers: 参数pod中对应的container列表
+//
+// caller:
+// 	1. Kubelet.convertStatusToAPIStatus()
+//
 // convertToAPIContainerStatuses converts the given internal container
 // statuses into API container statuses.
-func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecontainer.PodStatus, previousStatus []v1.ContainerStatus, containers []v1.Container, hasInitContainers, isInitContainer bool) []v1.ContainerStatus {
+func (kl *Kubelet) convertToAPIContainerStatuses(
+	pod *v1.Pod,
+	podStatus *kubecontainer.PodStatus,
+	previousStatus []v1.ContainerStatus,
+	containers []v1.Container,
+	hasInitContainers, isInitContainer bool,
+) []v1.ContainerStatus {
 	convertContainerStatus := func(cs *kubecontainer.ContainerStatus) *v1.ContainerStatus {
 		cid := cs.ID.String()
 		status := &v1.ContainerStatus{
@@ -1282,13 +1293,14 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		oldStatuses[status.Name] = status
 	}
 
+	// 初始化所有容器的 ContainerStatus (每个容器都有自己的 ContainerStatus)
+	//
 	// Set all container statuses to default waiting state
 	statuses := make(map[string]*v1.ContainerStatus, len(containers))
 	defaultWaitingState := v1.ContainerState{Waiting: &v1.ContainerStateWaiting{Reason: "ContainerCreating"}}
 	if hasInitContainers {
 		defaultWaitingState = v1.ContainerState{Waiting: &v1.ContainerStateWaiting{Reason: "PodInitializing"}}
 	}
-
 	for _, container := range containers {
 		status := &v1.ContainerStatus{
 			Name:  container.Name,
@@ -1309,9 +1321,11 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		}
 		statuses[container.Name] = status
 	}
-
+	// 按照创建时间排序
+	//
 	// Make the latest container status comes first.
 	sort.Sort(sort.Reverse(kubecontainer.SortContainerStatusesByCreationTime(podStatus.ContainerStatuses)))
+
 	// Set container statuses according to the statuses seen in pod status
 	containerSeen := map[string]int{}
 	for _, cStatus := range podStatus.ContainerStatuses {
