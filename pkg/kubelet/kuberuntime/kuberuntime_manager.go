@@ -315,8 +315,10 @@ func (m *kubeGenericRuntimeManager) Status() (*kubecontainer.RuntimeStatus, erro
 // GetPods 使用 docker api, 查询当前主机上运行着的 pause 容器, 然后反向构造 Pod 列表.
 //
 // caller:
-// 	1. pkg/kubelet/images/image_gc_manager.go -> realImageGCManager.detectImages()
-// 	2. pkg/kubelet/pleg/generic.go -> GenericPLEG.relist()
+// 	1. pkg/kubelet/pleg/generic.go -> GenericPLEG.relist()
+//  kubelet 每隔1s检测一次本节点上所有属于 pod 的容器的状态, 但是需要忽略管理员手动创建的容器
+// (如通过 docker run). 因此会先调用此函数查询本节点上的 pod 列表.
+// 	2. pkg/kubelet/images/image_gc_manager.go -> realImageGCManager.detectImages()
 //
 // GetPods returns a list of containers grouped by pods. The boolean parameter
 // specifies whether the runtime returns all containers including those already
@@ -344,12 +346,15 @@ func (m *kubeGenericRuntimeManager) GetPods(all bool) ([]*kubecontainer.Pod, err
 		p := pods[podUID]
 		converted, err := m.sandboxToKubeContainer(s)
 		if err != nil {
-			klog.V(4).Infof("Convert %q sandbox %v of pod %q failed: %v", m.runtimeName, s, podUID, err)
+			klog.V(4).Infof(
+				"Convert %q sandbox %v of pod %q failed: %v",
+				m.runtimeName, s, podUID, err,
+			)
 			continue
 		}
 		p.Sandboxes = append(p.Sandboxes, converted)
 	}
-
+	// 获取当前节点上所有的 container, 并根据 container label 中的 pod uid 找到所属的 Pod.
 	containers, err := m.getKubeletContainers(all)
 	if err != nil {
 		return nil, err
@@ -360,7 +365,7 @@ func (m *kubeGenericRuntimeManager) GetPods(all bool) ([]*kubecontainer.Pod, err
 			klog.V(4).Infof("Container does not have metadata: %+v", c)
 			continue
 		}
-
+		// container 的 label 中包含所属的 pod 的名称, uid 等信息.
 		labelledInfo := getContainerInfoFromLabels(c.Labels)
 		pod, found := pods[labelledInfo.PodUID]
 		if !found {
@@ -374,7 +379,10 @@ func (m *kubeGenericRuntimeManager) GetPods(all bool) ([]*kubecontainer.Pod, err
 
 		converted, err := m.toKubeContainer(c)
 		if err != nil {
-			klog.V(4).Infof("Convert %s container %v of pod %q failed: %v", m.runtimeName, c, labelledInfo.PodUID, err)
+			klog.V(4).Infof(
+				"Convert %s container %v of pod %q failed: %v",
+				m.runtimeName, c, labelledInfo.PodUID, err,
+			)
 			continue
 		}
 
@@ -657,6 +665,9 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 /////////////////////////////////////////////
 // SyncPod() 已拆分
 
+// caller:
+// 	1. pkg/kubelet/kuberuntime/kuberuntime_manager__syncpod.go -> SyncPod() 只有这一处
+//
 // If a container is still in backoff, the function will return a brief backoff error
 // and a detailed error message.
 func (m *kubeGenericRuntimeManager) doBackOff(
@@ -675,7 +686,10 @@ func (m *kubeGenericRuntimeManager) doBackOff(
 		return false, "", nil
 	}
 
-	klog.V(3).Infof("checking backoff for container %q in pod %q", container.Name, format.Pod(pod))
+	klog.V(3).Infof(
+		"checking backoff for container %q in pod %q", 
+		container.Name, format.Pod(pod),
+	)
 	// Use the finished time of the latest exited container
 	// as the start point to calculate whether to do back-off.
 	ts := cStatus.FinishedAt
@@ -683,9 +697,15 @@ func (m *kubeGenericRuntimeManager) doBackOff(
 	key := getStableKey(pod, container)
 	if backOff.IsInBackOffSince(key, ts) {
 		if ref, err := kubecontainer.GenerateContainerRef(pod, container); err == nil {
-			m.recorder.Eventf(ref, v1.EventTypeWarning, events.BackOffStartContainer, "Back-off restarting failed container")
+			m.recorder.Eventf(
+				ref, v1.EventTypeWarning, events.BackOffStartContainer, 
+				"Back-off restarting failed container",
+			)
 		}
-		err := fmt.Errorf("back-off %s restarting failed container=%s pod=%s", backOff.Get(key), container.Name, format.Pod(pod))
+		err := fmt.Errorf(
+			"back-off %s restarting failed container=%s pod=%s", 
+			backOff.Get(key), container.Name, format.Pod(pod),
+		)
 		klog.V(3).Infof("%s", err.Error())
 		return true, err.Error(), kubecontainer.ErrCrashLoopBackOff
 	}
@@ -702,8 +722,11 @@ func (m *kubeGenericRuntimeManager) doBackOff(
 // KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
 // gracePeriodOverride if specified allows the caller to override the pod default grace period.
 // only hard kill paths are allowed to specify a gracePeriodOverride in the kubelet in order to not corrupt user data.
-// it is useful when doing SIGKILL for hard eviction scenarios, or max grace period during soft eviction scenarios.
-func (m *kubeGenericRuntimeManager) KillPod(pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) error {
+// it is useful when doing SIGKILL for hard eviction scenarios,
+// or max grace period during soft eviction scenarios.
+func (m *kubeGenericRuntimeManager) KillPod(
+	pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64,
+) error {
 	err := m.killPodWithSyncResult(pod, runningPod, gracePeriodOverride)
 	return err.Error()
 }
@@ -735,6 +758,9 @@ func (m *kubeGenericRuntimeManager) killPodWithSyncResult(
 	return
 }
 
+// caller:
+// 	1. pkg/kubelet/pleg/generic.go -> GenericPLEG.updateCache()
+//
 // GetPodStatus retrieves the status of the pod, including the
 // information of all containers in the pod that are visible in Runtime.
 func (m *kubeGenericRuntimeManager) GetPodStatus(

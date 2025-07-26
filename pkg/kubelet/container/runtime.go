@@ -41,6 +41,7 @@ type ImageStats struct {
 }
 
 // 	@implementBy: pkg/kubelet/kuberuntime/kuberuntime_manager.go -> kubeGenericRuntimeManager{}
+//	(应该只有这一处实现)
 //
 // Runtime interface defines the interfaces that should be implemented
 // by a container runtime.

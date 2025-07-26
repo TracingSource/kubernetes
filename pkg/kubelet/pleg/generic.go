@@ -47,8 +47,10 @@ type GenericPLEG struct {
 	cache kubecontainer.Cache
 	// For testability.
 	clock clock.Clock
-	// Pods that failed to have their status retrieved during a relist. These pods will be
-	// retried during the next relisting.
+	// 重试队列
+	//
+	// Pods that failed to have their status retrieved during a relist.
+	// These pods will be retried during the next relisting.
 	podsToReinspect map[types.UID]*kubecontainer.Pod
 }
 
@@ -69,7 +71,7 @@ const (
 	relistThreshold = 3 * time.Minute
 )
 
-// caller: 
+// caller:
 // 	1. getContainerState()
 func convertState(state kubecontainer.ContainerState) plegContainerState {
 	switch state {
@@ -94,6 +96,8 @@ type podRecord struct {
 
 type podRecords map[types.UID]*podRecord
 
+// 	@param relistPeriod: pkg/kubelet/kubelet.go -> plegRelistPeriod 常量值为 1s
+//
 // caller:
 // 	1. pkg/kubelet/kubelet__new.go -> NewMainKubelet() 只有这一处
 //
@@ -119,7 +123,9 @@ func (g *GenericPLEG) Watch() chan *PodLifecycleEvent {
 	return g.eventChannel
 }
 
-// caller: 
+// Start 开启定时器, 每隔1s从本地 docker/containerd 获取所有容器的运行状态.
+//
+// caller:
 // 	1. pkg/kubelet/kubelet.go -> Kubelet.Run() kubelet 启动后被调用
 //
 // Start spawns a goroutine to relist periodically.
@@ -141,10 +147,13 @@ func (g *GenericPLEG) Healthy() (bool, error) {
 	return true, nil
 }
 
-// caller: 
+// 	@param oldState: running/exited/unknown 等状态字符串.
+// 	@param newState: running/exited/unknown 等状态字符串.
+//
+// caller:
 // 	1. computeEvents()
 func generateEvents(
-	podID types.UID, cid string, 
+	podID types.UID, cid string,
 	oldState, newState plegContainerState,
 ) []*PodLifecycleEvent {
 	if newState == oldState {
@@ -184,8 +193,10 @@ func (g *GenericPLEG) updateRelistTime(timestamp time.Time) {
 	g.relistTime.Store(timestamp)
 }
 
-// caller: 
-// 	1. GenericPLEG.Start()
+// relist 每隔1s从本地 docker/containerd 获取所有容器的运行状态.
+//
+// caller:
+// 	1. GenericPLEG.Start() 只有这一处
 //
 // relist queries the container runtime for list of pods/containers, compare
 // with the internal pods/containers, and generates events accordingly.
@@ -203,6 +214,7 @@ func (g *GenericPLEG) relist() {
 		metrics.DeprecatedPLEGRelistLatency.Observe(metrics.SinceInMicroseconds(timestamp))
 	}()
 
+	// GenericPLEG 只维护属于 Pod 的容器, 对于管理员自行创建的容器(如通过 docker run)是不管的.
 	// 注意: 这里的 podList 并不是标准的 coreve.Pod{} 对象列表.
 	// Get all the pods.
 	podList, err := g.runtime.GetPods(true)
@@ -218,6 +230,8 @@ func (g *GenericPLEG) relist() {
 	updateRunningPodAndContainerMetrics(pods)
 	g.podRecords.setCurrent(pods)
 
+	// 对比新旧容器, 生成事件.
+	//
 	// Compare the old and the current pods, and generate events.
 	eventsByPodID := map[types.UID][]*PodLifecycleEvent{}
 	// pid = pod uid
@@ -239,24 +253,28 @@ func (g *GenericPLEG) relist() {
 		needsReinspection = make(map[types.UID]*kubecontainer.Pod)
 	}
 
-	// If there are events associated with a pod, we should update the
-	// podCache.
+	// 遍历发生变动的事件列表, 将对应的 pod 的状态更新到本地缓存
+	//
+	// If there are events associated with a pod, we should update the podCache.
 	for pid, events := range eventsByPodID {
 		pod := g.podRecords.getCurrent(pid)
 		if g.cacheEnabled() {
 			// updateCache() will inspect the pod and update the cache. If an
 			// error occurs during the inspection, we want PLEG to retry again
-			// in the next relist. To achieve this, we do not update the
-			// associated podRecord of the pod, so that the change will be
-			// detect again in the next relist.
+			// in the next relist.
+			// To achieve this, we do not update the associated podRecord of the pod,
+			// so that the change will be detect again in the next relist.
 			// TODO: If many pods changed during the same relist period,
 			// inspecting the pod and getting the PodStatus to update the cache
-			// serially may take a while. We should be aware of this and
-			// parallelize if needed.
+			// serially may take a while.
+			// We should be aware of this and parallelize if needed.
 			if err := g.updateCache(pod, pid); err != nil {
 				// Rely on updateCache calling GetPodStatus to log the actual error.
-				klog.V(4).Infof("PLEG: Ignoring events for pod %s/%s: %v", pod.Name, pod.Namespace, err)
-
+				klog.V(4).Infof(
+					"PLEG: Ignoring events for pod %s/%s: %v", 
+					pod.Name, pod.Namespace, err,
+				)
+				// 本次relist缓存更新失败, 需要下次重试.
 				// make sure we try to reinspect the pod during the next relisting
 				needsReinspection[pid] = pod
 
@@ -308,7 +326,7 @@ func (g *GenericPLEG) relist() {
 
 // getContainersFromPods 从目标 pod 对象中, 取出 containers 列表(含 pause 容器).
 //
-// caller: 
+// caller:
 // 	1. GenericPLEG.relist()
 func getContainersFromPods(pods ...*kubecontainer.Pod) []*kubecontainer.Container {
 	cidSet := sets.NewString()
@@ -346,12 +364,14 @@ func getContainersFromPods(pods ...*kubecontainer.Pod) []*kubecontainer.Containe
 func computeEvents(
 	oldPod, newPod *kubecontainer.Pod, cid *kubecontainer.ContainerID,
 ) []*PodLifecycleEvent {
+	// 这里的 pid 为 pod 的 uid
 	var pid types.UID
 	if oldPod != nil {
 		pid = oldPod.ID
 	} else if newPod != nil {
 		pid = newPod.ID
 	}
+	// oldState/newState 为 running/exited/unknown 等状态字符串.
 	oldState := getContainerState(oldPod, cid)
 	newState := getContainerState(newPod, cid)
 	return generateEvents(pid, cid.ID, oldState, newState)
@@ -426,7 +446,7 @@ func (g *GenericPLEG) updateCache(pod *kubecontainer.Pod, pid types.UID) error {
 
 // updateEvents 将传入的 event 对象 append 到 eventsByPodID 列表中(如果不为 nil 的话)
 //
-// caller: 
+// caller:
 // 	1. GenericPLEG.relist()
 func updateEvents(eventsByPodID map[types.UID][]*PodLifecycleEvent, e *PodLifecycleEvent) {
 	if e == nil {
@@ -435,8 +455,8 @@ func updateEvents(eventsByPodID map[types.UID][]*PodLifecycleEvent, e *PodLifecy
 	eventsByPodID[e.ID] = append(eventsByPodID[e.ID], e)
 }
 
-// caller: 
-// 	1. computeEvents()
+// caller:
+// 	1. computeEvents() 只有这一处.
 func getContainerState(pod *kubecontainer.Pod, cid *kubecontainer.ContainerID) plegContainerState {
 	// Default to the non-existent state.
 	state := plegContainerNonExistent
@@ -456,7 +476,7 @@ func getContainerState(pod *kubecontainer.Pod, cid *kubecontainer.ContainerID) p
 	return state
 }
 
-// caller: 
+// caller:
 // 	1. GenericPLEG.relist()
 func updateRunningPodAndContainerMetrics(pods []*kubecontainer.Pod) {
 	// Set the number of running pods in the parameter
@@ -498,7 +518,7 @@ func (pr podRecords) getCurrent(id types.UID) *kubecontainer.Pod {
 //
 // @param pods: 当前主机上运行着的 Pod 列表.
 //
-// caller: 
+// caller:
 // 	1. GenericPLEG.relist() 只有这一处
 func (pr podRecords) setCurrent(pods []*kubecontainer.Pod) {
 	for i := range pr {

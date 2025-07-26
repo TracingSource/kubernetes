@@ -196,9 +196,12 @@ func (r *RemoteRuntimeService) RemoveContainer(containerID string) error {
 
 // caller:
 // 	1. pkg/kubelet/kuberuntime/instrumented_services.go -> instrumentedRuntimeService.ListContainers()
+// 	2. pkg/kubelet/kuberuntime/kuberuntime_container.go -> kubeGenericRuntimeManager.getKubeletContainers()
 //
 // ListContainers lists containers by filters.
-func (r *RemoteRuntimeService) ListContainers(filter *runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error) {
+func (r *RemoteRuntimeService) ListContainers(
+	filter *runtimeapi.ContainerFilter,
+) ([]*runtimeapi.Container, error) {
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
@@ -206,7 +209,10 @@ func (r *RemoteRuntimeService) ListContainers(filter *runtimeapi.ContainerFilter
 		Filter: filter,
 	})
 	if err != nil {
-		klog.Errorf("ListContainers with filter %+v from runtime service failed: %v", filter, err)
+		klog.Errorf(
+			"ListContainers with filter %+v from runtime service failed: %v", 
+			filter, err,
+		)
 		return nil, err
 	}
 

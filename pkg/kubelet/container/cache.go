@@ -10,6 +10,7 @@ import (
 // 	@implementBy: cache{}
 //
 // 生产者: pkg/kubelet/pleg/generic.go -> GenericPLEG.updateCache() 在 g.cache.Set()
+// 消费者: pkg/kubelet/pod_workers.go -> managePodLoop() 调用 p.podCache.GetNewerThan()
 //
 // Cache stores the PodStatus for the pods. It represents *all* the visible
 // pods/containers in the container runtime. All cache entries are at least as
@@ -52,6 +53,7 @@ type subRecord struct {
 type cache struct {
 	// Lock which guards all internal data structures.
 	lock sync.RWMutex
+	// key 为 pod 的 uid, value 为该 pod 的 status 信息.
 	// Map that stores the pod statuses.
 	pods map[types.UID]*data
 	// A global timestamp represents how fresh the cached data is. All
@@ -77,14 +79,19 @@ func (c *cache) Get(id types.UID) (*PodStatus, error) {
 	return d.status, d.err
 }
 
+// calleer:
+// 	1. pkg/kubelet/pod_workers.go -> podWorkers.managePodLoop() 只有这一处
+//  循环从 cache 获取目标 pod 的最新状态.
 func (c *cache) GetNewerThan(id types.UID, minTime time.Time) (*PodStatus, error) {
 	ch := c.subscribe(id, minTime)
 	d := <-ch
 	return d.status, d.err
 }
 
+// 	@param id: pod 的 uid
+//
 // caller:
-// 	1. pkg/kubelet/pleg/generic.go -> GenericPLEG.updateCache()
+// 	1. pkg/kubelet/pleg/generic.go -> GenericPLEG.updateCache() 只有这一处
 //
 // Set sets the PodStatus for the pod.
 func (c *cache) Set(id types.UID, status *PodStatus, err error, timestamp time.Time) {

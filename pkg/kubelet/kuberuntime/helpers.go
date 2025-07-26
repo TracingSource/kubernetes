@@ -70,7 +70,9 @@ func toRuntimeProtocol(protocol v1.Protocol) runtimeapi.Protocol {
 }
 
 // toKubeContainer converts runtimeapi.Container to kubecontainer.Container.
-func (m *kubeGenericRuntimeManager) toKubeContainer(c *runtimeapi.Container) (*kubecontainer.Container, error) {
+func (m *kubeGenericRuntimeManager) toKubeContainer(
+	c *runtimeapi.Container,
+) (*kubecontainer.Container, error) {
 	if c == nil || c.Id == "" || c.Image == nil {
 		return nil, fmt.Errorf("unable to convert a nil pointer to a runtime container")
 	}
