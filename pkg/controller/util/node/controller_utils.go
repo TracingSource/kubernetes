@@ -99,6 +99,13 @@ func SetPodTerminationReason(kubeClient clientset.Interface, pod *v1.Pod, nodeNa
 	return updatedPod, nil
 }
 
+//
+// caller:
+// 	1. pkg/controller/nodelifecycle/node_lifecycle_controller.go -> Controller.monitorNodeHealth()
+// 		监测到节点 NotReady 后, 顺手将该节点上的所有 Pod 标记为 NotReady.
+// 		该操作会将该节点的 Pod IP 从他们所属的 endpoint 中移除, addresses[] -> notReadyAddresses[]
+// 		但是 Pod 的状态仍然需要 NotReady 超过5分钟后才会由 running 变更 terminating
+// 	2. pkg/controller/nodelifecycle/node_lifecycle_controller.go -> Controller.processPod()
 // MarkPodsNotReady updates ready status of given pods running on
 // given node from master return true if success
 func MarkPodsNotReady(kubeClient clientset.Interface, pods []*v1.Pod, nodeName string) error {
@@ -161,13 +168,13 @@ func RecordNodeStatusChange(recorder record.EventRecorder, node *v1.Node, newSta
 		Namespace: "",
 	}
 	klog.V(2).Infof(
-		"Recording status change %s event message for node %s", 
+		"Recording status change %s event message for node %s",
 		newStatus, node.Name,
 	)
 	// TODO: This requires a transaction, either both node status is updated
 	// and event is recorded or neither should happen, see issue #6055.
 	recorder.Eventf(
-		ref, v1.EventTypeNormal, newStatus, 
+		ref, v1.EventTypeNormal, newStatus,
 		"Node %s status is now: %s", node.Name, newStatus,
 	)
 }
