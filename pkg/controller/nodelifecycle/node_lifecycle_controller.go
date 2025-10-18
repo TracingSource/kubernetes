@@ -798,12 +798,14 @@ func (nc *Controller) monitorNodeHealth() error {
 	if err != nil {
 		return err
 	}
+	// kube-controller-manager 启动时(且抢占到分布式锁), added 列表包含集群中所有节点,
+	// 另外两个列表则为空
 	added, deleted, newZoneRepresentatives := nc.classifyNodes(nodes)
 
 	for i := range newZoneRepresentatives {
 		nc.addPodEvictorForNewZone(newZoneRepresentatives[i])
 	}
-
+	// added 新增节点加入
 	for i := range added {
 		klog.V(1).Infof("Controller observed a new Node: %#v", added[i].Name)
 		nodeutil.RecordNodeEvent(
@@ -1034,6 +1036,10 @@ func legacyIsMasterNode(nodeName string) bool {
 	return false
 }
 
+// tryUpdateNodeHealth 更新节点状态
+//
+// 	@param node: 目标node最新的状态
+//
 // tryUpdateNodeHealth checks a given node's conditions and tries to update it.
 // Returns grace period to which given node is entitled, state of current
 // and last observed Ready Condition, and an error if it occurred.
@@ -1047,6 +1053,8 @@ func (nc *Controller) tryUpdateNodeHealth(node *v1.Node) (time.Duration, v1.Node
 	var observedReadyCondition v1.NodeCondition
 	_, currentReadyCondition := nodeutil.GetNodeCondition(&node.Status, v1.NodeReady)
 	if currentReadyCondition == nil {
+		// 节点刚加入, kubelet 还未上报过状态.
+		//
 		// If ready condition is nil, then kubelet (or nodecontroller) never posted node status.
 		// A fake ready condition is created, where LastHeartbeatTime and LastTransitionTime is set
 		// to node.CreationTimestamp to avoid handle the corner case.
